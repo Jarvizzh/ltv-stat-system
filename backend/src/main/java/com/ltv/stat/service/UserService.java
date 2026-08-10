@@ -1,0 +1,260 @@
+package com.ltv.stat.service;
+
+import com.ltv.stat.entity.SysUser;
+import com.ltv.stat.entity.UserLandingPage;
+import com.ltv.stat.repository.SysUserRepository;
+import com.ltv.stat.repository.UserLandingPageRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.PostConstruct;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@Transactional
+public class UserService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
+
+    private final SysUserRepository sysUserRepository;
+    private final UserLandingPageRepository userLandingPageRepository;
+
+    @Value("${app.auth.username:superadmin}")
+    private String defaultSuperAdminUsername;
+
+    @Value("${app.auth.password:superadmin}")
+    private String defaultSuperAdminPassword;
+
+    public UserService(SysUserRepository sysUserRepository, UserLandingPageRepository userLandingPageRepository) {
+        this.sysUserRepository = sysUserRepository;
+        this.userLandingPageRepository = userLandingPageRepository;
+    }
+
+    @PostConstruct
+    @Transactional
+    public void initDefaultUsers() {
+        // 1. 初始化或升级默认超级管理员 superadmin (SUPER_ADMIN)
+        Optional<SysUser> superAdminOpt = sysUserRepository.findByUsername(defaultSuperAdminUsername);
+        if (!superAdminOpt.isPresent()) {
+            SysUser superAdmin = new SysUser();
+            superAdmin.setUsername(defaultSuperAdminUsername);
+            superAdmin.setPasswordHash(hashPassword(defaultSuperAdminPassword));
+            superAdmin.setRole("SUPER_ADMIN");
+            superAdmin.setStatus(1);
+            sysUserRepository.save(superAdmin);
+            log.info("Initialized default super admin user: {}", defaultSuperAdminUsername);
+        } else {
+            SysUser superAdmin = superAdminOpt.get();
+            if (!"SUPER_ADMIN".equalsIgnoreCase(superAdmin.getRole())) {
+                superAdmin.setRole("SUPER_ADMIN");
+                sysUserRepository.save(superAdmin);
+                log.info("Ensured super admin user role: {}", defaultSuperAdminUsername);
+            }
+        }
+
+        // 2. 确保 admin 账号角色归位为普通管理员 ADMIN
+        Optional<SysUser> adminOpt = sysUserRepository.findByUsername("admin");
+        if (adminOpt.isPresent()) {
+            SysUser admin = adminOpt.get();
+            if ("SUPER_ADMIN".equalsIgnoreCase(admin.getRole())) {
+                admin.setRole("ADMIN");
+                sysUserRepository.save(admin);
+                log.info("Reset admin user role back to ADMIN");
+            }
+        } else {
+            SysUser admin = new SysUser();
+            admin.setUsername("admin");
+            admin.setPasswordHash(hashPassword("admin666"));
+            admin.setRole("ADMIN");
+            admin.setStatus(1);
+            sysUserRepository.save(admin);
+            log.info("Initialized default admin user: admin");
+        }
+    }
+
+    public Optional<SysUser> findByUsername(String username) {
+        return sysUserRepository.findByUsername(username);
+    }
+
+    public Optional<SysUser> findById(Long id) {
+        return sysUserRepository.findById(id);
+    }
+
+    public List<SysUser> listAllUsers() {
+        return sysUserRepository.findAllByOrderByCreatedAtDesc();
+    }
+
+    public boolean validatePassword(SysUser user, String rawPassword) {
+        if (user == null || rawPassword == null) return false;
+        return user.getPasswordHash().equals(hashPassword(rawPassword));
+    }
+
+    @Transactional
+    public SysUser createUser(String username, String rawPassword, String role) {
+        if (sysUserRepository.existsByUsername(username)) {
+            throw new IllegalArgumentException("用户名已存在: " + username);
+        }
+        SysUser user = new SysUser();
+        user.setUsername(username.trim());
+        user.setPasswordHash(hashPassword(rawPassword));
+        user.setRole(role != null ? role.toUpperCase() : "USER");
+        user.setStatus(1);
+        return sysUserRepository.save(user);
+    }
+
+    @Transactional
+    public void resetPassword(Long userId, String newRawPassword) {
+        SysUser user = sysUserRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
+        user.setPasswordHash(hashPassword(newRawPassword));
+        sysUserRepository.save(user);
+    }
+
+    @Transactional
+    public void updateUserRole(Long userId, String newRole) {
+        SysUser user = sysUserRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
+        user.setRole(newRole != null ? newRole.toUpperCase() : "USER");
+        sysUserRepository.save(user);
+    }
+
+    @Transactional
+    public void updateUserStatus(Long userId, Integer status) {
+        SysUser user = sysUserRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
+        user.setStatus(status);
+        sysUserRepository.save(user);
+    }
+
+    @Transactional
+    public void deleteUser(Long userId) {
+        userLandingPageRepository.deleteByUserId(userId);
+        sysUserRepository.deleteById(userId);
+    }
+
+    public Set<String> getAdminLandingPageIds(Long excludeUserId) {
+        List<SysUser> adminUsers = sysUserRepository.findAll().stream()
+                .filter(u -> "ADMIN".equalsIgnoreCase(u.getRole()) || "SUPER_ADMIN".equalsIgnoreCase(u.getRole()))
+                .filter(u -> excludeUserId == null || !u.getId().equals(excludeUserId))
+                .collect(Collectors.toList());
+        Set<String> adminPids = new HashSet<>();
+        for (SysUser admin : adminUsers) {
+            List<UserLandingPage> pages = userLandingPageRepository.findByUserId(admin.getId());
+            for (UserLandingPage page : pages) {
+                if (page.getLandingPageId() != null && !page.getLandingPageId().trim().isEmpty()) {
+                    adminPids.add(page.getLandingPageId().trim());
+                }
+            }
+        }
+        return adminPids;
+    }
+
+    public List<String> getUserLandingPageIds(Long userId) {
+        if (userId == null) return Collections.emptyList();
+        SysUser user = sysUserRepository.findById(userId).orElse(null);
+        List<String> pids = userLandingPageRepository.findByUserId(userId).stream()
+                .map(UserLandingPage::getLandingPageId)
+                .filter(pid -> pid != null && !pid.trim().isEmpty())
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        // 如果是普通用户 (USER)，剔除任何已被管理员 (ADMIN / SUPER_ADMIN) 配置的隔离落地页 ID
+        if (user != null && "USER".equalsIgnoreCase(user.getRole())) {
+            Set<String> adminPids = getAdminLandingPageIds(userId);
+            pids = pids.stream().filter(pid -> !adminPids.contains(pid)).collect(Collectors.toList());
+        }
+        return pids;
+    }
+
+    public List<com.ltv.stat.dto.LandingPageConfigItem> getUserLandingPageConfigs(Long userId) {
+        if (userId == null) return Collections.emptyList();
+        SysUser user = sysUserRepository.findById(userId).orElse(null);
+        List<UserLandingPage> list = userLandingPageRepository.findByUserId(userId);
+
+        // 如果是普通用户 (USER)，剔除已被管理员配置的隔离落地页 ID
+        if (user != null && "USER".equalsIgnoreCase(user.getRole())) {
+            Set<String> adminPids = getAdminLandingPageIds(userId);
+            list = list.stream()
+                    .filter(ulp -> ulp.getLandingPageId() != null && !adminPids.contains(ulp.getLandingPageId().trim()))
+                    .collect(Collectors.toList());
+        }
+
+        return list.stream()
+                .map(ulp -> new com.ltv.stat.dto.LandingPageConfigItem(ulp.getLandingPageId(), ulp.getTimezone()))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void updateUserLandingPageConfigs(Long userId, List<com.ltv.stat.dto.LandingPageConfigItem> items) {
+        SysUser user = sysUserRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
+
+        // 如果是普通用户 (USER)，拦截校验：不允许配置已被管理员 (ADMIN / SUPER_ADMIN) 配置的独占隔离落地页
+        if ("USER".equalsIgnoreCase(user.getRole())) {
+            Set<String> adminPids = getAdminLandingPageIds(userId);
+            if (items != null) {
+                for (com.ltv.stat.dto.LandingPageConfigItem item : items) {
+                    if (item != null && item.getLandingPageId() != null) {
+                        String pid = item.getLandingPageId().trim();
+                        if (adminPids.contains(pid)) {
+                            throw new IllegalArgumentException("落地页 ID [" + pid + "] 为管理员独占/隔离落地页，普通用户无法配置！");
+                        }
+                    }
+                }
+            }
+        }
+
+        userLandingPageRepository.deleteByUserId(userId);
+        userLandingPageRepository.flush();
+        if (items != null) {
+            Map<String, String> pidTzMap = new java.util.LinkedHashMap<>();
+            for (com.ltv.stat.dto.LandingPageConfigItem item : items) {
+                if (item != null && item.getLandingPageId() != null && !item.getLandingPageId().trim().isEmpty()) {
+                    String pid = item.getLandingPageId().trim();
+                    String tz = (item.getTimezone() != null && "ET".equalsIgnoreCase(item.getTimezone().trim())) ? "ET" : "BJ";
+                    pidTzMap.put(pid, tz);
+                }
+            }
+
+            List<UserLandingPage> list = new ArrayList<>();
+            for (Map.Entry<String, String> entry : pidTzMap.entrySet()) {
+                UserLandingPage ulp = new UserLandingPage();
+                ulp.setUserId(userId);
+                ulp.setLandingPageId(entry.getKey());
+                ulp.setTimezone(entry.getValue());
+                list.add(ulp);
+            }
+            userLandingPageRepository.saveAll(list);
+            userLandingPageRepository.flush();
+        }
+    }
+
+    @Transactional
+    public void updateUserLandingPageIds(Long userId, List<String> pageIds) {
+        if (pageIds == null) {
+            updateUserLandingPageConfigs(userId, Collections.emptyList());
+            return;
+        }
+        List<com.ltv.stat.dto.LandingPageConfigItem> items = pageIds.stream()
+                .filter(id -> id != null && !id.trim().isEmpty())
+                .map(id -> new com.ltv.stat.dto.LandingPageConfigItem(id.trim(), "BJ"))
+                .collect(Collectors.toList());
+        updateUserLandingPageConfigs(userId, items);
+    }
+
+    public static String hashPassword(String rawPassword) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(("zw-ltv-salt-" + rawPassword).getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(hash);
+        } catch (Exception e) {
+            return rawPassword;
+        }
+    }
+}

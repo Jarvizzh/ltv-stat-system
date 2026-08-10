@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: zw-ltv
+  datasource:
+    url: jdbc:mysql://localhost:3306/meta_zw_ltv?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: 123456
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+
+order:
+  api:
+    url: https://admin-api.rocnovel.com/ad/recharge/order/report/list
+    authorization: 0451eaf3-dd00-499d-87b7-de4be2d18a43
+    cookie: JSESSIONID=b959ba11-507c-4f63-8a01-b16ab37f96f4
+    client-group-id: "405323222546395136"
+
+app:
+  auth:
+    username: superadmin
+    password: superadmin
+    token-expire-days: 3
