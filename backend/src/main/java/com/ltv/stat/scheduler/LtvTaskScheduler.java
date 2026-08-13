@@ -54,6 +54,24 @@ public class LtvTaskScheduler {
     }
 
     /**
+     * 北京时间每天凌晨 00:40 分: 定时拉取全量订单 (从 2026-07-10 至今)
+     */
+    @Scheduled(cron = "0 40 0 * * ?", zone = "Asia/Shanghai")
+    public void scheduledFullOrderFetch() {
+        log.info("Starting scheduled full order fetch at 00:40 BJ Time (from 2026-07-10 to today)");
+        LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
+        String startTimeStr = "2026-07-10";
+        String endTimeStr = todayBj.format(DATE_FORMATTER);
+
+        try {
+            orderSyncService.syncOrdersAll(startTimeStr, endTimeStr);
+        } catch (Exception e) {
+            log.error("Scheduled full order fetch failed", e);
+        }
+        log.info("Scheduled full order fetch finished.");
+    }
+
+    /**
      * 北京时间每小时 30 分 (例如 00:30, 01:30, ..., 23:30): 定时全量统计 LTV 数据
      */
     @Scheduled(cron = "0 30 * * * ?", zone = "Asia/Shanghai")
