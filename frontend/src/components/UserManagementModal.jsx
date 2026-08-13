@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Users, UserPlus, KeyRound, Trash2, X, Check, Shield, User } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Users, UserPlus, KeyRound, Trash2, X, Check, Eye } from 'lucide-react';
 import CustomSelect from './CustomSelect';
 
 const ROLE_OPTIONS = [
@@ -8,7 +8,7 @@ const ROLE_OPTIONS = [
   { label: '超级管理员', value: 'SUPER_ADMIN' },
 ];
 
-export default function UserManagementModal({ isOpen, onClose, token, onRefreshUsers, showToast }) {
+export default function UserManagementModal({ isOpen, onClose, token, currentUser, onRefreshUsers, showToast }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -17,6 +17,20 @@ export default function UserManagementModal({ isOpen, onClose, token, onRefreshU
   const [newRole, setNewRole] = useState('USER');
   const [editingPasswordUserId, setEditingPasswordUserId] = useState(null);
   const [resetPasswordVal, setResetPasswordVal] = useState('');
+
+  const [editingViewPermissionUserId, setEditingViewPermissionUserId] = useState(null);
+  const [selectedViewPermissionIds, setSelectedViewPermissionIds] = useState([]);
+  const expandedRowRef = useRef(null);
+
+  const isSuperAdmin = currentUser && currentUser.role === 'SUPER_ADMIN';
+
+  useEffect(() => {
+    if (editingViewPermissionUserId && expandedRowRef.current) {
+      setTimeout(() => {
+        expandedRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    }
+  }, [editingViewPermissionUserId]);
 
   const fetchUsers = async () => {
     if (!token) return;
@@ -44,6 +58,7 @@ export default function UserManagementModal({ isOpen, onClose, token, onRefreshU
       fetchUsers();
       setShowAddForm(false);
       setEditingPasswordUserId(null);
+      setEditingViewPermissionUserId(null);
     }
   }, [isOpen]);
 
@@ -130,6 +145,29 @@ export default function UserManagementModal({ isOpen, onClose, token, onRefreshU
     }
   };
 
+  const handleSaveViewPermissions = async (userId) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/view-permissions`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ targetUserIds: selectedViewPermissionIds })
+      });
+      const data = await res.json();
+      if (res.ok && data.code === 0) {
+        if (showToast) showToast('只读视图权限分配成功！', 'success');
+        setEditingViewPermissionUserId(null);
+        fetchUsers();
+      } else {
+        if (showToast) showToast(data.msg || '保存视图权限失败', 'error');
+      }
+    } catch (e) {
+      if (showToast) showToast('保存视图权限异常', 'error');
+    }
+  };
+
   const handleDeleteUser = async (user) => {
     if (!window.confirm(`确定要删除用户 "${user.username}" 吗？此操作无法撤销。`)) return;
     try {
@@ -149,11 +187,19 @@ export default function UserManagementModal({ isOpen, onClose, token, onRefreshU
     }
   };
 
+  const toggleViewPermissionCheckbox = (targetId) => {
+    if (selectedViewPermissionIds.includes(targetId)) {
+      setSelectedViewPermissionIds(selectedViewPermissionIds.filter(id => id !== targetId));
+    } else {
+      setSelectedViewPermissionIds([...selectedViewPermissionIds, targetId]);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card modal-card-lg" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 650 }}>
+      <div className="modal-card modal-card-lg" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700 }}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Users size={20} className="modal-header-icon" />
@@ -167,7 +213,7 @@ export default function UserManagementModal({ isOpen, onClose, token, onRefreshU
         <div className="modal-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-sub)' }}>
-              管理员可以自由创建新账号、重置密码以及灵活修改用户角色权限。
+              管理员可灵活管理用户账号。超级管理员可分配登录账户可见的其他只读视图权限。
             </p>
             <button
               className="btn btn-primary"
@@ -224,93 +270,190 @@ export default function UserManagementModal({ isOpen, onClose, token, onRefreshU
           {loading ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-sub)' }}>加载用户列表中...</div>
           ) : (
-            <div className="user-table-container" style={{ paddingBottom: '80px' }}>
+            <div className="user-table-container" style={{ paddingBottom: '180px' }}>
               <table className="user-mgmt-table">
                 <thead>
                   <tr>
-                    <th style={{ width: 60 }}>ID</th>
+                    <th style={{ width: 50 }}>ID</th>
                     <th>账号名称</th>
                     <th>角色权限 (点击切换)</th>
+                    {isSuperAdmin && <th>分配可见视图</th>}
                     <th style={{ width: 140, textAlign: 'right' }}>操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map(u => (
-                    <React.Fragment key={u.id}>
-                      <tr>
-                        <td>{u.id}</td>
-                        <td>
-                          <span style={{ fontWeight: 600 }}>{u.username}</span>
-                        </td>
-                        <td>
-                          <CustomSelect
-                            value={u.role}
-                            onChange={(val) => handleUpdateRole(u.id, val)}
-                            options={ROLE_OPTIONS}
-                            placement="auto"
-                            style={{ width: '120px' }}
-                          />
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                            <button
-                              className="btn btn-secondary"
-                              style={{ padding: '0.25rem 0.4rem', fontSize: '0.75rem' }}
-                              title="修改密码"
-                              onClick={() => {
-                                setEditingPasswordUserId(editingPasswordUserId === u.id ? null : u.id);
-                                setResetPasswordVal('');
-                              }}
-                            >
-                              <KeyRound size={13} />
-                            </button>
-
-                            <button
-                              className="btn btn-secondary"
-                              style={{ padding: '0.25rem 0.4rem', fontSize: '0.75rem', color: 'var(--accent-rose)' }}
-                              title="删除用户"
-                              onClick={() => handleDeleteUser(u)}
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      {editingPasswordUserId === u.id && (
+                  {users.map(u => {
+                    const visibleCount = u.visibleUserIds ? u.visibleUserIds.length : 0;
+                    return (
+                      <React.Fragment key={u.id}>
                         <tr>
-                          <td colSpan={4} style={{ background: 'var(--bg-secondary)', padding: '0.75rem 1rem' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', maxWidth: 450 }}>
-                              <span style={{ fontSize: '0.85rem', color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>
-                                设置 [{u.username}] 新密码:
-                              </span>
-                              <input
-                                type="password"
-                                className="form-input"
-                                placeholder="输入新密码"
-                                value={resetPasswordVal}
-                                onChange={(e) => setResetPasswordVal(e.target.value)}
-                                style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
-                              />
-                              <button
-                                className="btn btn-primary"
-                                style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
-                                onClick={() => handleResetPassword(u.id)}
-                              >
-                                保存
-                              </button>
+                          <td>{u.id}</td>
+                          <td>
+                            <span style={{ fontWeight: 600 }}>{u.username}</span>
+                          </td>
+                          <td>
+                            <CustomSelect
+                              value={u.role}
+                              onChange={(val) => handleUpdateRole(u.id, val)}
+                              options={ROLE_OPTIONS}
+                              placement="auto"
+                              style={{ width: '120px' }}
+                            />
+                          </td>
+                          {isSuperAdmin && (
+                            <td>
+                              {u.role === 'SUPER_ADMIN' ? (
+                                <span style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 500 }} title="超级管理员无需分配，默认可见所有账户视图">
+                                  全量可看 (无需分配)
+                                </span>
+                              ) : (
+                                <button
+                                  className="btn btn-secondary"
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', gap: '0.3rem' }}
+                                  title="点击分配该账户可查看的其他账户视图（只读）"
+                                  onClick={() => {
+                                    if (editingViewPermissionUserId === u.id) {
+                                      setEditingViewPermissionUserId(null);
+                                    } else {
+                                      setEditingViewPermissionUserId(u.id);
+                                      setEditingPasswordUserId(null);
+                                      setSelectedViewPermissionIds(u.visibleUserIds || []);
+                                    }
+                                  }}
+                                >
+                                  <Eye size={13} color="#6366f1" />
+                                  <span>{visibleCount > 0 ? `已分配 ${visibleCount} 个` : '分配视图'}</span>
+                                </button>
+                              )}
+                            </td>
+                          )}
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                               <button
                                 className="btn btn-secondary"
-                                style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }}
-                                onClick={() => setEditingPasswordUserId(null)}
+                                style={{ padding: '0.25rem 0.4rem', fontSize: '0.75rem' }}
+                                title="修改密码"
+                                onClick={() => {
+                                  setEditingPasswordUserId(editingPasswordUserId === u.id ? null : u.id);
+                                  setEditingViewPermissionUserId(null);
+                                  setResetPasswordVal('');
+                                }}
                               >
-                                取消
+                                <KeyRound size={13} />
+                              </button>
+
+                              <button
+                                className="btn btn-secondary"
+                                style={{ padding: '0.25rem 0.4rem', fontSize: '0.75rem', color: 'var(--accent-rose)' }}
+                                title="删除用户"
+                                onClick={() => handleDeleteUser(u)}
+                              >
+                                <Trash2 size={13} />
                               </button>
                             </div>
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
+
+                        {/* 修改密码展开行 */}
+                        {editingPasswordUserId === u.id && (
+                          <tr>
+                            <td colSpan={isSuperAdmin ? 5 : 4} style={{ background: 'var(--bg-secondary)', padding: '0.75rem 1rem' }}>
+                              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'nowrap', width: '100%', maxWidth: 560 }}>
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text-sub)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                  设置 [{u.username}] 新密码:
+                                </span>
+                                <input
+                                  type="password"
+                                  className="form-input"
+                                  placeholder="输入新密码"
+                                  value={resetPasswordVal}
+                                  onChange={(e) => setResetPasswordVal(e.target.value)}
+                                  style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', flex: 1, minWidth: 120 }}
+                                />
+                                <button
+                                  className="btn btn-primary"
+                                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', whiteSpace: 'nowrap', flexShrink: 0 }}
+                                  onClick={() => handleResetPassword(u.id)}
+                                >
+                                  保存
+                                </button>
+                                <button
+                                  className="btn btn-secondary"
+                                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', whiteSpace: 'nowrap', flexShrink: 0 }}
+                                  onClick={() => setEditingPasswordUserId(null)}
+                                >
+                                  取消
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* 分配只读视图权限展开行 */}
+                        {isSuperAdmin && editingViewPermissionUserId === u.id && (
+                          <tr ref={expandedRowRef}>
+                            <td colSpan={5} style={{ background: 'var(--bg-secondary)', padding: '0.85rem 1rem', borderTop: '1px solid var(--border-color)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                                    勾选允许账号 <span style={{ color: '#6366f1' }}>[{u.username}]</span> 跨视图查看（只读）的其他账户：
+                                  </span>
+                                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                    <button
+                                      className="btn btn-primary"
+                                      style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                                      onClick={() => handleSaveViewPermissions(u.id)}
+                                    >
+                                      保存分配
+                                    </button>
+                                    <button
+                                      className="btn btn-secondary"
+                                      style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem' }}
+                                      onClick={() => setEditingViewPermissionUserId(null)}
+                                    >
+                                      取消
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', background: 'var(--bg-hover)', padding: '0.65rem 0.85rem', borderRadius: '0.4rem', border: '1px solid var(--border-light)' }}>
+                                  {users.filter(target => target.id !== u.id).map(target => {
+                                    const checked = selectedViewPermissionIds.includes(target.id);
+                                    return (
+                                      <label
+                                        key={target.id}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '0.35rem',
+                                          fontSize: '0.82rem',
+                                          cursor: 'pointer',
+                                          userSelect: 'none',
+                                          color: checked ? '#6366f1' : 'var(--text-main)',
+                                          fontWeight: checked ? 600 : 400
+                                        }}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={() => toggleViewPermissionCheckbox(target.id)}
+                                          style={{ accentColor: '#6366f1' }}
+                                        />
+                                        <span>{target.username} (ID: {target.id})</span>
+                                      </label>
+                                    );
+                                  })}
+                                  {users.length <= 1 && (
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)' }}>暂无其它账户可分配</span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -34,13 +34,13 @@ public class LtvTaskScheduler {
     }
 
     /**
-     * 北京时间每小时 05 分 (例如 00:05, 01:05, ..., 23:05): 定时拉取过去 3 天的全量增量订单
+     * 北京时间每小时 05 分 (例如 00:05, 01:05, ..., 23:05): 定时拉取过去 2 天的全量增量订单
      */
     @Scheduled(cron = "0 5 * * * ?", zone = "Asia/Shanghai")
     public void scheduledOrderFetch() {
-        log.info("Starting scheduled order fetch at xx:05 BJ Time (past 3 days)");
+        log.info("Starting scheduled order fetch at xx:05 BJ Time (past 2 days)");
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
-        LocalDate startBj = todayBj.minusDays(3);
+        LocalDate startBj = todayBj.minusDays(2);
 
         String startTimeStr = startBj.format(DATE_FORMATTER);
         String endTimeStr = todayBj.format(DATE_FORMATTER);
@@ -54,11 +54,11 @@ public class LtvTaskScheduler {
     }
 
     /**
-     * 北京时间每 6 小时 (00:30, 06:30, 12:30, 18:30): 定时全量统计 LTV 数据
+     * 北京时间每小时 30 分 (例如 00:30, 01:30, ..., 23:30): 定时全量统计 LTV 数据
      */
-    @Scheduled(cron = "0 30 0,6,12,18 * * ?", zone = "Asia/Shanghai")
+    @Scheduled(cron = "0 30 * * * ?", zone = "Asia/Shanghai")
     public void scheduledLtvCalculation() {
-        log.info("Starting scheduled LTV calculation at 00:30/06:30/12:30/18:30 BJ Time");
+        log.info("Starting hourly scheduled LTV calculation at xx:30 BJ Time");
         try {
             ltvStatService.calculateAllLtvStats();
         } catch (Exception e) {
@@ -68,11 +68,11 @@ public class LtvTaskScheduler {
     }
 
     /**
-     * 北京时间每小时 30 分 (例如 00:30, 01:30, ..., 23:30): 定时统计【每日充值分布】数据并落库
+     * 北京时间每小时 20 分 (例如 00:20, 01:20, ..., 23:20): 定时统计【每日充值分布】数据并落库
      */
-    @Scheduled(cron = "0 30 * * * ?", zone = "Asia/Shanghai")
+    @Scheduled(cron = "0 20 * * * ?", zone = "Asia/Shanghai")
     public void scheduledDailyDistributionCalculation() {
-        log.info("Starting hourly scheduled daily distribution calculation at xx:30 BJ Time");
+        log.info("Starting hourly scheduled daily distribution calculation at xx:20 BJ Time");
         try {
             dailyRechargeStatService.calculateAllDailyDistributionStats();
         } catch (Exception e) {

@@ -1,9 +1,13 @@
 package com.ltv.stat.service;
 
+import com.ltv.stat.dto.TokenInfo;
+import com.ltv.stat.dto.VisibleAccountDto;
 import com.ltv.stat.entity.SysUser;
 import com.ltv.stat.entity.UserLandingPage;
+import com.ltv.stat.entity.UserViewPermission;
 import com.ltv.stat.repository.SysUserRepository;
 import com.ltv.stat.repository.UserLandingPageRepository;
+import com.ltv.stat.repository.UserViewPermissionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +28,7 @@ public class UserService {
 
     private final SysUserRepository sysUserRepository;
     private final UserLandingPageRepository userLandingPageRepository;
+    private final UserViewPermissionRepository userViewPermissionRepository;
 
     @Value("${app.auth.username:superadmin}")
     private String defaultSuperAdminUsername;
@@ -31,9 +36,12 @@ public class UserService {
     @Value("${app.auth.password:superadmin}")
     private String defaultSuperAdminPassword;
 
-    public UserService(SysUserRepository sysUserRepository, UserLandingPageRepository userLandingPageRepository) {
+    public UserService(SysUserRepository sysUserRepository,
+                       UserLandingPageRepository userLandingPageRepository,
+                       UserViewPermissionRepository userViewPermissionRepository) {
         this.sysUserRepository = sysUserRepository;
         this.userLandingPageRepository = userLandingPageRepository;
+        this.userViewPermissionRepository = userViewPermissionRepository;
     }
 
     @PostConstruct
@@ -135,8 +143,98 @@ public class UserService {
     @Transactional
     public void deleteUser(Long userId) {
         userLandingPageRepository.deleteByUserId(userId);
+        userViewPermissionRepository.deleteByUserId(userId);
+        userViewPermissionRepository.deleteByTargetUserId(userId);
         sysUserRepository.deleteById(userId);
     }
+
+    public List<Long> getUserViewPermissionTargetIds(Long userId) {
+        if (userId == null) return Collections.emptyList();
+        return userViewPermissionRepository.findByUserId(userId).stream()
+                .map(UserViewPermission::getTargetUserId)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void updateUserViewPermissions(Long userId, List<Long> targetUserIds) {
+        if (userId == null) return;
+        if (!sysUserRepository.existsById(userId)) {
+            throw new IllegalArgumentException("用户不存在: " + userId);
+        }
+
+        userViewPermissionRepository.deleteByUserId(userId);
+        userViewPermissionRepository.flush();
+
+        if (targetUserIds != null && !targetUserIds.isEmpty()) {
+            List<UserViewPermission> list = new ArrayList<>();
+            Set<Long> uniqueTargets = new HashSet<>(targetUserIds);
+            for (Long targetId : uniqueTargets) {
+                if (targetId != null && !targetId.equals(userId) && sysUserRepository.existsById(targetId)) {
+                    UserViewPermission uvp = new UserViewPermission();
+                    uvp.setUserId(userId);
+                    uvp.setTargetUserId(targetId);
+                    list.add(uvp);
+                }
+            }
+            if (!list.isEmpty()) {
+                userViewPermissionRepository.saveAll(list);
+                userViewPermissionRepository.flush();
+            }
+        }
+    }
+
+    public List<VisibleAccountDto> getVisibleAccountsForUser(Long userId) {
+        if (userId == null) return Collections.emptyList();
+        SysUser user = sysUserRepository.findById(userId).orElse(null);
+        if (user == null) return Collections.emptyList();
+
+        List<SysUser> allUsers = sysUserRepository.findAllByOrderByCreatedAtDesc();
+
+        // 超级管理员：可查看系统中所有活跃用户
+        if ("SUPER_ADMIN".equalsIgnoreCase(user.getRole())) {
+            List<VisibleAccountDto> list = new ArrayList<>();
+            for (SysUser u : allUsers) {
+                if (u.getStatus() != null && u.getStatus() == 1) {
+                    boolean isSelf = u.getId().equals(userId);
+                    list.add(new VisibleAccountDto(u.getId(), u.getUsername(), u.getRole(), isSelf));
+                }
+            }
+            return list;
+        }
+
+        // 普通管理员 / 普通用户：包含自身主账户 + 被分配允许查看的目标账户
+        List<Long> grantedTargetIds = getUserViewPermissionTargetIds(userId);
+        Set<Long> visibleSet = new HashSet<>(grantedTargetIds);
+        visibleSet.add(userId);
+
+        List<VisibleAccountDto> result = new ArrayList<>();
+        // 首先加入本人账户
+        result.add(new VisibleAccountDto(user.getId(), user.getUsername(), user.getRole(), true));
+
+        // 其它被授权的账户
+        for (SysUser u : allUsers) {
+            if (!u.getId().equals(userId) && visibleSet.contains(u.getId()) && u.getStatus() != null && u.getStatus() == 1) {
+                result.add(new VisibleAccountDto(u.getId(), u.getUsername(), u.getRole(), false));
+            }
+        }
+
+        return result;
+    }
+
+    public boolean canUserViewTarget(TokenInfo currentUser, Long targetUserId) {
+        if (currentUser == null || currentUser.getUserId() == null) return false;
+        if (targetUserId == null || targetUserId.equals(currentUser.getUserId())) return true;
+        if (currentUser.isSuperAdmin()) return true;
+
+        return userViewPermissionRepository.existsByUserIdAndTargetUserId(currentUser.getUserId(), targetUserId);
+    }
+
+    public boolean canUserModifyTarget(TokenInfo currentUser, Long targetUserId) {
+        if (currentUser == null || currentUser.getUserId() == null) return false;
+        if (targetUserId == null || targetUserId.equals(currentUser.getUserId())) return true;
+        return currentUser.isSuperAdmin();
+    }
+
 
     public Set<String> getAdminLandingPageIds(Long excludeUserId) {
         List<SysUser> adminUsers = sysUserRepository.findAll().stream()

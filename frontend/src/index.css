@@ -197,6 +197,25 @@ body {
   border-color: var(--border-light);
 }
 
+.btn:disabled,
+.btn-secondary:disabled,
+.btn-primary:disabled,
+button:disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  pointer-events: auto !important;
+  filter: grayscale(80%) !important;
+  background: var(--bg-hover) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+button:disabled svg {
+  opacity: 0.5 !important;
+}
+
 /* Main Body & Table Layout */
 .main-content {
   flex: 1;

@@ -5,6 +5,7 @@ import com.ltv.stat.dto.LandingPageConfigItem;
 import com.ltv.stat.dto.TokenInfo;
 import com.ltv.stat.dto.UserLandingPageConfigResponseDto;
 import com.ltv.stat.dto.UserLandingPageUpdateRequestDto;
+import com.ltv.stat.dto.VisibleAccountDto;
 import com.ltv.stat.service.DailyRechargeStatService;
 import com.ltv.stat.service.LtvStatService;
 import com.ltv.stat.service.UserService;
@@ -18,7 +19,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/user/landing-pages")
+@RequestMapping("/api/user")
 public class UserConfigController {
 
     private static final Logger log = LoggerFactory.getLogger(UserConfigController.class);
@@ -33,37 +34,45 @@ public class UserConfigController {
         this.dailyRechargeStatService = dailyRechargeStatService;
     }
 
-    private Long resolveUserId(Long targetUserId) {
+    @GetMapping("/visible-accounts")
+    public ResponseEntity<?> getVisibleAccounts() {
         TokenInfo currentUser = UserContext.getCurrentUser();
-        if (currentUser == null) return null;
-        if (currentUser.isSuperAdmin() && targetUserId != null) {
-            return targetUserId;
+        if (currentUser == null || currentUser.getUserId() == null) {
+            return ResponseEntity.status(401).body(ApiResponseDto.error(401, "未登录"));
         }
-        return currentUser.getUserId();
+        List<VisibleAccountDto> visibleAccounts = userService.getVisibleAccountsForUser(currentUser.getUserId());
+        return ResponseEntity.ok(ApiResponseDto.success(visibleAccounts));
     }
 
-    @GetMapping
+    @GetMapping("/landing-pages")
     public ResponseEntity<?> getMyLandingPages(@RequestParam(value = "targetUserId", required = false) Long targetUserId) {
         TokenInfo currentUser = UserContext.getCurrentUser();
         if (currentUser == null || currentUser.getUserId() == null) {
             return ResponseEntity.status(401).body(ApiResponseDto.error(401, "未登录"));
         }
 
-        Long userId = resolveUserId(targetUserId);
+        Long userId = (targetUserId != null) ? targetUserId : currentUser.getUserId();
+        if (!userService.canUserViewTarget(currentUser, userId)) {
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权访问该账户的视图"));
+        }
+
         List<LandingPageConfigItem> configs = userService.getUserLandingPageConfigs(userId);
         List<String> pageIds = configs.stream().map(LandingPageConfigItem::getLandingPageId).collect(Collectors.toList());
 
         return ResponseEntity.ok(new UserLandingPageConfigResponseDto(configs, pageIds));
     }
 
-    @PostMapping
+    @PostMapping("/landing-pages")
     public ResponseEntity<?> updateMyLandingPages(@RequestBody UserLandingPageUpdateRequestDto body) {
         TokenInfo currentUser = UserContext.getCurrentUser();
         if (currentUser == null || currentUser.getUserId() == null) {
             return ResponseEntity.status(401).body(ApiResponseDto.error(401, "未登录"));
         }
 
-        Long userId = resolveUserId(body != null ? body.getTargetUserId() : null);
+        Long userId = (body != null && body.getTargetUserId() != null) ? body.getTargetUserId() : currentUser.getUserId();
+        if (!userService.canUserModifyTarget(currentUser, userId)) {
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "该账户视图为只读模式，无法修改落地页配置"));
+        }
 
         try {
             if (body != null && body.getLandingPages() != null) {

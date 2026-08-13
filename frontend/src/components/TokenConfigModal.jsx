@@ -13,10 +13,11 @@ export default function TokenConfigModal({ isOpen, onClose, onSaved, authFetch }
     if (isOpen) {
       fetchFunc('/api/token/get')
         .then((res) => res.json())
-        .then((data) => {
-          if (data.code === 0) {
-            setAuthorization(data.authorization || '');
-            setCookie(data.cookie || '');
+        .then((resData) => {
+          if (resData.code === 0) {
+            const config = resData.data || {};
+            setAuthorization(config.authorization || resData.authorization || '');
+            setCookie(config.cookie || resData.cookie || '');
           }
         })
         .catch((err) => console.error(err));

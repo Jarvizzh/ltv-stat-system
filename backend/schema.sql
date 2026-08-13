@@ -260,3 +260,14 @@ CREATE TABLE IF NOT EXISTS `user_subscription_period` (
   INDEX `idx_member_id` (`member_id`)
 );
 
+-- 9. 用户-账户视图只读分配关联表
+CREATE TABLE IF NOT EXISTS `user_view_permission` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` BIGINT NOT NULL,
+  `target_user_id` BIGINT NOT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_user_target` (`user_id`, `target_user_id`),
+  INDEX `idx_user_id` (`user_id`)
+);
+
+

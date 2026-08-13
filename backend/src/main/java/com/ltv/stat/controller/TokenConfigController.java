@@ -18,15 +18,15 @@ public class TokenConfigController {
         this.orderSyncService = orderSyncService;
     }
 
-    private boolean checkAdmin() {
+    private boolean checkSuperAdmin() {
         TokenInfo currentUser = UserContext.getCurrentUser();
-        return currentUser != null && currentUser.isAdmin();
+        return currentUser != null && currentUser.isSuperAdmin();
     }
 
     @GetMapping("/get")
     public ResponseEntity<?> getToken() {
-        if (!checkAdmin()) {
-            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权访问，API 设置仅管理员可见"));
+        if (!checkSuperAdmin()) {
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权访问，API 设置仅超级管理员可见"));
         }
         TokenConfigDto config = new TokenConfigDto(
                 orderSyncService.getActiveAuthorization(),
@@ -37,8 +37,8 @@ public class TokenConfigController {
 
     @PostMapping("/update")
     public ResponseEntity<?> updateToken(@RequestBody TokenConfigDto body) {
-        if (!checkAdmin()) {
-            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权访问，API 设置仅管理员可见"));
+        if (!checkSuperAdmin()) {
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权访问，API 设置仅超级管理员可见"));
         }
         String authorization = body != null ? body.getAuthorization() : null;
         String cookie = body != null ? body.getCookie() : null;

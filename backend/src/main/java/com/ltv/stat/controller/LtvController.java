@@ -11,6 +11,7 @@ import com.ltv.stat.service.LtvPredictService;
 import com.ltv.stat.service.LtvStatService;
 import com.ltv.stat.service.OrderSyncService;
 import com.ltv.stat.service.SubscribeConfigSyncService;
+import com.ltv.stat.service.UserService;
 import com.ltv.stat.util.UserContext;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,17 +31,20 @@ public class LtvController {
     private final OrderSyncService orderSyncService;
     private final LtvBenchmarkService ltvBenchmarkService;
     private final SubscribeConfigSyncService subscribeConfigSyncService;
+    private final UserService userService;
 
     public LtvController(LtvStatService ltvStatService,
                          DailyRechargeStatService dailyRechargeStatService,
                          OrderSyncService orderSyncService,
                          LtvBenchmarkService ltvBenchmarkService,
-                         SubscribeConfigSyncService subscribeConfigSyncService) {
+                         SubscribeConfigSyncService subscribeConfigSyncService,
+                         UserService userService) {
         this.ltvStatService = ltvStatService;
         this.dailyRechargeStatService = dailyRechargeStatService;
         this.orderSyncService = orderSyncService;
         this.ltvBenchmarkService = ltvBenchmarkService;
         this.subscribeConfigSyncService = subscribeConfigSyncService;
+        this.userService = userService;
     }
 
     private Long resolveTargetUserId(Long targetUserId) {
@@ -48,7 +52,10 @@ public class LtvController {
         if (currentUser == null || currentUser.getUserId() == null) {
             return targetUserId != null ? targetUserId : 1L;
         }
-        if (currentUser.isSuperAdmin() && targetUserId != null) {
+        if (targetUserId == null || targetUserId.equals(currentUser.getUserId())) {
+            return currentUser.getUserId();
+        }
+        if (userService.canUserViewTarget(currentUser, targetUserId)) {
             return targetUserId;
         }
         return currentUser.getUserId();
@@ -229,7 +236,14 @@ public class LtvController {
                 targetUserId = Long.valueOf(body.get("targetUserId").toString());
             } catch (Exception ignored) {}
         }
-        Long userId = resolveTargetUserId(targetUserId);
+        TokenInfo currentUser = UserContext.getCurrentUser();
+        Long userId = (targetUserId != null) ? targetUserId : (currentUser != null ? currentUser.getUserId() : 1L);
+        if (!userService.canUserModifyTarget(currentUser, userId)) {
+            Map<String, Object> res = new HashMap<>();
+            res.put("code", 403);
+            res.put("msg", "该账户视图为只读模式，无法修改消耗或备注");
+            return ResponseEntity.status(403).body(res);
+        }
 
         if (launchDateStr == null || launchDateStr.trim().isEmpty()) {
             Map<String, Object> res = new HashMap<>();
@@ -270,7 +284,14 @@ public class LtvController {
                 targetUserId = Long.valueOf(body.get("targetUserId").toString());
             } catch (Exception ignored) {}
         }
-        Long userId = resolveTargetUserId(targetUserId);
+        TokenInfo currentUser = UserContext.getCurrentUser();
+        Long userId = (targetUserId != null) ? targetUserId : (currentUser != null ? currentUser.getUserId() : 1L);
+        if (!userService.canUserModifyTarget(currentUser, userId)) {
+            Map<String, Object> res = new HashMap<>();
+            res.put("code", 403);
+            res.put("msg", "该账户视图为只读模式，无法批量导入消耗");
+            return ResponseEntity.status(403).body(res);
+        }
 
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
         if (items == null || items.isEmpty()) {

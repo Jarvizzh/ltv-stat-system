@@ -49,10 +49,34 @@ public class AdminUserController {
             List<String> pageIds = userService.getUserLandingPageIds(u.getId());
             dto.setLandingPageIds(pageIds);
             dto.setLandingPageCount(pageIds.size());
+            dto.setVisibleUserIds(userService.getUserViewPermissionTargetIds(u.getId()));
             result.add(dto);
         }
 
         return ResponseEntity.ok(ApiResponseDto.success(result));
+    }
+
+    @GetMapping("/{id}/view-permissions")
+    public ResponseEntity<?> getViewPermissions(@PathVariable("id") Long id) {
+        if (!checkSuperAdmin()) {
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权操作，仅超级管理员可配置视图分配权限"));
+        }
+        List<Long> targetUserIds = userService.getUserViewPermissionTargetIds(id);
+        return ResponseEntity.ok(ApiResponseDto.success(targetUserIds));
+    }
+
+    @PutMapping("/{id}/view-permissions")
+    public ResponseEntity<?> updateViewPermissions(@PathVariable("id") Long id, @RequestBody UserViewPermissionUpdateRequestDto body) {
+        if (!checkSuperAdmin()) {
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权操作，仅超级管理员可分配只读视图权限"));
+        }
+        try {
+            List<Long> targetUserIds = body != null ? body.getTargetUserIds() : Collections.emptyList();
+            userService.updateUserViewPermissions(id, targetUserIds);
+            return ResponseEntity.ok(ApiResponseDto.success("只读视图权限分配保存成功！", null));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(ApiResponseDto.error(500, "更新视图权限失败: " + e.getMessage()));
+        }
     }
 
     @PostMapping

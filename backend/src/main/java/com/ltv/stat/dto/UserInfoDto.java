@@ -14,6 +14,7 @@ public class UserInfoDto {
     private LocalDateTime createdAt;
     private List<String> landingPageIds;
     private Integer landingPageCount;
+    private List<Long> visibleUserIds;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -35,4 +36,7 @@ public class UserInfoDto {
 
     public Integer getLandingPageCount() { return landingPageCount; }
     public void setLandingPageCount(Integer landingPageCount) { this.landingPageCount = landingPageCount; }
+
+    public List<Long> getVisibleUserIds() { return visibleUserIds; }
+    public void setVisibleUserIds(List<Long> visibleUserIds) { this.visibleUserIds = visibleUserIds; }
 }

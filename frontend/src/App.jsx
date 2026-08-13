@@ -114,13 +114,13 @@ export default function App() {
     const token = localStorage.getItem('admin_token');
     if (!token) return;
     try {
-      const res = await authFetch('/api/admin/users');
+      const res = await authFetch('/api/user/visible-accounts');
       const json = await res.json();
       if (json.code === 0 && Array.isArray(json.data)) {
         setUsersList(json.data);
       }
     } catch (e) {
-      // non-admin will fail with 403 silently
+      console.error('Failed to fetch visible accounts:', e);
     }
   };
 
@@ -227,9 +227,7 @@ export default function App() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      if (currentUser && currentUser.role === 'SUPER_ADMIN') {
-        fetchUsersList();
-      }
+      fetchUsersList();
       if (activeTab === 'ltv') {
         fetchLtvData(targetUserId);
       } else if (activeTab === 'distribution') {
@@ -276,9 +274,7 @@ export default function App() {
     setGlobalDistributionData([]);
     setGlobalDistributionSummary(null);
 
-    if (loginData.role === 'SUPER_ADMIN') {
-      fetchUsersList();
-    }
+    fetchUsersList();
 
     // 立即自动拉取刷新新登录账号的数据
     if (activeTab === 'ltv') {
@@ -621,8 +617,6 @@ export default function App() {
         targetUserId={targetUserId}
         onSelectTargetUser={handleSelectTargetUser}
         loading={loading}
-        theme={theme}
-        onToggleTheme={toggleTheme}
         onLogout={() => setIsLogoutModalOpen(true)}
       />
 
@@ -718,15 +712,15 @@ export default function App() {
                   ) : (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN') && (
                     overallPaybackDays === -1 ? (
                       <span style={{ background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.3)', padding: '0.12rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.74rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                        预测回本：停滞
+                        回本：停滞
                       </span>
                     ) : overallPaybackDays > 365 ? (
                       <span style={{ background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.3)', padding: '0.12rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.74rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                        预测回本：&gt;365天
+                        回本：&gt;365天
                       </span>
                     ) : overallPaybackDays !== null ? (
                       <span style={{ background: overallPaybackDays <= 45 ? 'rgba(16, 185, 129, 0.15)' : overallPaybackDays <= 90 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(99, 102, 241, 0.15)', color: overallPaybackDays <= 45 ? '#10b981' : overallPaybackDays <= 90 ? '#f59e0b' : '#6366f1', border: '1px solid currentColor', padding: '0.12rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.74rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                        预测回本：{overallPaybackDays}天{overallPaybackCycleDays ? ` / 周期：${overallPaybackCycleDays}天` : ''}
+                        回本：{overallPaybackDays}天{overallPaybackCycleDays ? ` / 周期：${overallPaybackCycleDays}天` : ''}
                       </span>
                     ) : null
                   )}
@@ -895,8 +889,14 @@ export default function App() {
 
             <LtvTable
               data={data}
-              onEditRow={(row) => setEditingRow(row)}
-              isReadOnly={Boolean(currentUser && currentUser.role === 'SUPER_ADMIN' && targetUserId && currentUser.userId !== targetUserId)}
+              onEditRow={(row) => {
+                if (targetUserId && currentUser && targetUserId !== currentUser.userId) {
+                  showToast('只读视图模式下不可修改他人账户的消耗与备注', 'warning');
+                  return;
+                }
+                setEditingRow(row);
+              }}
+              isReadOnly={Boolean(targetUserId && currentUser && targetUserId !== currentUser.userId)}
               isAdmin={currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN'}
               isSuperAdmin={isSuperAdmin}
             />
@@ -939,7 +939,8 @@ export default function App() {
           isOpen={isUserManagementOpen}
           onClose={() => setIsUserManagementOpen(false)}
           token={localStorage.getItem('admin_token')}
-          onRefreshUsers={setUsersList}
+          currentUser={currentUser}
+          onRefreshUsers={fetchUsersList}
           showToast={showToast}
         />
       )}

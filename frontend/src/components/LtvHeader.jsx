@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, PieChart, Settings, RefreshCw, Sun, Moon, Upload, Users, LogOut, Shield, Eye, Globe, Download } from 'lucide-react';
+import { BarChart3, PieChart, Settings, RefreshCw, Upload, Users, LogOut, Shield, Eye, Globe, Download } from 'lucide-react';
 import CustomSelect from './CustomSelect';
 
 export default function LtvHeader({
@@ -16,13 +16,12 @@ export default function LtvHeader({
   targetUserId,
   onSelectTargetUser,
   onLogout,
-  loading,
-  theme,
-  onToggleTheme
+  loading
 }) {
   const isSuperAdmin = currentUser && currentUser.role === 'SUPER_ADMIN';
   const isAdmin = currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN');
-  const isReadOnly = Boolean(isSuperAdmin && targetUserId && currentUser && targetUserId !== currentUser.userId);
+  const isReadOnly = Boolean(targetUserId && currentUser && targetUserId !== currentUser.userId);
+  const canSwitchView = (isSuperAdmin || (usersList && usersList.length > 1)) && usersList && usersList.length > 0;
 
   return (
     <header className="app-header">
@@ -66,10 +65,10 @@ export default function LtvHeader({
       </div>
 
       <div className="header-actions">
-        {/* 超级管理员视图切换下拉框 (多视图仅超级管理员可见) */}
-        {isSuperAdmin && usersList && usersList.length > 0 && (
+        {/* 账户视图切换下拉框 (包含被分配只读视图或超级管理员可见) */}
+        {canSwitchView && (
           <div
-            title="超级管理员可无缝切换查看不同账号的数据视图"
+            title={isReadOnly ? '只读模式：您正在查看其他被授权账户的数据视图' : '主视图：您正在查看当前登录账户的数据'}
             style={{
               position: 'relative',
               zIndex: 1001,
@@ -84,13 +83,17 @@ export default function LtvHeader({
           >
             <Eye size={16} color={isReadOnly ? '#f43f5e' : '#6366f1'} />
             <span style={{ fontSize: '0.78rem', color: isReadOnly ? '#f43f5e' : '#6366f1', fontWeight: 600, whiteSpace: 'nowrap' }}>
-              {isReadOnly ? '视图(只读):' : '视图:'}
+              视图
             </span>
             <CustomSelect
               value={targetUserId || currentUser?.userId || ''}
               onChange={(val) => onSelectTargetUser(Number(val))}
-              options={usersList.map((u) => ({ label: u.username, value: u.id }))}
-              style={{ minWidth: '110px' }}
+              options={usersList.map((u) => {
+                const isSelfUser = u.isSelf || u.id === currentUser?.userId;
+                const labelText = isSelfUser ? u.username : `${u.username} (只读)`;
+                return { label: labelText, value: u.id };
+              })}
+              style={{ minWidth: '130px' }}
             />
           </div>
         )}
@@ -103,13 +106,12 @@ export default function LtvHeader({
           </button>
         )}
 
-        {/* API 设置按钮 (仅管理员/超级管理员可见) */}
-        {isAdmin && (
+        {/* API 设置按钮 (仅超级管理员可见，全局配置不受视图切换限制) */}
+        {isSuperAdmin && (
           <button
             className="btn btn-secondary"
             onClick={onOpenTokenModal}
-            disabled={isReadOnly}
-            title={isReadOnly ? '非登录用户视图只可查看，不可修改 API Token' : '配置第三方订单数据同步 Token与 Cookie'}
+            title="配置第三方订单数据同步 Token与 Cookie (全局系统配置)"
           >
             <Settings size={16} />
             <span>API 设置</span>
@@ -118,9 +120,12 @@ export default function LtvHeader({
 
         <button
           className="btn btn-secondary"
-          onClick={onOpenConfig}
-          disabled={isReadOnly}
-          title={isReadOnly ? '非登录用户视图只可查看，不可在此编辑落地页' : '管理当前账户绑定的落地页 ID'}
+          onClick={() => {
+            if (isReadOnly) return;
+            onOpenConfig();
+          }}
+          style={{ cursor: isReadOnly ? 'not-allowed' : 'pointer' }}
+          title={isReadOnly ? '只读视图模式下不可在此编辑落地页' : '管理当前账户绑定的落地页 ID'}
         >
           <Settings size={16} />
           <span>落地页配置</span>
@@ -128,9 +133,12 @@ export default function LtvHeader({
 
         <button
           className="btn btn-secondary"
-          onClick={onOpenBatchSpend}
-          disabled={isReadOnly}
-          title={isReadOnly ? '非登录用户视图只可查看，不可导入消耗' : '批量导入消耗'}
+          onClick={() => {
+            if (isReadOnly) return;
+            onOpenBatchSpend();
+          }}
+          style={{ cursor: isReadOnly ? 'not-allowed' : 'pointer' }}
+          title={isReadOnly ? '只读视图模式下不可导入消耗' : '批量导入消耗'}
         >
           <Upload size={16} />
           <span>消耗导入</span>
@@ -156,10 +164,6 @@ export default function LtvHeader({
             <Download size={18} color="#10b981" />
           </button>
         )}
-
-        <button className="theme-toggle-btn" onClick={onToggleTheme} title={theme === 'light' ? '切换为深色模式' : '切换为浅色模式'}>
-          {theme === 'light' ? <Moon size={18} color="#475569" /> : <Sun size={18} color="#fbbf24" />}
-        </button>
 
         {/* 退出登录按钮 (格式：图标 username) */}
         <button
