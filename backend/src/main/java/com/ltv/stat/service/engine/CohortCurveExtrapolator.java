@@ -29,7 +29,7 @@ public class CohortCurveExtrapolator {
         double w;
 
         double spendVal = spend != null ? spend.doubleValue() : 1000.0;
-        if (maxDays < 7) {
+        if (maxDays <= 7) {
             // 算法 1：样本消耗加权贝叶斯先验收缩 (Spend-Weighted Prior Shrinkage)
             double priorWeight = Math.min(0.20, Math.max(0.05, 1000.0 / Math.max(100.0, spendVal) * 0.05));
             alpha = (actualRoi + priorWeight) / (baseRoiSum + priorWeight);
@@ -40,13 +40,19 @@ public class CohortCurveExtrapolator {
 
             // 算法 2：未发生周划扣期平滑权重 (w: 0.15 ~ 0.25)
             w = 0.15 + 0.10 * ((double) maxDays / 7.0);
-        } else {
-            // 算法 3：跨过划扣节点后的离群点熔断 (保持回本模型精度)
+        } else if (maxDays <= 14) {
+            // 算法 2：首个周划扣周期内 (7~14天) 平滑渐进权重 (w: 0.25 ~ 0.85)
             alpha = Math.max(PredictAlgorithmConstants.MATURE_STAGE_MIN_ALPHA,
                     Math.min(PredictAlgorithmConstants.MATURE_STAGE_MAX_ALPHA, rawAlpha));
 
-            // 算法 2：跨过划扣节点后 Sigmoid 强信任真实划扣数据 (w: 0.85 ~ 0.95)
-            w = 0.85 + 0.10 * ((double) Math.min(53, maxDays - 7) / 53.0);
+            w = 0.25 + 0.60 * ((double) (maxDays - 7) / 7.0);
+        } else {
+            // 算法 3：跨过双周划扣节点后的离群点熔断 (保持回本模型精度)
+            alpha = Math.max(PredictAlgorithmConstants.MATURE_STAGE_MIN_ALPHA,
+                    Math.min(PredictAlgorithmConstants.MATURE_STAGE_MAX_ALPHA, rawAlpha));
+
+            // 算法 2：成熟期高信任真实划扣数据 (w: 0.85 ~ 0.95)
+            w = 0.85 + 0.10 * ((double) Math.min(46, maxDays - 14) / 46.0);
         }
 
         return w * alpha + (1.0 - w) * 1.0;

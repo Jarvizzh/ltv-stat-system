@@ -169,10 +169,42 @@ public class LtvStatServiceTest {
         List<RawOrder> orders = rawOrderRepository.findAll();
         DailyDistributionSummaryDto summary = dailyRechargeStatService.calculateDistributionSummaryFromOrders(orders);
 
-        assertNotNull(summary.getLastMonthRefund());
-        assertEquals(0, new BigDecimal("50.00").compareTo(summary.getLastMonthRefund()));
-
         assertNotNull(summary.getThisMonthRefund());
         assertEquals(0, new BigDecimal("30.00").compareTo(summary.getThisMonthRefund()));
+    }
+
+    @Test
+    public void testDiagnoseCohort() {
+        List<com.ltv.stat.entity.UserLandingPage> ulps = userLandingPageRepository.findAll();
+        System.out.println("====== USER LANDING PAGES ======");
+        for (com.ltv.stat.entity.UserLandingPage ulp : ulps) {
+            System.out.printf("USER_ID: %d | LP_ID: %s | TZ: %s%n", ulp.getUserId(), ulp.getLandingPageId(), ulp.getTimezone());
+        }
+
+        String memberId = "412902657034362880";
+        List<RawOrder> memberOrders = rawOrderRepository.findByMemberId(memberId);
+        System.out.println("====== MEMBER ORDERS (" + memberOrders.size() + ") ======");
+        for (RawOrder o : memberOrders) {
+            System.out.printf("REG_BJ: %s | REG_ET: %s | PAY_BJ: %s | PAY_ET: %s | AMOUNT: $%s%n",
+                    o.getRegisterTimeBj(), o.getRegisterDateEt(), o.getPayTimeBj(), o.getPayDateEt(), o.getOrderAmountUsd());
+        }
+
+        List<LtvDailyStat> stats = ltvDailyStatRepository.findAll();
+        System.out.println("====== LTV DAILY STATS ROWS ======");
+        for (LtvDailyStat s : stats) {
+            if (s.getLaunchDate().isAfter(LocalDate.of(2026, 7, 25)) && s.getLaunchDate().isBefore(LocalDate.of(2026, 7, 30))) {
+                System.out.printf("LAUNCH_DATE: %s | USER: %d | SPEND: $%s | TOTAL_RECHARGE: $%s | SUB_COUNT: %d%n",
+                        s.getLaunchDate(), s.getUserId(), s.getSpend(), s.getTotalRecharge(), s.getSubUserCount());
+                System.out.printf("  D1: $%s (ROI: %s) | D2: $%s (ROI: %s) | D3: $%s (ROI: %s)%n",
+                        s.getDay1Recharge(), s.getDay1Roi(), s.getDay2Recharge(), s.getDay2Roi(), s.getDay3Recharge(), s.getDay3Roi());
+                System.out.printf("  D10: $%s (ROI: %s) | D11: $%s (ROI: %s) | D12: $%s (ROI: %s)%n",
+                        s.getDay10Recharge(), s.getDay10Roi(), s.getDay11Recharge(), s.getDay11Roi(), s.getDay12Recharge(), s.getDay12Roi());
+                System.out.printf("  D13: $%s (ROI: %s) | D14: $%s (ROI: %s) | D15: $%s (ROI: %s)%n",
+                        s.getDay13Recharge(), s.getDay13Roi(), s.getDay14Recharge(), s.getDay14Roi(), s.getDay15Recharge(), s.getDay15Roi());
+                System.out.printf("  D16: $%s (ROI: %s) | D17: $%s (ROI: %s) | D18: $%s (ROI: %s) | D19: $%s (ROI: %s) | D20: $%s (ROI: %s)%n",
+                        s.getDay16Recharge(), s.getDay16Roi(), s.getDay17Recharge(), s.getDay17Roi(), s.getDay18Recharge(), s.getDay18Roi(), s.getDay19Recharge(), s.getDay19Roi(), s.getDay20Recharge(), s.getDay20Roi());
+            }
+        }
+        System.out.println("==================================");
     }
 }

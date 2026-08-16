@@ -26,4 +26,4 @@ app:
   auth:
     username: superadmin
     password: superadmin
-    token-expire-days: 3
+    token-expire-days: 7

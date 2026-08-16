@@ -348,7 +348,7 @@ public class LtvStatService {
         }
         stat.setSubPeriodDays(detectedPeriod);
 
-        // 3.1 订阅用户 7 日留存
+        // 3.1 订阅用户 7 日留存（> 7天后仍有充值的去重人数）
         LocalDate day8Date = launchDate.plusDays(7);
         if (!day8Date.isAfter(maxToday)) {
             Set<String> retainedMemberIds = cohortOrders.stream()
@@ -357,7 +357,7 @@ public class LtvStatService {
                         LocalDate payDate = getEffectivePayDate(o, tzMap);
                         if (payDate == null) return false;
                         long diff = ChronoUnit.DAYS.between(launchDate, payDate);
-                        return diff >= 6 && diff <= 7;
+                        return diff >= 7;
                     })
                     .map(RawOrder::getMemberId)
                     .collect(Collectors.toSet());
@@ -375,7 +375,7 @@ public class LtvStatService {
             stat.setDay7SubUserRetention(null);
         }
 
-        // 3.2 订阅用户 15 日留存
+        // 3.2 订阅用户 15 日留存（> 15天后仍有充值的去重人数）
         LocalDate day16Date = launchDate.plusDays(15);
         if (!day16Date.isAfter(maxToday)) {
             Set<String> retainedMemberIds15 = cohortOrders.stream()
@@ -384,7 +384,7 @@ public class LtvStatService {
                         LocalDate payDate = getEffectivePayDate(o, tzMap);
                         if (payDate == null) return false;
                         long diff = ChronoUnit.DAYS.between(launchDate, payDate);
-                        return diff >= 14 && diff <= 15;
+                        return diff >= 15;
                     })
                     .map(RawOrder::getMemberId)
                     .collect(Collectors.toSet());

@@ -13,4 +13,5 @@ public interface RawOrderRepository extends JpaRepository<RawOrder, Long> {
     List<RawOrder> findByRegisterDateEtGreaterThanEqual(LocalDate startDate);
     Optional<RawOrder> findTopByMemberIdAndIsSubsAndRenewTypeOrderByIdAsc(String memberId, Integer isSubs, Integer renewType);
     List<RawOrder> findByLandingPageIdIn(List<String> landingPageIds);
+    List<RawOrder> findByMemberId(String memberId);
 }

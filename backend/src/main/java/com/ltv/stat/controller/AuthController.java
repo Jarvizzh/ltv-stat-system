@@ -18,7 +18,7 @@ public class AuthController {
 
     private final UserService userService;
 
-    @Value("${app.auth.token-expire-days:3}")
+    @Value("${app.auth.token-expire-days:7}")
     private int tokenExpireDays;
 
     public AuthController(UserService userService) {
