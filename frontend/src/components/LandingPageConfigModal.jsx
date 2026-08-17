@@ -201,7 +201,7 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
               fontSize: '0.82rem',
               marginBottom: '0.85rem'
             }}>
-              ⚠️ 当前视图为只读模式/主账号视图，当前账户配置的落地页仅供查看，保存提交按钮已禁用。
+              ⚠️ 当前视图为只读模式/主账号视图，当前账户配置的落地页仅供查看。
             </div>
           )}
 
