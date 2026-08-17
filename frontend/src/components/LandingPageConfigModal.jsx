@@ -7,7 +7,7 @@ const TIMEZONE_OPTIONS = [
   { label: '北京时区 (BJ)', value: 'BJ' },
 ];
 
-export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authFetch, targetUser, targetUserId }) {
+export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authFetch, targetUser, targetUserId, isReadOnly }) {
   const [items, setItems] = useState([]); // [{ landingPageId: '', timezone: 'BJ' }]
   const [mode, setMode] = useState('list'); // 'list' | 'batch'
   const [batchText, setBatchText] = useState('');
@@ -59,14 +59,17 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
   if (!isOpen) return null;
 
   const handleAddItem = () => {
+    if (isReadOnly) return;
     setItems((prev) => [...prev, { landingPageId: '', timezone: 'BJ' }]);
   };
 
   const handleRemoveItem = (index) => {
+    if (isReadOnly) return;
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleItemChange = (index, field, value) => {
+    if (isReadOnly) return;
     setItems((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
@@ -74,9 +77,8 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
     });
   };
 
-
-
   const handleParseBatchText = () => {
+    if (isReadOnly) return;
     const lines = batchText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
     const parsed = lines.map((line) => {
       const parts = line.split(/[,，\s\t]+/);
@@ -103,6 +105,11 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
   };
 
   const handleSave = async () => {
+    if (isReadOnly) {
+      setMsg('只读/主账号视图模式下无法修改或提交落地页配置');
+      return;
+    }
+
     setLoading(true);
     setMsg('保存配置中，并自动完成秒级数据重算...');
 
@@ -175,7 +182,7 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Link2 size={20} className="modal-header-icon" />
             <h3 className="modal-title">
-              {targetUser ? `配置用户 [${targetUser.username}] 的落地页配置` : '落地页配置 (含时区设置)'}
+              {targetUser ? `配置用户 [${targetUser.username}] 的落地页配置` : `落地页配置 ${isReadOnly ? '(只读查看)' : '(含时区设置)'}`}
             </h3>
           </div>
           <button className="btn btn-secondary" style={{ padding: '0.25rem' }} onClick={onClose}>
@@ -184,6 +191,20 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
         </div>
 
         <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          {isReadOnly && (
+            <div style={{
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              color: '#f59e0b',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.375rem',
+              fontSize: '0.82rem',
+              marginBottom: '0.85rem'
+            }}>
+              ⚠️ 当前视图为只读模式/主账号视图，当前账户配置的落地页仅供查看，保存提交按钮已禁用。
+            </div>
+          )}
+
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div className="segmented-tab-container">
               <button
@@ -192,7 +213,7 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
                 onClick={() => setMode('list')}
               >
                 <List size={15} />
-                <span>列表明细编辑</span>
+                <span>列表明细</span>
               </button>
               <button
                 type="button"
@@ -200,7 +221,7 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
                 onClick={() => setMode('batch')}
               >
                 <FileText size={15} />
-                <span>批量粘贴导入</span>
+                <span>批量文本查看</span>
               </button>
             </div>
           </div>
@@ -208,7 +229,7 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
           {mode === 'list' ? (
             <div>
               <p style={{ fontSize: '0.82rem', color: 'var(--text-sub)', marginBottom: '0.75rem' }}>
-                配置各落地页 ID 及其归属时区。统计 LTV 报表时，系统将自动按配置的时区转换组别日期。
+                查看已配置的落地页 ID 及其归属时区。
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -234,61 +255,69 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
                       style={{ flex: 1, padding: '0.35rem 0.6rem', fontSize: '0.85rem' }}
                       placeholder="落地页 ID (pId)"
                       value={item.landingPageId}
+                      disabled={isReadOnly}
                       onChange={(e) => handleItemChange(idx, 'landingPageId', e.target.value)}
                     />
                     <CustomSelect
                       value={item.timezone}
                       onChange={(val) => handleItemChange(idx, 'timezone', val)}
                       options={TIMEZONE_OPTIONS}
+                      disabled={isReadOnly}
                       style={{ width: '135px' }}
                     />
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ padding: '0.35rem', color: '#f43f5e' }}
-                      onClick={() => handleRemoveItem(idx)}
-                      title="删除此项"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {!isReadOnly && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: '0.35rem', color: '#f43f5e' }}
+                        onClick={() => handleRemoveItem(idx)}
+                        title="删除此项"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
 
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ marginTop: '0.75rem', width: '100%', justifyContent: 'center', borderStyle: 'dashed' }}
-                onClick={handleAddItem}
-              >
-                <Plus size={16} />
-                <span>添加落地页</span>
-              </button>
+              {!isReadOnly && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ marginTop: '0.75rem', width: '100%', justifyContent: 'center', borderStyle: 'dashed' }}
+                  onClick={handleAddItem}
+                >
+                  <Plus size={16} />
+                  <span>添加落地页</span>
+                </button>
+              )}
             </div>
           ) : (
             <div>
               <p style={{ fontSize: '0.82rem', color: 'var(--text-sub)', marginBottom: '0.5rem' }}>
-                按行粘贴落地页 ID，每行一个。支持在 ID 后空格加时区标记（如 `405323 北京` 或 `405323 美东`）。无标记的行默认使用下方选择的时区：
+                已配置的落地页 ID 列表文本视图：
               </p>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', fontSize: '0.82rem' }}>
                 <span style={{ color: 'var(--text-sub)' }}>未标注行的默认时区：</span>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', cursor: isReadOnly ? 'not-allowed' : 'pointer' }}>
                   <input
                     type="radio"
                     name="defaultTz"
                     value="ET"
                     checked={defaultBatchTz === 'ET'}
+                    disabled={isReadOnly}
                     onChange={() => setDefaultBatchTz('ET')}
                   />
                   美东时区 (ET)
                 </label>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', cursor: isReadOnly ? 'not-allowed' : 'pointer' }}>
                   <input
                     type="radio"
                     name="defaultTz"
                     value="BJ"
                     checked={defaultBatchTz === 'BJ'}
+                    disabled={isReadOnly}
                     onChange={() => setDefaultBatchTz('BJ')}
                   />
                   北京时区 (BJ)
@@ -298,19 +327,22 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
               <textarea
                 className="form-textarea"
                 rows={8}
-                placeholder="例如:&#10;405323222546395136&#10;405323222546395137 北京&#10;405323222546395138 美东"
+                placeholder="暂无落地页配置"
                 value={batchText}
+                disabled={isReadOnly}
                 onChange={(e) => setBatchText(e.target.value)}
               />
 
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ marginTop: '0.5rem', width: '100%', justifyContent: 'center' }}
-                onClick={handleParseBatchText}
-              >
-                <span>解析并导入到列表明细</span>
-              </button>
+              {!isReadOnly && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ marginTop: '0.5rem', width: '100%', justifyContent: 'center' }}
+                  onClick={handleParseBatchText}
+                >
+                  <span>解析并导入到列表明细</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -323,12 +355,21 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
 
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
-            取消
+            关闭
           </button>
 
-          <button className="btn btn-primary" onClick={handleSave} disabled={loading}>
+          <button
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={loading || isReadOnly}
+            style={{
+              opacity: isReadOnly ? 0.45 : 1,
+              cursor: isReadOnly ? 'not-allowed' : 'pointer'
+            }}
+            title={isReadOnly ? '只读/主账号视图模式下不可提交修改' : '保存配置并秒级重算'}
+          >
             <Save size={16} />
-            <span>保存配置并秒级重算</span>
+            <span>{isReadOnly ? '保存配置 (只读不可提交)' : '保存配置并秒级重算'}</span>
           </button>
         </div>
       </div>

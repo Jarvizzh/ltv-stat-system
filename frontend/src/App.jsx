@@ -933,6 +933,7 @@ export default function App() {
         isOpen={isConfigOpen}
         targetUser={editingTargetUserLandingPage}
         targetUserId={targetUserId}
+        isReadOnly={isReadOnlyView}
         onClose={() => {
           setIsConfigOpen(false);
           setEditingTargetUserLandingPage(null);

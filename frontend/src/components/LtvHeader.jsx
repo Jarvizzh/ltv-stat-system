@@ -120,12 +120,8 @@ export default function LtvHeader({
 
         <button
           className="btn btn-secondary"
-          onClick={() => {
-            if (isReadOnly) return;
-            onOpenConfig();
-          }}
-          style={{ cursor: isReadOnly ? 'not-allowed' : 'pointer' }}
-          title={isReadOnly ? '主账号或只读视图模式下不可在此手动配置落地页' : '管理当前账户绑定的落地页 ID'}
+          onClick={onOpenConfig}
+          title={isReadOnly ? '查看当前账户绑定的落地页 ID（只读模式）' : '管理当前账户绑定的落地页 ID'}
         >
           <Settings size={16} />
           <span>落地页配置</span>
