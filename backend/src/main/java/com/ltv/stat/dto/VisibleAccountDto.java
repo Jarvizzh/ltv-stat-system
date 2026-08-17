@@ -5,14 +5,22 @@ public class VisibleAccountDto {
     private String username;
     private String role;
     private boolean isSelf;
+    private Integer isMaster;
+    private Integer subAccountCount;
 
     public VisibleAccountDto() {}
 
     public VisibleAccountDto(Long id, String username, String role, boolean isSelf) {
+        this(id, username, role, isSelf, 0, 0);
+    }
+
+    public VisibleAccountDto(Long id, String username, String role, boolean isSelf, Integer isMaster, Integer subAccountCount) {
         this.id = id;
         this.username = username;
         this.role = role;
         this.isSelf = isSelf;
+        this.isMaster = isMaster;
+        this.subAccountCount = subAccountCount;
     }
 
     public Long getId() { return id; }
@@ -26,4 +34,10 @@ public class VisibleAccountDto {
 
     public boolean isSelf() { return isSelf; }
     public void setSelf(boolean self) { isSelf = self; }
+
+    public Integer getIsMaster() { return isMaster; }
+    public void setIsMaster(Integer isMaster) { this.isMaster = isMaster; }
+
+    public Integer getSubAccountCount() { return subAccountCount; }
+    public void setSubAccountCount(Integer subAccountCount) { this.subAccountCount = subAccountCount; }
 }

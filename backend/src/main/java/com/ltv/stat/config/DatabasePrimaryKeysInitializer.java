@@ -76,6 +76,32 @@ public class DatabasePrimaryKeysInitializer {
                 log.warn("Failed to add total_refund column to ltv_daily_stat: {}", e.getMessage());
             }
         }
+
+        // 7. 检查并补充 sys_user 表的 is_master 列
+        if (!isColumnExist("sys_user", "is_master")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE sys_user ADD COLUMN is_master INT NOT NULL DEFAULT 0");
+                log.info("Successfully added is_master column to sys_user");
+            } catch (Exception e) {
+                log.warn("Failed to add is_master column to sys_user: {}", e.getMessage());
+            }
+        }
+
+        // 8. 检查并创建 user_sub_account 主-子账号关联表
+        try {
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS user_sub_account (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "master_user_id BIGINT NOT NULL, " +
+                    "sub_user_id BIGINT NOT NULL, " +
+                    "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+                    "UNIQUE KEY uk_master_sub (master_user_id, sub_user_id), " +
+                    "INDEX idx_master_user (master_user_id), " +
+                    "INDEX idx_sub_user (sub_user_id)" +
+                    ")");
+            log.info("Successfully checked/created user_sub_account table");
+        } catch (Exception e) {
+            log.warn("Failed to create user_sub_account table: {}", e.getMessage());
+        }
     }
 
     private void ensurePrimaryKey(String tableName, String expectedCols, String alterSql) {

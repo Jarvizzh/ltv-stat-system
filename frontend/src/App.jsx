@@ -551,6 +551,9 @@ export default function App() {
   const overallPaybackCycleDays = calculateOverallPaybackCycleDays();
 
   const isSuperAdmin = Boolean(currentUser && currentUser.role === 'SUPER_ADMIN');
+  const currentTargetUserObj = usersList.find(u => u.id === (targetUserId || currentUser?.userId));
+  const isTargetMaster = currentTargetUserObj ? Boolean(currentTargetUserObj.isMaster === 1) : false;
+  const isReadOnlyView = Boolean(targetUserId && currentUser && targetUserId !== currentUser.userId) || isTargetMaster;
 
   const renderActualPaybackTag = (days, monthStr, d30Roi, d60Roi, d90Roi) => {
     if (days === null || days === undefined) return null;
@@ -615,6 +618,7 @@ export default function App() {
         currentUser={currentUser}
         usersList={usersList}
         targetUserId={targetUserId}
+        isReadOnly={isReadOnlyView}
         onSelectTargetUser={handleSelectTargetUser}
         loading={loading}
         onLogout={() => setIsLogoutModalOpen(true)}
@@ -890,13 +894,16 @@ export default function App() {
             <LtvTable
               data={data}
               onEditRow={(row) => {
-                if (targetUserId && currentUser && targetUserId !== currentUser.userId) {
-                  showToast('只读视图模式下不可修改他人账户的消耗与备注', 'warning');
+                if (isReadOnlyView) {
+                  const msgText = isTargetMaster
+                    ? '主账号为数据汇总账号，消耗由子账号自动累加计算，不可直接修改'
+                    : '只读视图模式下不可修改他人账户的消耗与备注';
+                  showToast(msgText, 'warning');
                   return;
                 }
                 setEditingRow(row);
               }}
-              isReadOnly={Boolean(targetUserId && currentUser && targetUserId !== currentUser.userId)}
+              isReadOnly={isReadOnlyView}
               isAdmin={currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN'}
               isSuperAdmin={isSuperAdmin}
             />

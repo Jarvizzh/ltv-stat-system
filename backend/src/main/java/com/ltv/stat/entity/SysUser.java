@@ -23,6 +23,9 @@ public class SysUser {
     @Column(name = "status", nullable = false)
     private Integer status = 1; // 1: Active, 0: Disabled
 
+    @Column(name = "is_master", nullable = false)
+    private Integer isMaster = 0; // 0: Normal/Sub, 1: Master Account
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -54,6 +57,10 @@ public class SysUser {
 
     public Integer getStatus() { return status; }
     public void setStatus(Integer status) { this.status = status; }
+
+    public Integer getIsMaster() { return isMaster != null ? isMaster : 0; }
+    public void setIsMaster(Integer isMaster) { this.isMaster = isMaster; }
+    public boolean isMasterAccount() { return Integer.valueOf(1).equals(this.isMaster); }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

@@ -238,6 +238,12 @@ public class LtvController {
         }
         TokenInfo currentUser = UserContext.getCurrentUser();
         Long userId = (targetUserId != null) ? targetUserId : (currentUser != null ? currentUser.getUserId() : 1L);
+        if (userService.isMasterAccount(userId)) {
+            Map<String, Object> res = new HashMap<>();
+            res.put("code", 400);
+            res.put("msg", "主账号为数据汇总账号，消耗由关联子账号自动累加计算，不可直接编辑！");
+            return ResponseEntity.badRequest().body(res);
+        }
         if (!userService.canUserModifyTarget(currentUser, userId)) {
             Map<String, Object> res = new HashMap<>();
             res.put("code", 403);
@@ -286,6 +292,12 @@ public class LtvController {
         }
         TokenInfo currentUser = UserContext.getCurrentUser();
         Long userId = (targetUserId != null) ? targetUserId : (currentUser != null ? currentUser.getUserId() : 1L);
+        if (userService.isMasterAccount(userId)) {
+            Map<String, Object> res = new HashMap<>();
+            res.put("code", 400);
+            res.put("msg", "主账号为数据汇总账号，消耗由关联子账号自动累加计算，不可直接导入！");
+            return ResponseEntity.badRequest().body(res);
+        }
         if (!userService.canUserModifyTarget(currentUser, userId)) {
             Map<String, Object> res = new HashMap<>();
             res.put("code", 403);

@@ -15,6 +15,8 @@ public class UserInfoDto {
     private List<String> landingPageIds;
     private Integer landingPageCount;
     private List<Long> visibleUserIds;
+    private Integer isMaster;
+    private List<Long> subUserIds;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -39,4 +41,10 @@ public class UserInfoDto {
 
     public List<Long> getVisibleUserIds() { return visibleUserIds; }
     public void setVisibleUserIds(List<Long> visibleUserIds) { this.visibleUserIds = visibleUserIds; }
+
+    public Integer getIsMaster() { return isMaster; }
+    public void setIsMaster(Integer isMaster) { this.isMaster = isMaster; }
+
+    public List<Long> getSubUserIds() { return subUserIds; }
+    public void setSubUserIds(List<Long> subUserIds) { this.subUserIds = subUserIds; }
 }

@@ -29,6 +29,7 @@ public class UserService {
     private final SysUserRepository sysUserRepository;
     private final UserLandingPageRepository userLandingPageRepository;
     private final UserViewPermissionRepository userViewPermissionRepository;
+    private final com.ltv.stat.repository.UserSubAccountRepository userSubAccountRepository;
 
     @Value("${app.auth.username:superadmin}")
     private String defaultSuperAdminUsername;
@@ -38,10 +39,12 @@ public class UserService {
 
     public UserService(SysUserRepository sysUserRepository,
                        UserLandingPageRepository userLandingPageRepository,
-                       UserViewPermissionRepository userViewPermissionRepository) {
+                       UserViewPermissionRepository userViewPermissionRepository,
+                       com.ltv.stat.repository.UserSubAccountRepository userSubAccountRepository) {
         this.sysUserRepository = sysUserRepository;
         this.userLandingPageRepository = userLandingPageRepository;
         this.userViewPermissionRepository = userViewPermissionRepository;
+        this.userSubAccountRepository = userSubAccountRepository;
     }
 
     @PostConstruct
@@ -145,7 +148,70 @@ public class UserService {
         userLandingPageRepository.deleteByUserId(userId);
         userViewPermissionRepository.deleteByUserId(userId);
         userViewPermissionRepository.deleteByTargetUserId(userId);
+        userSubAccountRepository.deleteByMasterUserId(userId);
+        userSubAccountRepository.deleteBySubUserId(userId);
         sysUserRepository.deleteById(userId);
+    }
+
+    public boolean isMasterAccount(Long userId) {
+        if (userId == null) return false;
+        SysUser user = sysUserRepository.findById(userId).orElse(null);
+        return user != null && user.isMasterAccount();
+    }
+
+    public List<Long> getSubUserIdsForMaster(Long masterUserId) {
+        if (masterUserId == null) return Collections.emptyList();
+        return userSubAccountRepository.findByMasterUserId(masterUserId).stream()
+                .map(com.ltv.stat.entity.UserSubAccount::getSubUserId)
+                .collect(Collectors.toList());
+    }
+
+    public List<Long> getMasterUserIdsForSub(Long subUserId) {
+        if (subUserId == null) return Collections.emptyList();
+        return userSubAccountRepository.findBySubUserId(subUserId).stream()
+                .map(com.ltv.stat.entity.UserSubAccount::getMasterUserId)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void updateMasterStatus(Long userId, Integer isMaster) {
+        SysUser user = sysUserRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
+        user.setIsMaster(isMaster != null ? isMaster : 0);
+        sysUserRepository.save(user);
+        if (Integer.valueOf(1).equals(isMaster)) {
+            // 提升为主账号时，解除作为其他主账号子账号的关联
+            userSubAccountRepository.deleteBySubUserId(userId);
+        } else {
+            // 取消主账号时，删除关联的所有子账号关系
+            userSubAccountRepository.deleteByMasterUserId(userId);
+        }
+    }
+
+    @Transactional
+    public void updateMasterSubAccounts(Long masterUserId, List<Long> subUserIds) {
+        SysUser masterUser = sysUserRepository.findById(masterUserId)
+                .orElseThrow(() -> new IllegalArgumentException("主账号不存在: " + masterUserId));
+
+        userSubAccountRepository.deleteByMasterUserId(masterUserId);
+        userSubAccountRepository.flush();
+
+        if (subUserIds != null && !subUserIds.isEmpty()) {
+            List<com.ltv.stat.entity.UserSubAccount> list = new ArrayList<>();
+            Set<Long> uniqueSubs = new HashSet<>(subUserIds);
+            for (Long subId : uniqueSubs) {
+                if (subId != null && !subId.equals(masterUserId)) {
+                    SysUser subUser = sysUserRepository.findById(subId).orElse(null);
+                    if (subUser != null && !subUser.isMasterAccount()) {
+                        list.add(new com.ltv.stat.entity.UserSubAccount(masterUserId, subId));
+                    }
+                }
+            }
+            if (!list.isEmpty()) {
+                userSubAccountRepository.saveAll(list);
+                userSubAccountRepository.flush();
+            }
+        }
     }
 
     public List<Long> getUserViewPermissionTargetIds(Long userId) {
@@ -196,7 +262,8 @@ public class UserService {
             for (SysUser u : allUsers) {
                 if (u.getStatus() != null && u.getStatus() == 1) {
                     boolean isSelf = u.getId().equals(userId);
-                    list.add(new VisibleAccountDto(u.getId(), u.getUsername(), u.getRole(), isSelf));
+                    int subCount = isMasterAccount(u.getId()) ? getSubUserIdsForMaster(u.getId()).size() : 0;
+                    list.add(new VisibleAccountDto(u.getId(), u.getUsername(), u.getRole(), isSelf, u.getIsMaster(), subCount));
                 }
             }
             return list;
@@ -209,12 +276,14 @@ public class UserService {
 
         List<VisibleAccountDto> result = new ArrayList<>();
         // 首先加入本人账户
-        result.add(new VisibleAccountDto(user.getId(), user.getUsername(), user.getRole(), true));
+        int selfSubCount = isMasterAccount(user.getId()) ? getSubUserIdsForMaster(user.getId()).size() : 0;
+        result.add(new VisibleAccountDto(user.getId(), user.getUsername(), user.getRole(), true, user.getIsMaster(), selfSubCount));
 
         // 其它被授权的账户
         for (SysUser u : allUsers) {
             if (!u.getId().equals(userId) && visibleSet.contains(u.getId()) && u.getStatus() != null && u.getStatus() == 1) {
-                result.add(new VisibleAccountDto(u.getId(), u.getUsername(), u.getRole(), false));
+                int subCount = isMasterAccount(u.getId()) ? getSubUserIdsForMaster(u.getId()).size() : 0;
+                result.add(new VisibleAccountDto(u.getId(), u.getUsername(), u.getRole(), false, u.getIsMaster(), subCount));
             }
         }
 
@@ -255,28 +324,40 @@ public class UserService {
 
     public List<String> getUserLandingPageIds(Long userId) {
         if (userId == null) return Collections.emptyList();
-        SysUser user = sysUserRepository.findById(userId).orElse(null);
-        List<String> pids = userLandingPageRepository.findByUserId(userId).stream()
-                .map(UserLandingPage::getLandingPageId)
-                .filter(pid -> pid != null && !pid.trim().isEmpty())
-                .map(String::trim)
+        return getUserLandingPageConfigs(userId).stream()
+                .map(com.ltv.stat.dto.LandingPageConfigItem::getLandingPageId)
                 .collect(Collectors.toList());
-
-        // 如果是普通用户 (USER)，剔除任何已被管理员 (ADMIN / SUPER_ADMIN) 配置的隔离落地页 ID
-        if (user != null && "USER".equalsIgnoreCase(user.getRole())) {
-            Set<String> adminPids = getAdminLandingPageIds(userId);
-            pids = pids.stream().filter(pid -> !adminPids.contains(pid)).collect(Collectors.toList());
-        }
-        return pids;
     }
 
     public List<com.ltv.stat.dto.LandingPageConfigItem> getUserLandingPageConfigs(Long userId) {
         if (userId == null) return Collections.emptyList();
         SysUser user = sysUserRepository.findById(userId).orElse(null);
+        if (user == null) return Collections.emptyList();
+
+        // 若为主账号，自动聚合所有子账号配置的落地页（去重）
+        if (user.isMasterAccount()) {
+            List<Long> subUserIds = getSubUserIdsForMaster(userId);
+            Set<String> uniquePids = new HashSet<>();
+            List<com.ltv.stat.dto.LandingPageConfigItem> aggregated = new ArrayList<>();
+            for (Long subId : subUserIds) {
+                List<com.ltv.stat.dto.LandingPageConfigItem> subConfigs = getUserLandingPageConfigs(subId);
+                for (com.ltv.stat.dto.LandingPageConfigItem item : subConfigs) {
+                    if (item != null && item.getLandingPageId() != null && !item.getLandingPageId().trim().isEmpty()) {
+                        String pid = item.getLandingPageId().trim();
+                        if (!uniquePids.contains(pid)) {
+                            uniquePids.add(pid);
+                            aggregated.add(item);
+                        }
+                    }
+                }
+            }
+            return aggregated;
+        }
+
         List<UserLandingPage> list = userLandingPageRepository.findByUserId(userId);
 
         // 如果是普通用户 (USER)，剔除已被管理员配置的隔离落地页 ID
-        if (user != null && "USER".equalsIgnoreCase(user.getRole())) {
+        if ("USER".equalsIgnoreCase(user.getRole())) {
             Set<String> adminPids = getAdminLandingPageIds(userId);
             list = list.stream()
                     .filter(ulp -> ulp.getLandingPageId() != null && !adminPids.contains(ulp.getLandingPageId().trim()))
@@ -292,6 +373,10 @@ public class UserService {
     public void updateUserLandingPageConfigs(Long userId, List<com.ltv.stat.dto.LandingPageConfigItem> items) {
         SysUser user = sysUserRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
+
+        if (user.isMasterAccount()) {
+            throw new IllegalArgumentException("主账号为数据汇总账号，落地页由关联子账号自动聚合，不可直接编辑！");
+        }
 
         // 如果是普通用户 (USER)，拦截校验：不允许配置已被管理员 (ADMIN / SUPER_ADMIN) 配置的独占隔离落地页
         if ("USER".equalsIgnoreCase(user.getRole())) {

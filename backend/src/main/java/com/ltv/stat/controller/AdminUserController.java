@@ -50,10 +50,72 @@ public class AdminUserController {
             dto.setLandingPageIds(pageIds);
             dto.setLandingPageCount(pageIds.size());
             dto.setVisibleUserIds(userService.getUserViewPermissionTargetIds(u.getId()));
+            dto.setIsMaster(u.getIsMaster());
+            dto.setSubUserIds(userService.getSubUserIdsForMaster(u.getId()));
             result.add(dto);
         }
 
         return ResponseEntity.ok(ApiResponseDto.success(result));
+    }
+
+    @PutMapping("/{id}/master-status")
+    public ResponseEntity<?> updateMasterStatus(@PathVariable("id") Long id, @RequestBody Map<String, Object> body) {
+        if (!checkSuperAdmin()) {
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权操作，仅超级管理员可修改主账号属性"));
+        }
+        try {
+            Object isMasterObj = body != null ? body.get("isMaster") : 0;
+            Integer isMaster = 0;
+            if (isMasterObj != null) {
+                if (isMasterObj instanceof Boolean) {
+                    isMaster = (Boolean) isMasterObj ? 1 : 0;
+                } else {
+                    isMaster = Integer.valueOf(isMasterObj.toString().trim());
+                }
+            }
+            userService.updateMasterStatus(id, isMaster);
+
+            ltvStatService.calculateLtvStatsForUser(id);
+            dailyRechargeStatService.calculateDailyDistributionStatsForUser(id);
+
+            return ResponseEntity.ok(ApiResponseDto.success("账号类型更新成功！", null));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(ApiResponseDto.error(500, "更新失败: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/sub-accounts")
+    public ResponseEntity<?> getSubAccounts(@PathVariable("id") Long id) {
+        if (!checkSuperAdmin()) {
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权操作"));
+        }
+        List<Long> subUserIds = userService.getSubUserIdsForMaster(id);
+        return ResponseEntity.ok(ApiResponseDto.success(subUserIds));
+    }
+
+    @PutMapping("/{id}/sub-accounts")
+    public ResponseEntity<?> updateSubAccounts(@PathVariable("id") Long id, @RequestBody Map<String, Object> body) {
+        if (!checkSuperAdmin()) {
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权操作，仅超级管理员可分配子账号"));
+        }
+        try {
+            List<?> rawList = (body != null && body.get("subUserIds") instanceof List) ? (List<?>) body.get("subUserIds") : Collections.emptyList();
+            List<Long> subUserIds = new ArrayList<>();
+            for (Object obj : rawList) {
+                if (obj != null) {
+                    subUserIds.add(Long.valueOf(obj.toString().trim()));
+                }
+            }
+            userService.updateMasterSubAccounts(id, subUserIds);
+
+            // 触发主账号数据重算
+            ltvStatService.calculateLtvStatsForUser(id);
+            dailyRechargeStatService.calculateDailyDistributionStatsForUser(id);
+
+            return ResponseEntity.ok(ApiResponseDto.success("子账号关联分配成功，主账号汇总数据已秒级重算！", null));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(ApiResponseDto.error(500, "保存子账号关联失败: " + e.getMessage()));
+        }
     }
 
     @GetMapping("/{id}/view-permissions")

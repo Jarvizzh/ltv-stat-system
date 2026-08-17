@@ -81,6 +81,9 @@ public class LtvStatService {
 
     public LtvLaunchConfig saveLaunchConfig(Long userId, LocalDate launchDate, BigDecimal spend, String remark) {
         if (userId == null) userId = 1L;
+        if (userService.isMasterAccount(userId)) {
+            throw new IllegalArgumentException("主账号为数据汇总账号，消耗由关联子账号自动计算，不可直接编辑！");
+        }
         final Long uid = userId;
         LtvLaunchConfig config = ltvLaunchConfigRepository.findByUserIdAndLaunchDate(uid, launchDate).orElseGet(() -> {
             LtvLaunchConfig c = new LtvLaunchConfig();
@@ -92,7 +95,14 @@ public class LtvStatService {
         config.setLaunchDate(launchDate);
         if (spend != null) config.setSpend(spend);
         if (remark != null) config.setRemark(remark);
-        return ltvLaunchConfigRepository.save(config);
+        LtvLaunchConfig saved = ltvLaunchConfigRepository.save(config);
+        
+        // 触发所属主账号的报表重算
+        List<Long> parentMasterIds = userService.getMasterUserIdsForSub(uid);
+        for (Long masterId : parentMasterIds) {
+            calculateLtvStatsForUser(masterId);
+        }
+        return saved;
     }
 
     public LtvLaunchConfig saveLaunchConfig(LocalDate launchDate, BigDecimal spend, String remark) {
@@ -102,6 +112,9 @@ public class LtvStatService {
     @Transactional
     public int batchSaveLaunchConfig(Long userId, List<Map<String, Object>> items) {
         if (userId == null) userId = 1L;
+        if (userService.isMasterAccount(userId)) {
+            throw new IllegalArgumentException("主账号为数据汇总账号，消耗由关联子账号自动计算，不可直接导入！");
+        }
         int count = 0;
         for (Map<String, Object> item : items) {
             String dateStr = (String) item.get("launchDate");
@@ -122,6 +135,12 @@ public class LtvStatService {
         }
         ltvLaunchConfigRepository.flush();
         calculateLtvStatsForUser(userId);
+        
+        // 触发所属主账号的报表重算
+        List<Long> parentMasterIds = userService.getMasterUserIdsForSub(userId);
+        for (Long masterId : parentMasterIds) {
+            calculateLtvStatsForUser(masterId);
+        }
         return count;
     }
 
@@ -234,8 +253,40 @@ public class LtvStatService {
                 })
                 .collect(Collectors.groupingBy(o -> getEffectiveRegisterDate(o, tzMap)));
 
-        Map<LocalDate, LtvLaunchConfig> configsByDate = ltvLaunchConfigRepository.findByUserId(userId).stream()
-                .collect(Collectors.toMap(LtvLaunchConfig::getLaunchDate, c -> c));
+        Map<LocalDate, LtvLaunchConfig> configsByDate;
+        String masterRemark = "";
+        boolean isMasterAcc = userService.isMasterAccount(userId);
+        if (isMasterAcc) {
+            List<Long> subUserIds = userService.getSubUserIdsForMaster(userId);
+            List<String> subUsernames = new ArrayList<>();
+            for (Long subId : subUserIds) {
+                userService.findById(subId).ifPresent(u -> subUsernames.add(u.getUsername()));
+            }
+            String subNamesStr = String.join("、", subUsernames);
+            masterRemark = subNamesStr.isEmpty() ? "汇总数据" : "汇总数据（子账号：" + subNamesStr + "）";
+
+            Map<LocalDate, BigDecimal> sumSpendMap = new HashMap<>();
+            for (Long subId : subUserIds) {
+                List<LtvLaunchConfig> subConfigs = ltvLaunchConfigRepository.findByUserId(subId);
+                for (LtvLaunchConfig sc : subConfigs) {
+                    if (sc.getLaunchDate() != null && sc.getSpend() != null) {
+                        sumSpendMap.merge(sc.getLaunchDate(), sc.getSpend(), BigDecimal::add);
+                    }
+                }
+            }
+            configsByDate = new HashMap<>();
+            for (Map.Entry<LocalDate, BigDecimal> entry : sumSpendMap.entrySet()) {
+                LtvLaunchConfig mc = new LtvLaunchConfig();
+                mc.setUserId(userId);
+                mc.setLaunchDate(entry.getKey());
+                mc.setSpend(entry.getValue());
+                mc.setRemark(masterRemark);
+                configsByDate.put(entry.getKey(), mc);
+            }
+        } else {
+            configsByDate = ltvLaunchConfigRepository.findByUserId(userId).stream()
+                    .collect(Collectors.toMap(LtvLaunchConfig::getLaunchDate, c -> c));
+        }
 
         LocalDate currDate = START_DATE;
         List<LtvDailyStat> statList = new ArrayList<>();
@@ -245,7 +296,7 @@ public class LtvStatService {
             LtvLaunchConfig launchConfig = configsByDate.get(currDate);
 
             BigDecimal spend = launchConfig != null ? launchConfig.getSpend() : BigDecimal.ZERO;
-            String remark = launchConfig != null ? launchConfig.getRemark() : "";
+            String remark = isMasterAcc ? masterRemark : (launchConfig != null ? launchConfig.getRemark() : "");
 
             LtvDailyStat stat = calculateSingleCohort(userId, currDate, cohortOrders, spend, remark, maxToday, tzMap);
             statList.add(stat);
@@ -256,6 +307,12 @@ public class LtvStatService {
         ltvDailyStatRepository.flush();
         ltvDailyStatRepository.saveAll(statList);
         ltvDailyStatRepository.flush();
+
+        // 触发所属主账号的 LTV 报表同步重算
+        List<Long> parentMasterIds = userService.getMasterUserIdsForSub(userId);
+        for (Long masterId : parentMasterIds) {
+            calculateLtvStatsForUser(masterId);
+        }
     }
 
     /**

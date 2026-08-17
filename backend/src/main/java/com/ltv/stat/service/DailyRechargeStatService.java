@@ -247,6 +247,12 @@ public class DailyRechargeStatService {
         dailyRechargeDistributionRepository.flush();
         dailyRechargeDistributionRepository.saveAll(statList);
         dailyRechargeDistributionRepository.flush();
+
+        // 触发所属主账号的每日充值分布重算
+        List<Long> parentMasterIds = userService.getMasterUserIdsForSub(userId);
+        for (Long masterId : parentMasterIds) {
+            calculateDailyDistributionStatsForUser(masterId);
+        }
     }
 
     @Transactional
