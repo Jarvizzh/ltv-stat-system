@@ -269,17 +269,20 @@ public class UserService {
             return list;
         }
 
-        // 普通管理员 / 普通用户：包含自身主账户 + 被分配允许查看的目标账户
+        // 普通管理员 / 普通用户：包含自身主账户 + 被分配允许查看的目标账户 + 若为主账号则自动包含名下子账号
         List<Long> grantedTargetIds = getUserViewPermissionTargetIds(userId);
         Set<Long> visibleSet = new HashSet<>(grantedTargetIds);
         visibleSet.add(userId);
+        if (isMasterAccount(userId)) {
+            visibleSet.addAll(getSubUserIdsForMaster(userId));
+        }
 
         List<VisibleAccountDto> result = new ArrayList<>();
         // 首先加入本人账户
         int selfSubCount = isMasterAccount(user.getId()) ? getSubUserIdsForMaster(user.getId()).size() : 0;
         result.add(new VisibleAccountDto(user.getId(), user.getUsername(), user.getRole(), true, user.getIsMaster(), selfSubCount));
 
-        // 其它被授权的账户
+        // 其它被授权的账户 (包含权限表授权 + 主子账号归属)
         for (SysUser u : allUsers) {
             if (!u.getId().equals(userId) && visibleSet.contains(u.getId()) && u.getStatus() != null && u.getStatus() == 1) {
                 int subCount = isMasterAccount(u.getId()) ? getSubUserIdsForMaster(u.getId()).size() : 0;
@@ -295,13 +298,23 @@ public class UserService {
         if (targetUserId == null || targetUserId.equals(currentUser.getUserId())) return true;
         if (currentUser.isSuperAdmin()) return true;
 
+        if (userSubAccountRepository.existsByMasterUserIdAndSubUserId(currentUser.getUserId(), targetUserId)) {
+            return true;
+        }
+
         return userViewPermissionRepository.existsByUserIdAndTargetUserId(currentUser.getUserId(), targetUserId);
     }
 
     public boolean canUserModifyTarget(TokenInfo currentUser, Long targetUserId) {
         if (currentUser == null || currentUser.getUserId() == null) return false;
         if (targetUserId == null || targetUserId.equals(currentUser.getUserId())) return true;
-        return currentUser.isSuperAdmin();
+        if (currentUser.isSuperAdmin()) return true;
+
+        if (userSubAccountRepository.existsByMasterUserIdAndSubUserId(currentUser.getUserId(), targetUserId)) {
+            return true;
+        }
+
+        return false;
     }
 
 

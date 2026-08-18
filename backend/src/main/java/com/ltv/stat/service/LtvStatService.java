@@ -95,13 +95,8 @@ public class LtvStatService {
         config.setLaunchDate(launchDate);
         if (spend != null) config.setSpend(spend);
         if (remark != null) config.setRemark(remark);
-        LtvLaunchConfig saved = ltvLaunchConfigRepository.save(config);
-        
-        // 触发所属主账号的报表重算
-        List<Long> parentMasterIds = userService.getMasterUserIdsForSub(uid);
-        for (Long masterId : parentMasterIds) {
-            calculateLtvStatsForUser(masterId);
-        }
+        LtvLaunchConfig saved = ltvLaunchConfigRepository.saveAndFlush(config);
+        invalidateUserCache(uid);
         return saved;
     }
 
@@ -131,17 +126,26 @@ public class LtvStatService {
                 } catch (Exception ignored) {}
             }
 
-            saveLaunchConfig(userId, launchDate, spend, remark);
+            final Long uid = userId;
+            final LocalDate fDate = launchDate;
+            final BigDecimal fSpend = spend;
+            final String fRemark = remark;
+            LtvLaunchConfig config = ltvLaunchConfigRepository.findByUserIdAndLaunchDate(uid, fDate).orElseGet(() -> {
+                LtvLaunchConfig c = new LtvLaunchConfig();
+                c.setUserId(uid);
+                c.setLaunchDate(fDate);
+                return c;
+            });
+            config.setUserId(uid);
+            config.setLaunchDate(fDate);
+            if (fSpend != null) config.setSpend(fSpend);
+            if (fRemark != null) config.setRemark(fRemark);
+            ltvLaunchConfigRepository.save(config);
             count++;
         }
         ltvLaunchConfigRepository.flush();
+        invalidateUserCache(userId);
         calculateLtvStatsForUser(userId);
-        
-        // 触发所属主账号的报表重算
-        List<Long> parentMasterIds = userService.getMasterUserIdsForSub(userId);
-        for (Long masterId : parentMasterIds) {
-            calculateLtvStatsForUser(masterId);
-        }
         return count;
     }
 
