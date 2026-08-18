@@ -58,6 +58,7 @@ public class LtvStatService {
     private final LtvPredictService ltvPredictService;
     private final OrderSyncService orderSyncService;
     private final LtvBenchmarkService ltvBenchmarkService;
+    private final AsyncRecalculateService asyncRecalculateService;
 
     public LtvStatService(RawOrderRepository rawOrderRepository,
                           LtvLaunchConfigRepository ltvLaunchConfigRepository,
@@ -67,7 +68,8 @@ public class LtvStatService {
                           UserService userService,
                           LtvPredictService ltvPredictService,
                           @org.springframework.context.annotation.Lazy OrderSyncService orderSyncService,
-                          @org.springframework.beans.factory.annotation.Autowired(required = false) LtvBenchmarkService ltvBenchmarkService) {
+                          @org.springframework.beans.factory.annotation.Autowired(required = false) LtvBenchmarkService ltvBenchmarkService,
+                          @org.springframework.context.annotation.Lazy AsyncRecalculateService asyncRecalculateService) {
         this.rawOrderRepository = rawOrderRepository;
         this.ltvLaunchConfigRepository = ltvLaunchConfigRepository;
         this.ltvDailyStatRepository = ltvDailyStatRepository;
@@ -77,6 +79,7 @@ public class LtvStatService {
         this.ltvPredictService = ltvPredictService;
         this.orderSyncService = orderSyncService;
         this.ltvBenchmarkService = ltvBenchmarkService;
+        this.asyncRecalculateService = asyncRecalculateService;
     }
 
     public LtvLaunchConfig saveLaunchConfig(Long userId, LocalDate launchDate, BigDecimal spend, String remark) {
@@ -243,10 +246,10 @@ public class LtvStatService {
     }
 
     /**
-     * 计算并持久化指定用户的 LTV 统计表
+     * 计算并持久化指定用户的 LTV 统计表 (仅针对指定用户本身，不触发父级主账号)
      */
     @Transactional
-    public void calculateLtvStatsForUser(Long userId) {
+    public void calculateLtvStatsForUserDirect(Long userId) {
         if (userId == null) userId = 1L;
         invalidateUserCache(userId);
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
@@ -331,13 +334,19 @@ public class LtvStatService {
         ltvDailyStatRepository.flush();
 
         invalidateUserCache(userId);
+    }
 
-        // 触发所属主账号的 LTV 报表同步重算
-        List<Long> parentMasterIds = userService.getMasterUserIdsForSub(userId);
-        for (Long masterId : parentMasterIds) {
-            calculateLtvStatsForUser(masterId);
+    /**
+     * 计算并持久化指定用户的 LTV 统计表，并异步触发关联主账号数据重算
+     */
+    @Transactional
+    public void calculateLtvStatsForUser(Long userId) {
+        calculateLtvStatsForUserDirect(userId);
+
+        // 异步触发所属主账号的报表重算 (在后台独立线程执行，不阻塞前端)
+        if (asyncRecalculateService != null) {
+            asyncRecalculateService.asyncRecalculateMastersForSubUser(userId);
         }
-        invalidateUserCache(userId);
     }
 
     /**

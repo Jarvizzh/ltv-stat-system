@@ -37,15 +37,18 @@ public class DailyRechargeStatService {
     private final DailyRechargeDistributionRepository dailyRechargeDistributionRepository;
     private final UserService userService;
     private final LtvStatService ltvStatService;
+    private final AsyncRecalculateService asyncRecalculateService;
 
     public DailyRechargeStatService(RawOrderRepository rawOrderRepository,
                                     DailyRechargeDistributionRepository dailyRechargeDistributionRepository,
                                     UserService userService,
-                                    LtvStatService ltvStatService) {
+                                    LtvStatService ltvStatService,
+                                    @org.springframework.context.annotation.Lazy AsyncRecalculateService asyncRecalculateService) {
         this.rawOrderRepository = rawOrderRepository;
         this.dailyRechargeDistributionRepository = dailyRechargeDistributionRepository;
         this.userService = userService;
         this.ltvStatService = ltvStatService;
+        this.asyncRecalculateService = asyncRecalculateService;
     }
 
     public List<DailyRechargeDistribution> getDailyDistributionStats(Long userId) {
@@ -213,8 +216,11 @@ public class DailyRechargeStatService {
         return summary;
     }
 
+    /**
+     * 计算并持久化指定用户的每日充值分布表 (仅针对指定用户本身，不触发父级主账号)
+     */
     @Transactional
-    public void calculateDailyDistributionStatsForUser(Long userId) {
+    public void calculateDailyDistributionStatsForUserDirect(Long userId) {
         if (userId == null) userId = 1L;
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
 
@@ -241,11 +247,18 @@ public class DailyRechargeStatService {
         dailyRechargeDistributionRepository.flush();
         dailyRechargeDistributionRepository.saveAll(statList);
         dailyRechargeDistributionRepository.flush();
+    }
 
-        // 触发所属主账号的每日充值分布重算
-        List<Long> parentMasterIds = userService.getMasterUserIdsForSub(userId);
-        for (Long masterId : parentMasterIds) {
-            calculateDailyDistributionStatsForUser(masterId);
+    /**
+     * 计算并持久化指定用户的每日充值分布表，并异步触发关联主账号数据重算
+     */
+    @Transactional
+    public void calculateDailyDistributionStatsForUser(Long userId) {
+        calculateDailyDistributionStatsForUserDirect(userId);
+
+        // 异步触发所属主账号的每日充值分布重算 (后台线程执行，不阻塞前端)
+        if (asyncRecalculateService != null) {
+            asyncRecalculateService.asyncRecalculateMastersForSubUser(userId);
         }
     }
 
