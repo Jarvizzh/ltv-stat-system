@@ -122,7 +122,8 @@ public class LtvStatService {
             String remark = (String) item.get("remark");
 
             if (dateStr == null || dateStr.trim().isEmpty()) continue;
-            LocalDate launchDate = LocalDate.parse(dateStr.trim());
+            LocalDate launchDate = parseFlexDate(dateStr);
+            if (launchDate == null) continue;
             BigDecimal spend = BigDecimal.ZERO;
             if (spendObj != null) {
                 try {
@@ -155,6 +156,23 @@ public class LtvStatService {
             return order.getRegisterDateEt();
         }
         return order.getRegisterTimeBj() != null ? order.getRegisterTimeBj().toLocalDate() : order.getRegisterDateEt();
+    }
+
+    public static LocalDate parseFlexDate(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) return null;
+        try {
+            String s = dateStr.trim().replace('.', '-').replace('/', '-');
+            String[] parts = s.split("-");
+            if (parts.length == 3) {
+                int year = Integer.parseInt(parts[0]);
+                int month = Integer.parseInt(parts[1]);
+                int day = Integer.parseInt(parts[2]);
+                return LocalDate.of(year, month, day);
+            }
+            return LocalDate.parse(s);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public static LocalDate getEffectiveRegisterDate(RawOrder order) {

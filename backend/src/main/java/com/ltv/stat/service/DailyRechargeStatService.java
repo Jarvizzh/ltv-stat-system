@@ -50,12 +50,6 @@ public class DailyRechargeStatService {
 
     public List<DailyRechargeDistribution> getDailyDistributionStats(Long userId) {
         if (userId == null) userId = 1L;
-        List<String> userPIds = userService.getUserLandingPageIds(userId);
-        if (userPIds == null || userPIds.isEmpty()) {
-            dailyRechargeDistributionRepository.deleteByUserId(userId);
-            dailyRechargeDistributionRepository.flush();
-            return Collections.emptyList();
-        }
         List<DailyRechargeDistribution> list = dailyRechargeDistributionRepository.findByUserIdAndDateGreaterThanEqualOrderByDateDesc(userId, START_DATE);
         if (list.isEmpty()) {
             calculateDailyDistributionStatsForUser(userId);
