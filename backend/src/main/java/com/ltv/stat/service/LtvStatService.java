@@ -326,11 +326,14 @@ public class LtvStatService {
         ltvDailyStatRepository.saveAll(statList);
         ltvDailyStatRepository.flush();
 
+        invalidateUserCache(userId);
+
         // 触发所属主账号的 LTV 报表同步重算
         List<Long> parentMasterIds = userService.getMasterUserIdsForSub(userId);
         for (Long masterId : parentMasterIds) {
             calculateLtvStatsForUser(masterId);
         }
+        invalidateUserCache(userId);
     }
 
     /**
