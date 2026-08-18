@@ -977,6 +977,7 @@ export default function App() {
 
       <BatchSpendModal
         isOpen={isBatchSpendOpen}
+        targetUserId={targetUserId}
         onClose={() => setIsBatchSpendOpen(false)}
         onSaved={handleBatchSpendSaved}
         authFetch={authFetch}
@@ -985,6 +986,7 @@ export default function App() {
       <EditSpendModal
         isOpen={!!editingRow}
         item={editingRow}
+        targetUserId={targetUserId}
         onClose={() => setEditingRow(null)}
         onSaved={handleSpendSaved}
         authFetch={authFetch}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, AlertCircle } from 'lucide-react';
 
-export default function EditSpendModal({ isOpen, item, onClose, onSaved, authFetch }) {
+export default function EditSpendModal({ isOpen, item, onClose, onSaved, authFetch, targetUserId }) {
   const [spend, setSpend] = useState('');
   const [remark, setRemark] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,6 +42,7 @@ export default function EditSpendModal({ isOpen, item, onClose, onSaved, authFet
           launchDate: item.launchDate,
           spend: parsedSpend,
           remark: remark,
+          targetUserId: targetUserId || null,
         }),
       });
       const data = await res.json();

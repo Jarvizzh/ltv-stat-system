@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 
-export default function BatchSpendModal({ isOpen, onClose, onSaved, authFetch }) {
+export default function BatchSpendModal({ isOpen, onClose, onSaved, authFetch, targetUserId }) {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -9,7 +9,7 @@ export default function BatchSpendModal({ isOpen, onClose, onSaved, authFetch })
   if (!isOpen) return null;
 
   const fetchFunc = authFetch || fetch;
-
+  
   const parseLines = () => {
     const lines = inputText.split(/\r?\n/);
     const parsed = [];
@@ -83,7 +83,10 @@ export default function BatchSpendModal({ isOpen, onClose, onSaved, authFetch })
       const res = await fetchFunc('/api/ltv/batch-spend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: parsed }),
+        body: JSON.stringify({
+          items: parsed,
+          targetUserId: targetUserId || null,
+        }),
       });
       const json = await res.json();
       if (json.code === 0) {
