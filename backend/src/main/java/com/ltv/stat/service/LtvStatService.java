@@ -513,12 +513,6 @@ public class LtvStatService {
     @Transactional
     public List<LtvDailyStat> getLtvDailyStats(Long userId) {
         if (userId == null) userId = 1L;
-        List<String> userPIds = userService.getUserLandingPageIds(userId);
-        if (userPIds == null || userPIds.isEmpty()) {
-            ltvDailyStatRepository.deleteByUserId(userId);
-            ltvDailyStatRepository.flush();
-            return Collections.emptyList();
-        }
         List<LtvDailyStat> list = ltvDailyStatRepository.findByUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(userId, START_DATE);
         if (list.isEmpty()) {
             calculateLtvStatsForUser(userId);
