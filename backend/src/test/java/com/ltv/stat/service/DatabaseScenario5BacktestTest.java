@@ -4,6 +4,7 @@ import com.ltv.stat.dto.PredictionResult;
 import com.ltv.stat.entity.LtvDailyStat;
 import com.ltv.stat.entity.LtvDailyStatId;
 import com.ltv.stat.repository.LtvDailyStatRepository;
+import com.ltv.stat.util.CohortStatHelper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,17 +29,35 @@ public class DatabaseScenario5BacktestTest {
     private LtvDailyStatRepository ltvDailyStatRepository;
 
     @Autowired
+    private com.ltv.stat.repository.SysUserRepository sysUserRepository;
+
+    @Autowired
+    private LtvBenchmarkService ltvBenchmarkService;
+
+    @Autowired
     private LtvStatService ltvStatService;
 
     @Autowired
     private LtvPredictService ltvPredictService;
 
     @Test
-    @DisplayName("场景5：数据库已回本 Cohort 回溯测试明细")
+    @DisplayName("场景5：数据库已回本 Cohort 回溯测试明细 (仅 jarvis 用户)")
     public void testScenario5DatabaseBacktest() {
         System.out.println("\n=========================================================================================");
-        System.out.println("                 场景 5：数据库已回本 Cohort 回溯测试明细 (Scenario 5 Backtest)");
+        System.out.println("          场景 5：数据库已回本 Cohort 回溯测试明细 (仅 jarvis 用户视角)");
         System.out.println("=========================================================================================\n");
+
+        java.util.Optional<com.ltv.stat.entity.SysUser> jarvisOpt = sysUserRepository.findByUsername("jarvis");
+        Long targetUserId = jarvisOpt.isPresent() ? jarvisOpt.get().getId() : 3L;
+        String username = jarvisOpt.isPresent() ? jarvisOpt.get().getUsername() : "jarvis";
+
+        System.out.println(">>> 步骤 0：在开始预测回本天数前，先全量重算并更新 LTV 预测历史基准线 (LtvBenchmarkService)... <<<");
+        try {
+            ltvBenchmarkService.recalculateAllBenchmarks();
+            System.out.println(">>> 基准线更新成功！开始进行切片预测校验... <<<\n");
+        } catch (Exception e) {
+            System.err.println("基准线更新异常: " + e.getMessage());
+        }
 
         List<LtvDailyStat> allStats = ltvDailyStatRepository.findAllByOrderByLaunchDateAsc();
 
@@ -50,7 +69,7 @@ public class DatabaseScenario5BacktestTest {
 
         List<LtvDailyStat> paidBackCohorts = new ArrayList<>();
         for (LtvDailyStat s : allStats) {
-            if (s.getUserId() != null && s.getUserId() > 0 && s.getSpend() != null && s.getSpend().compareTo(BigDecimal.ZERO) > 0 && isPaidBack(s)) {
+            if (s.getUserId() != null && s.getUserId().equals(targetUserId) && s.getSpend() != null && s.getSpend().compareTo(BigDecimal.ZERO) > 0 && isPaidBack(s)) {
                 paidBackCohorts.add(s);
             }
         }
@@ -100,15 +119,19 @@ public class DatabaseScenario5BacktestTest {
         System.out.println("\n-------------------------------------------------------------------------------------------------------------------------");
         System.out.println("                                场景 5 数据库回溯精度统计摘要 (Scenario 5 Summary)");
         System.out.println("-------------------------------------------------------------------------------------------------------------------------");
-        System.out.printf("%-10s | %-10s | %-12s | %-12s | %-12s | %-12s | %-12s%n",
-                "观察窗口", "有效样本数", "MAE误差(天)", "±2天命中率", "±3天命中率", "±5天命中率", "±7天命中率");
-        System.out.println("-------------------------------------------------------------------------------------------------------------------------");
+        System.out.printf("%-10s | %-10s | %-12s | %-12s | %-12s | %-12s | %-12s | %-12s%n",
+                "观察窗口", "有效样本数", "MedAE(中位数)", "MAE(算术均值)", "±2天命中率", "±3天命中率", "±5天命中率", "±7天命中率");
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------");
 
         for (int w : windows) {
             List<Integer> errs = windowErrorsMap.get(w);
             int count = errs.size();
             if (count > 0) {
                 double mae = errs.stream().mapToInt(Integer::intValue).average().orElse(0.0);
+                List<Integer> sortedErrs = new ArrayList<>(errs);
+                Collections.sort(sortedErrs);
+                double medAe = sortedErrs.get(sortedErrs.size() / 2);
+
                 long hit2 = errs.stream().filter(e -> e <= 2).count();
                 long hit3 = errs.stream().filter(e -> e <= 3).count();
                 long hit5 = errs.stream().filter(e -> e <= 5).count();
@@ -119,10 +142,10 @@ public class DatabaseScenario5BacktestTest {
                 double hit5Rate = (double) hit5 / count * 100.0;
                 double hit7Rate = (double) hit7 / count * 100.0;
 
-                System.out.printf("Day %-6d | %-10d | %-12.2f | %-12.1f%% | %-12.1f%% | %-12.1f%% | %-12.1f%%%n",
-                        w, count, mae, hit2Rate, hit3Rate, hit5Rate, hit7Rate);
+                System.out.printf("Day %-6d | %-10d | %-12.2f | %-12.2f | %-12.1f%% | %-12.1f%% | %-12.1f%% | %-12.1f%%%n",
+                        w, count, medAe, mae, hit2Rate, hit3Rate, hit5Rate, hit7Rate);
             } else {
-                System.out.printf("Day %-6d | 0          | N/A          | N/A          | N/A          | N/A          | N/A%n", w);
+                System.out.printf("Day %-6d | 0          | N/A          | N/A          | N/A          | N/A          | N/A          | N/A%n", w);
             }
         }
         System.out.println("=========================================================================================\n");
