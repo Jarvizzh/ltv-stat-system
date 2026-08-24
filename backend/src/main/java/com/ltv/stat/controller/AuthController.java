@@ -55,6 +55,10 @@ public class AuthController {
                 response.setUsername(user.getUsername());
                 response.setRole(user.getRole());
                 response.setExpireDays(tokenExpireDays);
+                response.setPermPredictPayback(user.hasPermPredictPayback() ? 1 : 0);
+                response.setPermRoiPredict(user.hasPermRoiPredict() ? 1 : 0);
+                response.setPermGlobalDistribution(user.hasPermGlobalDistribution() ? 1 : 0);
+                response.setPermExport(user.hasPermExport() ? 1 : 0);
                 return ResponseEntity.ok(response);
             }
         }
@@ -81,6 +85,20 @@ public class AuthController {
             response.setUserId(tokenInfo.getUserId());
             response.setUsername(tokenInfo.getUsername());
             response.setRole(tokenInfo.getRole());
+
+            userService.findById(tokenInfo.getUserId()).ifPresent(user -> {
+                if (user.getRole() != null) {
+                    response.setRole(user.getRole());
+                }
+                if (user.getUsername() != null) {
+                    response.setUsername(user.getUsername());
+                }
+                response.setPermPredictPayback(user.hasPermPredictPayback() ? 1 : 0);
+                response.setPermRoiPredict(user.hasPermRoiPredict() ? 1 : 0);
+                response.setPermGlobalDistribution(user.hasPermGlobalDistribution() ? 1 : 0);
+                response.setPermExport(user.hasPermExport() ? 1 : 0);
+            });
+
             return ResponseEntity.ok(response);
         } else {
             response.setCode(401);

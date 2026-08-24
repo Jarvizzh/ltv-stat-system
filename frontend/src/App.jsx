@@ -25,9 +25,47 @@ export default function App() {
     return {
       userId: uid ? Number(uid) : 1,
       username: localStorage.getItem('admin_username') || 'admin',
-      role: localStorage.getItem('admin_role') || 'USER'
+      role: localStorage.getItem('admin_role') || 'USER',
+      permPredictPayback: Number(localStorage.getItem('admin_perm_predict_payback') || 0),
+      permRoiPredict: Number(localStorage.getItem('admin_perm_roi_predict') || 0),
+      permGlobalDistribution: Number(localStorage.getItem('admin_perm_global_distribution') || 0),
+      permExport: Number(localStorage.getItem('admin_perm_export') || 0),
     };
   });
+
+  const isSuperAdmin = Boolean(currentUser && currentUser.role === 'SUPER_ADMIN');
+  const hasPermPredictPayback = isSuperAdmin || Boolean(currentUser?.permPredictPayback === 1);
+  const hasPermRoiPredict = isSuperAdmin || Boolean(currentUser?.permRoiPredict === 1);
+  const hasPermGlobalDistribution = isSuperAdmin || Boolean(currentUser?.permGlobalDistribution === 1);
+  const hasPermExport = isSuperAdmin || Boolean(currentUser?.permExport === 1);
+
+  useEffect(() => {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+      fetch('/api/auth/check', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.code === 0) {
+          localStorage.setItem('admin_perm_predict_payback', data.permPredictPayback || 0);
+          localStorage.setItem('admin_perm_roi_predict', data.permRoiPredict || 0);
+          localStorage.setItem('admin_perm_global_distribution', data.permGlobalDistribution || 0);
+          localStorage.setItem('admin_perm_export', data.permExport || 0);
+          localStorage.setItem('admin_role', data.role || 'USER');
+          setCurrentUser(prev => ({
+            ...prev,
+            role: data.role || prev.role,
+            permPredictPayback: data.permPredictPayback || 0,
+            permRoiPredict: data.permRoiPredict || 0,
+            permGlobalDistribution: data.permGlobalDistribution || 0,
+            permExport: data.permExport || 0,
+          }));
+        }
+      })
+      .catch(() => {});
+    }
+  }, []);
 
   const [targetUserId, setTargetUserId] = useState(() => {
     const uid = localStorage.getItem('admin_user_id');
@@ -36,6 +74,12 @@ export default function App() {
 
   const [usersList, setUsersList] = useState([]);
   const [activeTab, setActiveTab] = useState('ltv'); // 'ltv' | 'distribution'
+
+  useEffect(() => {
+    if (activeTab === 'global-distribution' && !hasPermGlobalDistribution) {
+      setActiveTab('ltv');
+    }
+  }, [activeTab, hasPermGlobalDistribution]);
   const [data, setData] = useState([]);
   const [distributionData, setDistributionData] = useState([]);
   const [distributionSummary, setDistributionSummary] = useState(null);
@@ -59,7 +103,7 @@ export default function App() {
 
   const handleConfirmExport = (dateRange) => {
     if (activeTab === 'ltv') {
-      exportLtvTable(data, true, currentUser?.username || '', dateRange);
+      exportLtvTable(data, hasPermPredictPayback, currentUser?.username || '', dateRange);
     } else if (activeTab === 'distribution') {
       exportDistributionTable(distributionData, false, dateRange);
     } else if (activeTab === 'global-distribution') {
@@ -203,6 +247,7 @@ export default function App() {
 
   const fetchGlobalDistributionData = async () => {
     if (!localStorage.getItem('admin_token')) return;
+    if (!hasPermGlobalDistribution) return;
     setLoading(true);
     try {
       const res = await authFetch('/api/ltv/global-daily-distribution');
@@ -212,13 +257,10 @@ export default function App() {
         if (json.summary) {
           setGlobalDistributionSummary(json.summary);
         }
-      } else {
-        showToast(json.msg || '获取全量充值分析数据失败', 'error');
       }
     } catch (err) {
       if (err.message !== 'UNAUTHORIZED') {
         console.error('Failed to fetch global daily distribution data:', err);
-        showToast('获取全量充值分析数据失败', 'error');
       }
     } finally {
       setLoading(false);
@@ -233,10 +275,12 @@ export default function App() {
       } else if (activeTab === 'distribution') {
         fetchDistributionData(targetUserId);
       } else if (activeTab === 'global-distribution') {
-        fetchGlobalDistributionData();
+        if (hasPermGlobalDistribution) {
+          fetchGlobalDistributionData();
+        }
       }
     }
-  }, [isAuthenticated, activeTab, targetUserId]);
+  }, [isAuthenticated, activeTab, targetUserId, hasPermGlobalDistribution]);
 
   const handleSelectTargetUser = (newUserId) => {
     setTargetUserId(newUserId);
@@ -250,7 +294,9 @@ export default function App() {
     } else if (activeTab === 'distribution') {
       fetchDistributionData(newUserId);
     } else if (activeTab === 'global-distribution') {
-      fetchGlobalDistributionData();
+      if (hasPermGlobalDistribution) {
+        fetchGlobalDistributionData();
+      }
     }
     const userObj = usersList.find(u => u.id === newUserId);
     showToast(`已切换至用户视图: [${userObj ? userObj.username : newUserId}]，已自动刷新数据`, 'info');
@@ -262,7 +308,11 @@ export default function App() {
     const userObj = {
       userId: newUid,
       username: loginData.username,
-      role: loginData.role
+      role: loginData.role,
+      permPredictPayback: loginData.permPredictPayback || 0,
+      permRoiPredict: loginData.permRoiPredict || 0,
+      permGlobalDistribution: loginData.permGlobalDistribution || 0,
+      permExport: loginData.permExport || 0,
     };
     setCurrentUser(userObj);
     setTargetUserId(newUid);
@@ -282,7 +332,9 @@ export default function App() {
     } else if (activeTab === 'distribution') {
       fetchDistributionData(newUid);
     } else if (activeTab === 'global-distribution') {
-      fetchGlobalDistributionData();
+      if (userObj.role === 'SUPER_ADMIN' || userObj.permGlobalDistribution === 1) {
+        fetchGlobalDistributionData();
+      }
     }
 
     showToast(`登录成功！欢迎 ${loginData.username}，已加载最新数据`, 'success');
@@ -349,7 +401,9 @@ export default function App() {
         setIsSyncModalOpen(false);
         fetchLtvData();
         fetchDistributionData();
-        fetchGlobalDistributionData();
+        if (hasPermGlobalDistribution) {
+          fetchGlobalDistributionData();
+        }
         showToast('LTV 与 充值分析全量报表重算完成！', 'success');
       } else {
         showToast(`提示: ${json.msg}`, 'warning');
@@ -380,7 +434,9 @@ export default function App() {
         setIsSyncModalOpen(false);
         fetchLtvData();
         fetchDistributionData();
-        fetchGlobalDistributionData();
+        if (hasPermGlobalDistribution) {
+          fetchGlobalDistributionData();
+        }
         showToast(`全流程抓取与重算完成！`, 'success');
       } else if (json.code === 4002) {
         setErrorMessage(json.msg);
@@ -549,15 +605,13 @@ export default function App() {
   };
 
   const overallPaybackCycleDays = calculateOverallPaybackCycleDays();
-
-  const isSuperAdmin = Boolean(currentUser && currentUser.role === 'SUPER_ADMIN');
   const currentTargetUserObj = usersList.find(u => u.id === (targetUserId || currentUser?.userId));
   const isTargetMaster = currentTargetUserObj ? Boolean(currentTargetUserObj.isMaster === 1) : false;
   const isReadOnlyView = Boolean(targetUserId && currentUser && targetUserId !== currentUser.userId) || isTargetMaster;
 
   const renderActualPaybackTag = (days, monthStr, d30Roi, d60Roi, d90Roi) => {
     if (days === null || days === undefined) return null;
-    const hasPred = isSuperAdmin && d30Roi !== null && d30Roi !== undefined;
+    const hasPred = hasPermRoiPredict && d30Roi !== null && d30Roi !== undefined;
     return (
       <span
         onMouseEnter={(e) => {
@@ -713,7 +767,7 @@ export default function App() {
                     <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.12rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.74rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       已回本{overallPaybackCycleDays ? ` / 周期：${overallPaybackCycleDays}天` : ''}
                     </span>
-                  ) : (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN') && (
+                  ) : hasPermPredictPayback && (
                     overallPaybackDays === -1 ? (
                       <span style={{ background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.3)', padding: '0.12rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.74rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
                         回本：停滞
@@ -824,7 +878,7 @@ export default function App() {
                         {formatUsd(lastMonthProfit)}
                       </span>
                       {renderActualPaybackTag(lastMonthActualPaybackDays, lastMonthStr, lastMonthPredD30, lastMonthPredD60, lastMonthPredD90)}
-                      {isSuperAdmin && lastMonthActualPaybackDays === null && lastMonthPredD30 !== null && lastMonthPredD30 !== undefined && (
+                      {hasPermRoiPredict && lastMonthActualPaybackDays === null && lastMonthPredD30 !== null && lastMonthPredD30 !== undefined && (
                         <span
                           onMouseEnter={(e) => {
                             const rect = e.currentTarget.getBoundingClientRect();
@@ -906,6 +960,8 @@ export default function App() {
               isReadOnly={isReadOnlyView}
               isAdmin={currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN'}
               isSuperAdmin={isSuperAdmin}
+              hasPermPredictPayback={hasPermPredictPayback}
+              hasPermRoiPredict={hasPermRoiPredict}
             />
           </>
         )}

@@ -19,7 +19,8 @@ export default function LtvHeader({
   loading
 }) {
   const isSuperAdmin = currentUser && currentUser.role === 'SUPER_ADMIN';
-  const isAdmin = currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN');
+  const hasPermGlobalDistribution = isSuperAdmin || currentUser?.permGlobalDistribution === 1;
+  const hasPermExport = isSuperAdmin || currentUser?.permExport === 1;
   const isReadOnly = Boolean(targetUserId && currentUser && targetUserId !== currentUser.userId);
   const canSwitchView = (isSuperAdmin || (usersList && usersList.length > 1)) && usersList && usersList.length > 0;
 
@@ -51,7 +52,7 @@ export default function LtvHeader({
             <PieChart size={16} />
             <span>充值分析</span>
           </button>
-          {isAdmin && (
+          {hasPermGlobalDistribution && (
             <button
               className={`nav-tab-btn ${activeTab === 'global-distribution' ? 'active' : ''}`}
               onClick={() => onTabChange('global-distribution')}
@@ -149,8 +150,8 @@ export default function LtvHeader({
           <span>{loading ? '同步中...' : '数据同步'}</span>
         </button>
 
-        {/* 导出表格按钮 (仅管理员与超级管理员可见) */}
-        {isAdmin && (
+        {/* 导出表格按钮 */}
+        {hasPermExport && (
           <button
             className="theme-toggle-btn"
             onClick={onOpenExportModal}

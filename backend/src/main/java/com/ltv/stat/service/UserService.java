@@ -108,6 +108,22 @@ public class UserService {
 
     @Transactional
     public SysUser createUser(String username, String rawPassword, String role) {
+        return createUser(username, rawPassword, role, 0, null, null, 0, 0, 0, 0);
+    }
+
+    @Transactional
+    public SysUser createUser(
+            String username,
+            String rawPassword,
+            String role,
+            Integer isMaster,
+            List<Long> visibleUserIds,
+            List<Long> subUserIds,
+            Integer permPredictPayback,
+            Integer permRoiPredict,
+            Integer permGlobalDistribution,
+            Integer permExport
+    ) {
         if (sysUserRepository.existsByUsername(username)) {
             throw new IllegalArgumentException("用户名已存在: " + username);
         }
@@ -116,7 +132,25 @@ public class UserService {
         user.setPasswordHash(hashPassword(rawPassword));
         user.setRole(role != null ? role.toUpperCase() : "USER");
         user.setStatus(1);
-        return sysUserRepository.save(user);
+        user.setIsMaster(isMaster != null ? isMaster : 0);
+        user.setPermPredictPayback(permPredictPayback != null ? permPredictPayback : 0);
+        user.setPermRoiPredict(permRoiPredict != null ? permRoiPredict : 0);
+        user.setPermGlobalDistribution(permGlobalDistribution != null ? permGlobalDistribution : 0);
+        user.setPermExport(permExport != null ? permExport : 0);
+
+        SysUser savedUser = sysUserRepository.save(user);
+
+        // 如果配置了只读视图
+        if (visibleUserIds != null && !visibleUserIds.isEmpty()) {
+            updateUserViewPermissions(savedUser.getId(), visibleUserIds);
+        }
+
+        // 如果是主账号并配置了子账号
+        if (Integer.valueOf(1).equals(user.getIsMaster()) && subUserIds != null && !subUserIds.isEmpty()) {
+            updateMasterSubAccounts(savedUser.getId(), subUserIds);
+        }
+
+        return savedUser;
     }
 
     @Transactional
@@ -247,6 +281,43 @@ public class UserService {
                 userViewPermissionRepository.flush();
             }
         }
+    }
+
+    @Transactional
+    public void updateUserPermissions(Long userId, Integer permPredictPayback, Integer permRoiPredict, Integer permGlobalDistribution, Integer permExport) {
+        SysUser user = sysUserRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
+
+        if (permPredictPayback != null) user.setPermPredictPayback(permPredictPayback);
+        if (permRoiPredict != null) user.setPermRoiPredict(permRoiPredict);
+        if (permGlobalDistribution != null) user.setPermGlobalDistribution(permGlobalDistribution);
+        if (permExport != null) user.setPermExport(permExport);
+
+        sysUserRepository.save(user);
+    }
+
+    public boolean hasPermGlobalDistribution(Long userId) {
+        if (userId == null) return false;
+        SysUser user = sysUserRepository.findById(userId).orElse(null);
+        return user != null && user.hasPermGlobalDistribution();
+    }
+
+    public boolean hasPermExport(Long userId) {
+        if (userId == null) return false;
+        SysUser user = sysUserRepository.findById(userId).orElse(null);
+        return user != null && user.hasPermExport();
+    }
+
+    public boolean hasPermPredictPayback(Long userId) {
+        if (userId == null) return false;
+        SysUser user = sysUserRepository.findById(userId).orElse(null);
+        return user != null && user.hasPermPredictPayback();
+    }
+
+    public boolean hasPermRoiPredict(Long userId) {
+        if (userId == null) return false;
+        SysUser user = sysUserRepository.findById(userId).orElse(null);
+        return user != null && user.hasPermRoiPredict();
     }
 
     public List<VisibleAccountDto> getVisibleAccountsForUser(Long userId) {

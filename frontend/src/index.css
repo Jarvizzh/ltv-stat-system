@@ -617,18 +617,20 @@ td.sticky-col {
 
 .user-mgmt-table th {
   background: var(--bg-th);
-  padding: 0.75rem 1rem;
+  padding: 0.7rem 0.85rem;
   text-align: left;
   font-weight: 600;
   color: var(--text-sub);
   border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
 }
 
 .user-mgmt-table td {
-  padding: 0.75rem 1rem;
+  padding: 0.7rem 0.85rem;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-main);
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .user-mgmt-table tr:last-child td {

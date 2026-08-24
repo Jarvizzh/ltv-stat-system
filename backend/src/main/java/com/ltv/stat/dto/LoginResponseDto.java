@@ -11,6 +11,10 @@ public class LoginResponseDto {
     private String username;
     private String role;
     private Integer expireDays;
+    private Integer permPredictPayback;
+    private Integer permRoiPredict;
+    private Integer permGlobalDistribution;
+    private Integer permExport;
 
     public LoginResponseDto() {}
 
@@ -34,4 +38,16 @@ public class LoginResponseDto {
 
     public Integer getExpireDays() { return expireDays; }
     public void setExpireDays(Integer expireDays) { this.expireDays = expireDays; }
+
+    public Integer getPermPredictPayback() { return permPredictPayback != null ? permPredictPayback : 0; }
+    public void setPermPredictPayback(Integer permPredictPayback) { this.permPredictPayback = permPredictPayback; }
+
+    public Integer getPermRoiPredict() { return permRoiPredict != null ? permRoiPredict : 0; }
+    public void setPermRoiPredict(Integer permRoiPredict) { this.permRoiPredict = permRoiPredict; }
+
+    public Integer getPermGlobalDistribution() { return permGlobalDistribution != null ? permGlobalDistribution : 0; }
+    public void setPermGlobalDistribution(Integer permGlobalDistribution) { this.permGlobalDistribution = permGlobalDistribution; }
+
+    public Integer getPermExport() { return permExport != null ? permExport : 0; }
+    public void setPermExport(Integer permExport) { this.permExport = permExport; }
 }

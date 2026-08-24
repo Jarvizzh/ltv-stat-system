@@ -26,6 +26,19 @@ public class SysUser {
     @Column(name = "is_master", nullable = false)
     private Integer isMaster = 0; // 0: Normal/Sub, 1: Master Account
 
+    // 细粒度功能权限 (0: 无权限, 1: 拥有权限，超级管理员默认拥有所有权限)
+    @Column(name = "perm_predict_payback", nullable = false)
+    private Integer permPredictPayback = 0; // 预测回本（包括LTV表格预测回本列）
+
+    @Column(name = "perm_roi_predict", nullable = false)
+    private Integer permRoiPredict = 0; // （D30~D90）ROI预测
+
+    @Column(name = "perm_global_distribution", nullable = false)
+    private Integer permGlobalDistribution = 0; // 平台汇总
+
+    @Column(name = "perm_export", nullable = false)
+    private Integer permExport = 0; // 数据导出
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -61,6 +74,23 @@ public class SysUser {
     public Integer getIsMaster() { return isMaster != null ? isMaster : 0; }
     public void setIsMaster(Integer isMaster) { this.isMaster = isMaster; }
     public boolean isMasterAccount() { return Integer.valueOf(1).equals(this.isMaster); }
+    public boolean isSuperAdmin() { return "SUPER_ADMIN".equalsIgnoreCase(this.role); }
+
+    public Integer getPermPredictPayback() { return permPredictPayback != null ? permPredictPayback : 0; }
+    public void setPermPredictPayback(Integer permPredictPayback) { this.permPredictPayback = permPredictPayback; }
+    public boolean hasPermPredictPayback() { return isSuperAdmin() || Integer.valueOf(1).equals(this.permPredictPayback); }
+
+    public Integer getPermRoiPredict() { return permRoiPredict != null ? permRoiPredict : 0; }
+    public void setPermRoiPredict(Integer permRoiPredict) { this.permRoiPredict = permRoiPredict; }
+    public boolean hasPermRoiPredict() { return isSuperAdmin() || Integer.valueOf(1).equals(this.permRoiPredict); }
+
+    public Integer getPermGlobalDistribution() { return permGlobalDistribution != null ? permGlobalDistribution : 0; }
+    public void setPermGlobalDistribution(Integer permGlobalDistribution) { this.permGlobalDistribution = permGlobalDistribution; }
+    public boolean hasPermGlobalDistribution() { return isSuperAdmin() || Integer.valueOf(1).equals(this.permGlobalDistribution); }
+
+    public Integer getPermExport() { return permExport != null ? permExport : 0; }
+    public void setPermExport(Integer permExport) { this.permExport = permExport; }
+    public boolean hasPermExport() { return isSuperAdmin() || Integer.valueOf(1).equals(this.permExport); }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

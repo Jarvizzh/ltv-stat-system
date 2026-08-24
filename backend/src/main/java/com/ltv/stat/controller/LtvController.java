@@ -111,8 +111,8 @@ public class LtvController {
     @GetMapping("/global-daily-distribution")
     public ResponseEntity<?> getGlobalDailyDistribution() {
         TokenInfo currentUser = UserContext.getCurrentUser();
-        if (currentUser == null || !currentUser.isAdmin()) {
-            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权访问，仅管理员可查看全量平台汇总"));
+        if (currentUser == null || !userService.hasPermGlobalDistribution(currentUser.getUserId())) {
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权访问，请联系超级管理员分配「平台汇总」功能权限"));
         }
         List<DailyRechargeDistribution> list = dailyRechargeStatService.getGlobalDailyDistributionStats();
         DailyDistributionSummaryDto summary = dailyRechargeStatService.getGlobalDailyDistributionSummary();

@@ -3,11 +3,12 @@ import { Edit2, Download } from 'lucide-react';
 import { exportLtvTable } from '../utils/exportExcel';
 import ExportModal from './ExportModal';
 
-export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuperAdmin }) {
+export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuperAdmin, hasPermPredictPayback, hasPermRoiPredict }) {
   const [hoveredRemark, setHoveredRemark] = useState(null);
   const [hoveredPrediction, setHoveredPrediction] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const showPrediction = Boolean(isAdmin);
+  const showPrediction = isSuperAdmin || Boolean(hasPermPredictPayback);
+  const showRoiPredict = isSuperAdmin || Boolean(hasPermRoiPredict);
 
   const handleConfirmExport = (dateRange) => {
     exportLtvTable(data, showPrediction, '', dateRange);
@@ -379,7 +380,7 @@ export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuper
                   <td
                     className="sticky-col col-11 text-center col-boundary"
                     onMouseEnter={(e) => {
-                      if (row.spend > 0) {
+                      if (row.spend > 0 && showRoiPredict) {
                         const rect = e.currentTarget.getBoundingClientRect();
                         setHoveredPrediction({
                           date: row.launchDate,
@@ -396,7 +397,7 @@ export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuper
                       }
                     }}
                     onMouseLeave={() => setHoveredPrediction(null)}
-                    style={{ left: `${left11}px`, width: `${colWidths.col11}px`, minWidth: `${colWidths.col11}px`, cursor: 'pointer' }}
+                    style={{ left: `${left11}px`, width: `${colWidths.col11}px`, minWidth: `${colWidths.col11}px`, cursor: showRoiPredict ? 'pointer' : 'default' }}
                   >
                     {row.spend > 0 ? formatPaybackDays(row.predictedPaybackDays) : <span style={{ color: 'var(--text-muted)' }}>-</span>}
                   </td>
@@ -450,8 +451,8 @@ export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuper
         </div>
       )}
 
-      {/* 仅超级管理员 (isSuperAdmin) 鼠标移入“预测回本”单元格悬浮展示 D30, D60, D90 ROI 预测卡片 Tooltip */}
-      {isSuperAdmin && hoveredPrediction && (
+      {/* 拥有 ROI 预测权限 (showRoiPredict) 鼠标移入“预测回本”单元格悬浮展示 D30, D60, D90 ROI 预测卡片 Tooltip */}
+      {showRoiPredict && hoveredPrediction && (
         <div
           className="instant-prediction-popover"
           style={{

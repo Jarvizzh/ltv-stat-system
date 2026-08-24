@@ -52,6 +52,10 @@ public class AdminUserController {
             dto.setVisibleUserIds(userService.getUserViewPermissionTargetIds(u.getId()));
             dto.setIsMaster(u.getIsMaster());
             dto.setSubUserIds(userService.getSubUserIdsForMaster(u.getId()));
+            dto.setPermPredictPayback(u.hasPermPredictPayback() ? 1 : 0);
+            dto.setPermRoiPredict(u.hasPermRoiPredict() ? 1 : 0);
+            dto.setPermGlobalDistribution(u.hasPermGlobalDistribution() ? 1 : 0);
+            dto.setPermExport(u.hasPermExport() ? 1 : 0);
             result.add(dto);
         }
 
@@ -141,6 +145,24 @@ public class AdminUserController {
         }
     }
 
+    @PutMapping("/{id}/permissions")
+    public ResponseEntity<?> updatePermissions(@PathVariable("id") Long id, @RequestBody UserPermissionsUpdateRequestDto body) {
+        if (!checkSuperAdmin()) {
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权操作，仅超级管理员可分配功能权限"));
+        }
+        try {
+            Integer permPredictPayback = body != null ? body.getPermPredictPayback() : 0;
+            Integer permRoiPredict = body != null ? body.getPermRoiPredict() : 0;
+            Integer permGlobalDistribution = body != null ? body.getPermGlobalDistribution() : 0;
+            Integer permExport = body != null ? body.getPermExport() : 0;
+
+            userService.updateUserPermissions(id, permPredictPayback, permRoiPredict, permGlobalDistribution, permExport);
+            return ResponseEntity.ok(ApiResponseDto.success("功能权限分配保存成功！", null));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(ApiResponseDto.error(500, "更新功能权限失败: " + e.getMessage()));
+        }
+    }
+
     @PostMapping
     public ResponseEntity<?> createUser(@RequestBody CreateUserRequestDto body) {
         if (!checkSuperAdmin()) {
@@ -156,7 +178,26 @@ public class AdminUserController {
         }
 
         try {
-            userService.createUser(username.trim(), password.trim(), role);
+            Integer isMaster = body != null ? body.getIsMaster() : 0;
+            List<Long> visibleUserIds = body != null ? body.getVisibleUserIds() : null;
+            List<Long> subUserIds = body != null ? body.getSubUserIds() : null;
+            Integer permPredictPayback = body != null ? body.getPermPredictPayback() : 0;
+            Integer permRoiPredict = body != null ? body.getPermRoiPredict() : 0;
+            Integer permGlobalDistribution = body != null ? body.getPermGlobalDistribution() : 0;
+            Integer permExport = body != null ? body.getPermExport() : 0;
+
+            userService.createUser(
+                    username.trim(),
+                    password.trim(),
+                    role,
+                    isMaster,
+                    visibleUserIds,
+                    subUserIds,
+                    permPredictPayback,
+                    permRoiPredict,
+                    permGlobalDistribution,
+                    permExport
+            );
             return ResponseEntity.ok(ApiResponseDto.success("创建成功", null));
         } catch (IllegalArgumentException ie) {
             return ResponseEntity.badRequest().body(ApiResponseDto.error(400, ie.getMessage()));

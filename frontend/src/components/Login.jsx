@@ -30,6 +30,10 @@ export default function Login({ onLoginSuccess }) {
         localStorage.setItem('admin_username', data.username);
         localStorage.setItem('admin_role', data.role || 'USER');
         localStorage.setItem('admin_user_id', data.userId);
+        localStorage.setItem('admin_perm_predict_payback', data.permPredictPayback || 0);
+        localStorage.setItem('admin_perm_roi_predict', data.permRoiPredict || 0);
+        localStorage.setItem('admin_perm_global_distribution', data.permGlobalDistribution || 0);
+        localStorage.setItem('admin_perm_export', data.permExport || 0);
         onLoginSuccess(data);
       } else {
         setErrorMsg(data.msg || '登录失败，请检查账号密码');
