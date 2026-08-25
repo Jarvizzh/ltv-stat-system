@@ -219,4 +219,23 @@ public final class CohortStatHelper {
         }
         return false;
     }
+
+    /**
+     * 计算最近 window 天内产生新充值增量（正充值天数）的比例 C_window
+     */
+    public static double getRechargeContinuityRatio(LtvDailyStat stat, int maxDays, int window) {
+        if (stat == null || maxDays <= 1 || window <= 0) return 0.0;
+        int startDay = Math.max(2, maxDays - window + 1);
+        int totalDays = maxDays - startDay + 1;
+        if (totalDays <= 0) return 0.0;
+        int activeDays = 0;
+        for (int d = startDay; d <= maxDays; d++) {
+            BigDecimal curr = getRechargeForDay(stat, d);
+            BigDecimal prev = getRechargeForDay(stat, d - 1);
+            if (curr != null && prev != null && curr.subtract(prev).compareTo(new BigDecimal("0.01")) > 0) {
+                activeDays++;
+            }
+        }
+        return (double) activeDays / totalDays;
+    }
 }

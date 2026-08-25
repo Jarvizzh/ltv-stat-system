@@ -67,65 +67,67 @@ graph TD
 ### Step 1: 建立或匹配小说基准曲线 (Benchmark Baseline Matching)
 
 针对 Cohort 中解析出的订阅周期 P（单次/日订 P = 1, 周订 P = 7, 月订 P = 30 等）：
-1. 优先从数据库匹配该小说落地页/渠道维度（如维度类型 `USER` 或 `ALL`）由历史成熟 Cohort（Age ≥ 14 天）萃取出的网文基准线：
+1. **订阅套餐配置动态匹配 (Subscription Config Versions)**：
+   优先根据当前 Cohort 的上线时间 `launchTime` 从 `SubscriptionConfigVersion` 匹配当时的生效套餐：
+   - 首充价格：`configFirstUsd = firstPriceCent / 100.0`
+   - 续费价格：`configRenewUsd = renewPriceCent / 100.0`
+2. **历史大盘真实基准线匹配 (Empirical Baseline)**：
+   从数据库匹配该小说落地页/渠道维度（如维度类型 `USER` 或 `ALL`）由历史成熟 Cohort（Age ≥ 14 天）萃取出的网文基准线：
    - `baseRet[d]`：第 d 天的基准留存/续订率；
    - `baseArpu[d]`：第 d 天的基准单客 ARPU（含金币复购与自动续扣）。
-2. 若无历史数据，启用 **网文合成基准线 (Synthetic Standard Benchmark Fallback)**：
+3. **合成基准线兜底 (Synthetic Standard Benchmark Fallback)**：
+   若无历史基准数据，优先采用套餐配置价；若全为空，启用默认兜底价格（**周订 $19.99 / 日订 $9.99**）：
    - **周订 / 月订**：在划扣节点 d = 1, P+1, 2P+1 ... 按衰减指数建模：
-     baseRet[d] = 0.55 ^ (cycleIndex - 1)
+     `baseRet[d] = 0.55 ^ (cycleIndex - 1)`
    - **单次/日订**：按小说读者流失与追更规律的幂律衰减建模：
-     baseRet[d] = 1 / (d ^ 0.75)
-3. **90 天后小说完本尾部长尾衰减**：
-   baseRet[d] = baseRet[90] × (90 / d) ^ 1.2  (d > 90)
+     `baseRet[d] = 1 / (d ^ 0.75)`
+4. **90 天后小说完本尾部长尾衰减**：
+   `baseRet[d] = baseRet[90] × (90 / d) ^ 1.2`  (d > 90)
 
 ---
 
-### Step 2: 计算初始放缩因子与贝叶斯先验收缩 (`CohortCurveExtrapolator.computeOptimalScaleFactor`)
+### Step 2: 动态客单萃取与放缩因子计算 (`CohortCurveExtrapolator.computeOptimalScaleFactor`)
 
 根据已知观察天数 maxDays = min(daysElapsed, 60)，计算当前小说批次的实际累计 ROI 与基准预期 ROI 总和：
 
-actualRoi = actualRecharge / spend
+`actualRoi = actualRecharge / spend`
 
-baseRoiSum = Σ (baseRet[d] × unitPrice_d × userCount) / spend
+`baseRoiSum = Σ (baseRet[d] × unitPrice_d × userCount) / spend`
 
-未收缩的原始放大系数：
+#### 1. 单客充值力 (Realized ARPU) 贝叶斯动态萃取
+对于大额金币充值批次，单客真实充值力可能远超单次订阅价格。系统通过贝叶斯加权吸收当前批次的真实单客充值水平：
+`RealizedARPU = actualRecharge / (userCount × Σ baseRet[d])`
+`EffectiveARPU = w_arpu × clamp(0.5 × BaseARPU, 8.0 × BaseARPU, RealizedARPU) + (1 - w_arpu) × BaseARPU`
+其中时间置信度权重 `w_arpu = timeWeight(maxDays) × (userCount / (userCount + 5.0))`（7 天以内 `w_arpu = 0` 保证早期风控，14 天后平滑提升至 0.85）。
 
-α_raw = actualRoi / baseRoiSum
-
-#### 贝叶斯先验收缩与离群点熔断 (Empirical Bayes & Outlier Clamping)
-
-- **极早期（maxDays < 7 天）**：
-  由于前 1~3 天读者充值容易受到个别“土豪读者”大额金币充值影响，加入消耗金额加权先验收缩，防止小消耗大充值导致预测过度乐观：
-  α = (actualRoi + priorWeight) / (baseRoiSum + priorWeight)
-  其中 priorWeight = clamp(0.05, 0.20, (1000 / spend) × 0.05)。
-  限制 α ∈ [`EARLY_STAGE_MIN_ALPHA`, `EARLY_STAGE_MAX_ALPHA`]（即 `[0.80, 1.25]`），贝叶斯权重 w = 0.15 + 0.10 × (maxDays / 7)。
-
-- **成熟期（maxDays ≥ 7 天）**：
-  跨过首个小说周卡/月卡续扣节点后，Sigmoid 强信任真实续扣与复购数据：
-  α = clamp(`MATURE_STAGE_MIN_ALPHA`, `MATURE_STAGE_MAX_ALPHA`, α_raw)（即 `[0.60, 2.00]`），权重 w = 0.85 + 0.10 × (min(53, maxDays - 7) / 53)。
+#### 2. 放缩因子贝叶斯先验收缩与小样本自适应松绑
+- **极早期（maxDays ≤ 7 天）**：
+  加入消耗金额加权先验收缩，防止早期低消耗大充值导致预测过度乐观：
+  `α = (actualRoi + priorWeight) / (baseRoiSum + priorWeight)`
+  限制 α ∈ [`EARLY_STAGE_MIN_ALPHA`, `EARLY_STAGE_MAX_ALPHA`]（即 `[0.80, 1.25]`），贝叶斯权重 `w = 0.15 + 0.10 × (maxDays / 7)`。
+- **成熟期常规批次（maxDays > 7 天）**：
+  限制 α ∈ [`MATURE_STAGE_MIN_ALPHA`, `MATURE_STAGE_MAX_ALPHA`]（即 `[0.60, 2.00]`），成熟期权重 `w = 0.85 + 0.10 × (min(46, maxDays - 14) / 46)`。
+- **小样本活跃大户批次（N ≤ 5 且 C_7 ≥ 0.70 且 ROI ≥ 0.40）**：
+  识别到土豪持续充值特征后，自适应松绑放缩上限至 `3.50`，远期衰减指数放宽至 `0.15`。
 
 最终放缩因子：
-
-scaleFactor = w × α + (1.0 - w) × 1.0
+`scaleFactor = w × α + (1.0 - w) × 1.0`
 
 ---
 
-### Step 3: 未来 365 天充值曲线推导与双重衰减 (Curve Extrapolation & Scale Decay)
+### Step 3: 未来 365 天充值曲线推导与双轨系综融合 (Curve Extrapolation & Ensemble)
 
 从 t = maxDays + 1 至 365 天进行逐日外推：
 
-1. **均值回归衰减 (Scale Decay)**：
-   放缩系数随读者阅读完本向网文行业大盘 1.0 平滑回归：
-   scaleDecay(t) = (maxDays / t) ^ `SCALE_DECAY_EXPONENT` （`SCALE_DECAY_EXPONENT = 0.35`）
-   effectiveScaleFactor(t) = 1.0 + (scaleFactor - 1.0) × scaleDecay(t)
-
-2. **周期续订/复购自然衰减 (Cycle Decay)**：
-   cycleDecay(t) = (7 / t) ^ `CYCLE_DECAY_EXPONENT` （`CYCLE_DECAY_EXPONENT = 0.06`）  (t > 7)
-
-3. **每日预测充值累加**：
-   在划扣/追更节点上计算当日预测新增充值收入 ΔR(t)：
-   ΔR(t) = baseRet[t] × effectiveScaleFactor(t) × cycleDecay(t) × renewPrice × userCount
-   cumRecharge[t] = cumRecharge[t-1] + ΔR(t)
+1. **轨道 A：留存衰减基准外推曲线推导**：
+   - 放缩系数向 1.0 平滑回归：`scaleDecay(t) = (maxDays / t) ^ SCALE_DECAY_EXPONENT`
+   - 有效放缩因子：`effectiveScaleFactor(t) = 1.0 + (scaleFactor - 1.0) × scaleDecay(t)`
+   - 周期续订自然衰减：`cycleDecay(t) = (7 / t) ^ CYCLE_DECAY_EXPONENT`  (t > 7)
+   - 每日预测充值收入：`ΔR(t) = baseRet[t] × effectiveScaleFactor(t) × cycleDecay(t) × EffectiveARPU × userCount`
+   - 若命中活跃大户特征，施加近 7 天真实充值日速度下界保护：`ΔR(t) = max(ΔR(t), DailyVelocity × (maxDays/t)^0.15)`
+2. **轨道 B：成熟期 (D14+) 双轨 OLS 动量动态系综融合**：
+   - 当 `maxDays ≥ 14` 且对数回归拟合优度 `R^2 ≥ 0.85` 时，根据 `R^2` 和观察天数动态计算融合权重 `λ ∈ [0, 0.45]`：
+     `cumRecharge[t] = (1 - λ) × cumRecharge_A[t] + λ × (spend × (a × ln(t) + b))`
 
 ---
 
@@ -157,12 +159,23 @@ requiredFlatDays = max(`MIN_FLAT_DAYS`, P_max × `PERIOD_FLAT_MULTIPLIER`) （�
 
 若触发停滞，未来预测充值曲线平盘，回本天数返回 `-1`。
 
-### 2. OLS 线性对数拟合兜底 (`CohortCurveExtrapolator.predictCohortOlsFallback`)
+### 2. 成熟期 (D14+) 双轨 OLS 动量动态系综 (Ensemble)
+当观察天数 $t \ge 14$ 且历史数据对数拟合优度 $R^2 \ge 0.85$ 时，系统自动激活双轨动态融合机制：
+- **轨道 A**：留存衰减基准外推曲线（大盘宏观规律）；
+- **轨道 B**：历史充值对数回归拟合曲线 $\text{ROI}(t) = a \cdot \ln(t) + b$（微观增长动量）；
+- **融合加权**：$\text{FinalCurve}(t) = (1 - \lambda) \times \text{Curve}_A(t) + \lambda \times \text{Curve}_B(t)$，兼顾大盘宏观留存规律与当前批次的强增长惯性。
+
+### 3. 小样本 (N ≤ 5) 活跃大户自适应松绑与单客 ARPU 贝叶斯萃取
+针对小样本高客单批次（如仅有 2 名超级土豪读者）：
+- **连续性指数 $C_7$ 识别**：若近 7 天内连续充值天数占比 $C_7 \ge 0.70$ 且实际 ROI $\ge 0.40$，动态松绑放缩上限至 3.5 并柔化远期衰减；
+- **Realized ARPU 贝叶斯修正**：结合样本量与成熟期时间置信度，动态吸收单客高充值力，攻克极端小样本回本预测钝化问题。
+
+### 4. 兜底线性对数拟合方法 (`CohortCurveExtrapolator.predictCohortOlsFallback`)
 当缺少有效网文历史基准线时，利用历史充值点通过最小二乘法对数拟合 R(t) = a × ln(t) + b，当 a > 0.0001 时求得解析解：
 
 t_payback = exp((1.0 - b) / a)
 
-### 3. 大盘整体回本天数 (`PaybackPredictEngine.calculateOverallPaybackDays`)
+### 5. 大盘整体回本天数 (`PaybackPredictEngine.calculateOverallPaybackDays`)
 对于广告主/整体小说平台视角，采用 **自下而上（Bottom-Up）自然日历对齐算法**：
 - 按各个 H5 落地页/广告账户 Cohort 真实的 `launchDate` 在自然日历上逐日求和大盘预测充值曲线；
 - 解决不同批次小说 Cohort 处于不同生命周期阶段（如老广告组与新测试广告组）的交叠累加问题；
@@ -174,14 +187,14 @@ t_payback = exp((1.0 - b) / a)
 
 | 包名 / 类名 | 关键方法 / 字段 | 职责说明 |
 | :--- | :--- | :--- |
-| `com.ltv.stat.service.LtvPredictService` | `predictCohortDailyRechargeCurve` | 编排层，匹配数据并调度外推引擎生成 D1~D365 全量预测充值曲线 |
+| `com.ltv.stat.service.LtvPredictService` | `predictCohortDailyRechargeCurve` | 编排层，实现 Realized ARPU 贝叶斯萃取、双轨系综融合并生成 D1~D365 预测充值曲线 |
 | `com.ltv.stat.service.engine.LtvPredictFacade` | `assembleCohortPrediction` / `assembleOverallPrediction` | 门面类，分发调度引擎并组装单 Cohort 及大盘 `PredictionResult` DTO |
 | `com.ltv.stat.service.engine.PaybackPredictEngine` | `calculateCohortPaybackDays` / `calculateOverallPaybackDays` | 引擎层，计算单 Cohort 真实已回本天数、未来交叉回本点及大盘交叠回本 |
 | `com.ltv.stat.service.engine.RoiPredictEngine` | `calculateCohortRoiTrend` | 引擎层，提取 D30/D60/D90 里程碑，施加单调递增约束与动态上限保护 |
-| `com.ltv.stat.service.engine.CohortCurveExtrapolator` | `computeOptimalScaleFactor` / `predictCohortOlsFallback` | **纯算子引擎**，计算贝叶斯放缩因子与 OLS 线性对数拟合 |
-| `com.ltv.stat.util.CohortStatHelper` | `getRechargeForDay` / `isSubscriptionStagnant` | **数据与状态助手**，解耦提供 Cohort 充值提取与追更/平盘停滞判定 |
-| `com.ltv.stat.service.engine.PredictAlgorithmConstants` | `SCALE_DECAY_EXPONENT` / `MATURE_STAGE_MAX_ALPHA` 等 | **常量管理**，集中存放所有算法超参数、熔断阈值与上限配置 |
-| `com.ltv.stat.service.LtvBenchmarkService` | `getBenchmarkCurve` | 查询与萃取网文历史成熟 Cohort 的留存与 ARPU 基准线 |
+| `com.ltv.stat.service.engine.CohortCurveExtrapolator` | `computeOptimalScaleFactor` / `computeOlsFit` / `computeOlsEnsembleWeight` | **纯算子引擎**，计算贝叶斯放缩因子、OLS 拟合优度及动态系综权重 |
+| `com.ltv.stat.util.CohortStatHelper` | `getRechargeForDay` / `isSubscriptionStagnant` / `getRechargeContinuityRatio` | **数据与状态助手**，提供充值提取、连续性指数与平盘停滞判定 |
+| `com.ltv.stat.service.engine.PredictAlgorithmConstants` | `SCALE_DECAY_EXPONENT` / `OLS_ENSEMBLE_MIN_R2` 等 | **常量管理**，集中存放所有算法超参数、P2 动态系综阈值与上限配置 |
+| `com.ltv.stat.service.LtvBenchmarkService` | `getBenchmarkCurve` / `recalculateAllBenchmarks` | 查询与萃取网文历史成熟 Cohort 的留存与 ARPU 基准线 |
 
 ---
 

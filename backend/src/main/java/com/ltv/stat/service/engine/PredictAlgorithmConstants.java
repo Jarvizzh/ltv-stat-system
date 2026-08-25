@@ -35,4 +35,24 @@ public final class PredictAlgorithmConstants {
     public static final double D90_BASE_MAX_ROI = 2.20;
     public static final double D90_MAX_ROI_MULT = 1.70;
     public static final double D90_MAX_ROI_ADD = 0.75;
+
+    // P2 模块 1：贝叶斯单客充值力 (Realized ARPU) 萃取超参数
+    public static final double ARPU_SHRINKAGE_K_USER = 5.0; // 用户量先验收缩常数 K_user
+
+    // P2 模块 2：成熟期 (D14+) 双轨 OLS 动量系综超参数
+    public static final int OLS_ENSEMBLE_MIN_DAYS = 14;      // 激活 OLS 动量融合的最小观察天数
+    public static final double OLS_ENSEMBLE_MIN_R2 = 0.85;   // 激活 OLS 融合的拟合优度 R^2 门槛
+    public static final double OLS_ENSEMBLE_MIN_SLOPE = 0.03;// 激活 OLS 融合的最小增长斜率 a
+    public static final double OLS_ENSEMBLE_MAX_WEIGHT = 0.45;// OLS 动量最大融合权重 lambda
+
+    // P2 模块 3：小样本 (N <= 5) 活跃大户自适应松绑超参数
+    public static final int SMALL_COHORT_MAX_USERS = 5;
+    public static final double SMALL_COHORT_CONTINUITY_THRESHOLD = 0.70; // 近7天有>=70%天数连续产生充值
+    public static final double SMALL_COHORT_MIN_ROI = 0.40;              // 激活松绑的最小实际达成 ROI
+    public static final double SMALL_COHORT_MATURE_MAX_ALPHA = 3.50;     // 小样本松绑后的最大放缩上限
+    public static final double SMALL_COHORT_SCALE_DECAY_EXPONENT = 0.15; // 小样本松绑后的远期衰减指数
+
+    // 默认兜底价格常量：周订 19.99，日订 9.99
+    public static final double DEFAULT_DAILY_SUB_PRICE = 9.99;
+    public static final double DEFAULT_WEEKLY_SUB_PRICE = 19.99;
 }

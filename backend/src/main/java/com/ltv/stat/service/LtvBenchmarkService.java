@@ -8,6 +8,7 @@ import com.ltv.stat.entity.UserSubscriptionPeriod;
 import com.ltv.stat.repository.LtvPredictBenchmarkRepository;
 import com.ltv.stat.repository.RawOrderRepository;
 import com.ltv.stat.repository.UserSubscriptionPeriodRepository;
+import com.ltv.stat.service.engine.PredictAlgorithmConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -245,7 +246,8 @@ public class LtvBenchmarkService {
             int activeCount = totalActiveMembersCount.getOrDefault(d, 0);
             double avgRet = (double) activeCount / poolInitialSubs;
             BigDecimal recharge = totalRechargeMap.getOrDefault(d, BigDecimal.ZERO);
-            double avgArpu = activeCount > 0 ? recharge.doubleValue() / activeCount : (d == 1 ? (subPeriodDays == 7 ? 6.99 : 0.99) : 0.0);
+            double defaultPrice = (subPeriodDays == 1) ? PredictAlgorithmConstants.DEFAULT_DAILY_SUB_PRICE : PredictAlgorithmConstants.DEFAULT_WEEKLY_SUB_PRICE;
+            double avgArpu = activeCount > 0 ? recharge.doubleValue() / activeCount : (d == 1 ? defaultPrice : 0.0);
 
             baseRet[d] = avgRet;
             baseArpu[d] = avgArpu;

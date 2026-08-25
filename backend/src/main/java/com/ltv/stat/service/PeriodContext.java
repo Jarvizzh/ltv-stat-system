@@ -10,4 +10,5 @@ public class PeriodContext {
     public double[] baseArpu = new double[366];
     public Double configRenewUsd;
     public Double configFirstUsd;
+    public double effectiveArpu;
 }

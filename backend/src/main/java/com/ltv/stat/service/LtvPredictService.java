@@ -182,7 +182,8 @@ public class LtvPredictService {
                 }
             } else {
                 // 标准合成基准线兜底 (Synthetic Standard Benchmark Fallback)
-                double unitPrice = ctx.configRenewUsd != null ? ctx.configRenewUsd : (ctx.configFirstUsd != null ? ctx.configFirstUsd : 6.99);
+                double defaultUnitPrice = (period == 1) ? PredictAlgorithmConstants.DEFAULT_DAILY_SUB_PRICE : PredictAlgorithmConstants.DEFAULT_WEEKLY_SUB_PRICE;
+                double unitPrice = ctx.configRenewUsd != null ? ctx.configRenewUsd : (ctx.configFirstUsd != null ? ctx.configFirstUsd : defaultUnitPrice);
                 for (int d = 1; d <= 90; d++) {
                     if (period > 1) {
                         if ((d - 1) % period == 0) {
@@ -241,6 +242,49 @@ public class LtvPredictService {
         }
 
         double actualRoi = actualRecharge.divide(spend, 4, RoundingMode.HALF_UP).doubleValue();
+
+        // P2 模块 3：小样本强活跃大户特征识别与充值动量下界
+        double continuityRatio = CohortStatHelper.getRechargeContinuityRatio(stat, maxDays, 7);
+        boolean isSmallCohortActive = (effectiveSubUserCount <= PredictAlgorithmConstants.SMALL_COHORT_MAX_USERS
+                && continuityRatio >= PredictAlgorithmConstants.SMALL_COHORT_CONTINUITY_THRESHOLD
+                && actualRoi >= PredictAlgorithmConstants.SMALL_COHORT_MIN_ROI && maxDays >= 10);
+
+        double recentDailyVelocity = 0.0;
+        if (isSmallCohortActive && maxDays >= 7) {
+            BigDecimal rNow = getRechargeForDay(stat, maxDays);
+            BigDecimal r7Ago = getRechargeForDay(stat, maxDays - 7);
+            if (rNow != null && r7Ago != null) {
+                recentDailyVelocity = Math.max(0.0, rNow.subtract(r7Ago).doubleValue() / 7.0);
+            }
+        }
+
+        // P2 模块 1：Cohort 自身单客充值力 (Realized ARPU) 贝叶斯动态萃取
+        double timeWeight = 0.0;
+        if (maxDays > 7 && maxDays <= 14) {
+            timeWeight = 0.10 + 0.40 * ((double) (maxDays - 7) / 7.0);
+        } else if (maxDays > 14) {
+            timeWeight = 0.50 + 0.35 * ((double) Math.min(46, maxDays - 14) / 46.0);
+        }
+        double userWeight = (double) effectiveSubUserCount / (effectiveSubUserCount + PredictAlgorithmConstants.ARPU_SHRINKAGE_K_USER);
+        double arpuWeight = timeWeight * userWeight;
+
+        for (PeriodContext ctx : contexts) {
+            double retSum = 0.0;
+            for (int d = 1; d <= maxDays; d++) {
+                retSum += ctx.baseRet[d];
+            }
+            double defaultFallback = (ctx.periodDays == 1) ? PredictAlgorithmConstants.DEFAULT_DAILY_SUB_PRICE : PredictAlgorithmConstants.DEFAULT_WEEKLY_SUB_PRICE;
+            double baseArpuAnchor = (ctx.configRenewUsd != null) ? ctx.configRenewUsd
+                    : ((ctx.baseArpu != null && ctx.baseArpu[maxDays] > 0) ? ctx.baseArpu[maxDays] : defaultFallback);
+            if (retSum > 0.01 && effectiveSubUserCount > 0 && arpuWeight > 0.001) {
+                double realizedArpu = actualRecharge.doubleValue() / (effectiveSubUserCount * retSum);
+                double boundedRealizedArpu = Math.max(0.5 * baseArpuAnchor, Math.min(8.0 * baseArpuAnchor, realizedArpu));
+                ctx.effectiveArpu = arpuWeight * boundedRealizedArpu + (1.0 - arpuWeight) * baseArpuAnchor;
+            } else {
+                ctx.effectiveArpu = baseArpuAnchor;
+            }
+        }
+
         double baseRoiSum = 0;
         for (int d = 1; d <= maxDays; d++) {
             for (PeriodContext ctx : contexts) {
@@ -256,12 +300,14 @@ public class LtvPredictService {
             }
         }
         baseRoiSum = Math.max(0.0001, baseRoiSum);
-        double scaleFactor = computeOptimalScaleFactor(actualRoi, baseRoiSum, maxDays, spend);
+        double scaleFactor = computeOptimalScaleFactor(actualRoi, baseRoiSum, maxDays, spend, isSmallCohortActive);
 
+        // 轨道 A：留存衰减基准外推曲线推导
+        double scaleDecayExp = isSmallCohortActive ? PredictAlgorithmConstants.SMALL_COHORT_SCALE_DECAY_EXPONENT : PredictAlgorithmConstants.SCALE_DECAY_EXPONENT;
         double currentCumRecharge = actualRecharge.doubleValue();
         for (int t = maxDays + 1; t <= 365; t++) {
-            // 1. 均值回归机制：放缩因子向 1.0 平滑回归 (使用常量 SCALE_DECAY_EXPONENT = 0.35)
-            double scaleDecay = Math.pow((double) maxDays / t, PredictAlgorithmConstants.SCALE_DECAY_EXPONENT);
+            // 1. 均值回归机制：放缩因子向 1.0 平滑回归
+            double scaleDecay = Math.pow((double) maxDays / t, scaleDecayExp);
             double effectiveScaleFactor = 1.0 + (scaleFactor - 1.0) * scaleDecay;
 
             // 2. 周期续订自然衰减校准 (使用常量 CYCLE_DECAY_EXPONENT = 0.06)
@@ -271,12 +317,35 @@ public class LtvPredictService {
             for (PeriodContext ctx : contexts) {
                 if (ctx.periodDays == 1 || (t - 1) % ctx.periodDays == 0) {
                     double predRet = ctx.baseRet[t] * effectiveScaleFactor * cycleDecay;
-                    double predArpu = (ctx.configRenewUsd != null) ? ctx.configRenewUsd : ctx.baseArpu[t];
+                    double defaultArpu = (ctx.configRenewUsd != null) ? ctx.configRenewUsd : ctx.baseArpu[t];
+                    double predArpu = (arpuWeight > 0.001 && ctx.effectiveArpu > 0) ? ctx.effectiveArpu : defaultArpu;
                     dailyDeltaIncome += predRet * predArpu * ctx.userCount;
                 }
             }
+            if (isSmallCohortActive && recentDailyVelocity > 0.01) {
+                double velDecay = Math.pow((double) maxDays / t, PredictAlgorithmConstants.SMALL_COHORT_SCALE_DECAY_EXPONENT);
+                dailyDeltaIncome = Math.max(dailyDeltaIncome, recentDailyVelocity * velDecay);
+            }
             currentCumRecharge += dailyDeltaIncome;
             cumRecharge[t] = currentCumRecharge;
+        }
+
+        // P2 模块 2：成熟期 (D14+) 双轨 OLS 动量动态系综融合 (Ensemble)
+        if (maxDays >= PredictAlgorithmConstants.OLS_ENSEMBLE_MIN_DAYS) {
+            CohortCurveExtrapolator.OlsFitResult olsFit = CohortCurveExtrapolator.computeOlsFit(stat, maxDays);
+            if (olsFit.valid) {
+                double lambda = CohortCurveExtrapolator.computeOlsEnsembleWeight(olsFit.r2, maxDays);
+                if (lambda > 0.001) {
+                    double spendVal = spend.doubleValue();
+                    double baseRechargeAnchor = actualRecharge.doubleValue();
+                    for (int t = maxDays + 1; t <= 365; t++) {
+                        double olsRoi = olsFit.a * Math.log(t) + olsFit.b;
+                        double olsRecharge = spendVal * olsRoi;
+                        double effectiveOlsRecharge = Math.max(baseRechargeAnchor, olsRecharge);
+                        cumRecharge[t] = (1.0 - lambda) * cumRecharge[t] + lambda * effectiveOlsRecharge;
+                    }
+                }
+            }
         }
 
         return cumRecharge;
@@ -303,6 +372,10 @@ public class LtvPredictService {
 
     public static double computeOptimalScaleFactor(double actualRoi, double baseRoiSum, int maxDays, BigDecimal spend) {
         return CohortCurveExtrapolator.computeOptimalScaleFactor(actualRoi, baseRoiSum, maxDays, spend);
+    }
+
+    public static double computeOptimalScaleFactor(double actualRoi, double baseRoiSum, int maxDays, BigDecimal spend, boolean isSmallCohortActive) {
+        return CohortCurveExtrapolator.computeOptimalScaleFactor(actualRoi, baseRoiSum, maxDays, spend, isSmallCohortActive);
     }
 
     public static int getMaxPeriodInDistribution(LtvDailyStat stat) {
