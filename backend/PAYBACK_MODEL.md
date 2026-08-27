@@ -175,7 +175,21 @@ requiredFlatDays = max(`MIN_FLAT_DAYS`, P_max × `PERIOD_FLAT_MULTIPLIER`) （�
 
 t_payback = exp((1.0 - b) / a)
 
-### 5. 大盘整体回本天数 (`PaybackPredictEngine.calculateOverallPaybackDays`)
+### 5. ROI 里程碑预测与月度指标汇总同步优化 (`RoiPredictEngine.calculateCohortRoiTrend`)
+系统为 **单 Cohort 批次** 以及 **自然月月度汇总（Monthly Summary）** 提供高精度的 D30 / D60 / D90 ROI 预测：
+1. **分阶段分权治理 (Phase-Decoupled Control)**：
+   - **极早期 ($D3 \sim D7$)**：微观曲线易受 D1 首充脉冲扰动，结合网文历史经验增长倍率先验（$M_{\text{prior}}(3 \to 30)=2.65, M(7 \to 30)=1.80$）与样本量置信度进行贝叶斯平滑融合；
+   - **成熟期 ($D14 \sim D30$)**：底层外推曲线具备充分样本特异性与 OLS 动量，$100\%$ 完全信任底层微观外推曲线，杜绝宏观先验稀释；
+   - **到达自适应修正**：当天数达到 $30\text{D} / 60\text{D} / 90\text{D}$ 时，预测值直接精确修正为实际已发生的真实值，消除任何数据断层。
+2. **首充冲动型断崖衰竭识别 (Impulse Dropoff Detection)**：
+   - 在 $D3 \sim D5$ 窗口，检测读者是否在 D1 大额充值后连续停滞（$\text{Recharge}(D3) \le \text{Recharge}(D1) \times 1.05$）；
+   - 若命中读者流失特征，自动施加 $0.70$ 的流失折价保护，杜绝早期乐观误判。
+3. **时间自适应弹性上下界 (Elastic Dynamic Bounds)**：
+   - 彻底废除静态硬编码天花板，基于当前达成 ROI 与剩余时间动态计算上限 $\text{MaxROI}_{30}(t) = \text{ActualROI}(t) \times (1.0 + 2.2 \sqrt{\frac{30-t}{30}}) + 0.08 \times \frac{30-t}{30}$。
+4. **月度指标汇总 (Monthly Summary) 100% 自动继承**：
+   - `LtvStatService.getSingleMonthSummary` 汇总上月指标时，逐日调用底层单批次预测算子并累加充值（$\frac{\sum \text{PredRecharge}}{\sum \text{Spend}}$），全量自动继承底层 ROI 引擎的所有优化红利。
+
+### 6. 大盘整体回本天数 (`PaybackPredictEngine.calculateOverallPaybackDays`)
 对于广告主/整体小说平台视角，采用 **自下而上（Bottom-Up）自然日历对齐算法**：
 - 按各个 H5 落地页/广告账户 Cohort 真实的 `launchDate` 在自然日历上逐日求和大盘预测充值曲线；
 - 解决不同批次小说 Cohort 处于不同生命周期阶段（如老广告组与新测试广告组）的交叠累加问题；
@@ -190,10 +204,10 @@ t_payback = exp((1.0 - b) / a)
 | `com.ltv.stat.service.LtvPredictService` | `predictCohortDailyRechargeCurve` | 编排层，实现 Realized ARPU 贝叶斯萃取、双轨系综融合并生成 D1~D365 预测充值曲线 |
 | `com.ltv.stat.service.engine.LtvPredictFacade` | `assembleCohortPrediction` / `assembleOverallPrediction` | 门面类，分发调度引擎并组装单 Cohort 及大盘 `PredictionResult` DTO |
 | `com.ltv.stat.service.engine.PaybackPredictEngine` | `calculateCohortPaybackDays` / `calculateOverallPaybackDays` | 引擎层，计算单 Cohort 真实已回本天数、未来交叉回本点及大盘交叠回本 |
-| `com.ltv.stat.service.engine.RoiPredictEngine` | `calculateCohortRoiTrend` | 引擎层，提取 D30/D60/D90 里程碑，施加单调递增约束与动态上限保护 |
+| `com.ltv.stat.service.engine.RoiPredictEngine` | `calculateCohortRoiTrend` | 引擎层，计算 D30/D60/D90 里程碑预测，实现历史倍率先验融合、首充冲动折价与到达真实修正 |
 | `com.ltv.stat.service.engine.CohortCurveExtrapolator` | `computeOptimalScaleFactor` / `computeOlsFit` / `computeOlsEnsembleWeight` | **纯算子引擎**，计算贝叶斯放缩因子、OLS 拟合优度及动态系综权重 |
 | `com.ltv.stat.util.CohortStatHelper` | `getRechargeForDay` / `isSubscriptionStagnant` / `getRechargeContinuityRatio` | **数据与状态助手**，提供充值提取、连续性指数与平盘停滞判定 |
-| `com.ltv.stat.service.engine.PredictAlgorithmConstants` | `SCALE_DECAY_EXPONENT` / `OLS_ENSEMBLE_MIN_R2` 等 | **常量管理**，集中存放所有算法超参数、P2 动态系综阈值与上限配置 |
+| `com.ltv.stat.service.engine.PredictAlgorithmConstants` | `SCALE_DECAY_EXPONENT` / `getEmpiricalMultiplierTo30` 等 | **常量管理**，集中存放所有算法超参数、P2 动态系综阈值与先验配置 |
 | `com.ltv.stat.service.LtvBenchmarkService` | `getBenchmarkCurve` / `recalculateAllBenchmarks` | 查询与萃取网文历史成熟 Cohort 的留存与 ARPU 基准线 |
 
 ---

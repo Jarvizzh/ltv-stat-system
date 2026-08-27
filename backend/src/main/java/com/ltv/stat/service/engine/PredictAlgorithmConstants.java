@@ -23,18 +23,19 @@ public final class PredictAlgorithmConstants {
     public static final int MIN_FLAT_DAYS = 6;
     public static final int PERIOD_FLAT_MULTIPLIER = 2;
 
-    // ROI 里程碑 (D30, D60, D90) 动态上限保护系数
-    public static final double D30_BASE_MAX_ROI = 1.50;
-    public static final double D30_MAX_ROI_MULT = 1.25;
-    public static final double D30_MAX_ROI_ADD = 0.28;
+    // ROI 历史经验倍率先验方法与链式推演超参数
+    public static final double ROI_60_CHAIN_MULTIPLIER = 1.25; // D30 到 D60 经验倍率
+    public static final double ROI_90_CHAIN_MULTIPLIER = 1.18; // D60 到 D90 经验倍率
+    public static final double ROI_SAMPLE_SIZE_K = 8.0;        // ROI 预测用户量先验收缩常数
 
-    public static final double D60_BASE_MAX_ROI = 1.80;
-    public static final double D60_MAX_ROI_MULT = 1.45;
-    public static final double D60_MAX_ROI_ADD = 0.50;
-
-    public static final double D90_BASE_MAX_ROI = 2.20;
-    public static final double D90_MAX_ROI_MULT = 1.70;
-    public static final double D90_MAX_ROI_ADD = 0.75;
+    public static double getEmpiricalMultiplierTo30(int day) {
+        if (day >= 30) return 1.0;
+        if (day <= 3) return 2.65;
+        if (day <= 7) return 1.80;
+        if (day <= 14) return 1.35;
+        if (day <= 21) return 1.15;
+        return 1.0 + (30.0 - day) / 30.0 * 0.15;
+    }
 
     // P2 模块 1：贝叶斯单客充值力 (Realized ARPU) 萃取超参数
     public static final double ARPU_SHRINKAGE_K_USER = 5.0; // 用户量先验收缩常数 K_user

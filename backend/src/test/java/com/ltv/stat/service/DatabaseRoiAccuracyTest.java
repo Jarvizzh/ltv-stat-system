@@ -3,6 +3,7 @@ package com.ltv.stat.service;
 import com.ltv.stat.LtvApplication;
 import com.ltv.stat.entity.LtvDailyStat;
 import com.ltv.stat.repository.LtvDailyStatRepository;
+import com.ltv.stat.util.CohortStatHelper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,10 +28,144 @@ public class DatabaseRoiAccuracyTest {
     private LtvDailyStatRepository ltvDailyStatRepository;
 
     @Autowired
+    private LtvBenchmarkService ltvBenchmarkService;
+
+    @Autowired
     private LtvPredictService ltvPredictService;
 
+    @Autowired
+    private LtvStatService ltvStatService;
+
     @Test
-    @DisplayName("基于数据库真实 Cohort 验证 Day 7, Day 14, Day 30 ROI 预测精度")
+    @DisplayName("验证月度 ROI 预测 (Monthly Summary) 同步优化效果")
+    void testMonthlySummaryRoiPrediction() {
+        System.out.println("\n=========================================================================================");
+        System.out.println("            用户月度指标汇总 (Monthly Summary) ROI 预测同步优化验证");
+        System.out.println("=========================================================================================\n");
+
+        ltvBenchmarkService.recalculateAllBenchmarks();
+        com.ltv.stat.dto.MonthlySummaryDto summary = ltvStatService.getMonthlySummaryForUser(3L);
+
+        assertNotNull(summary, "无法生成月度汇总数据");
+
+        if (summary.getLastMonth() != null) {
+            com.ltv.stat.dto.SingleMonthSummaryDto lm = summary.getLastMonth();
+            System.out.println("【上月指标汇总 (" + lm.getMonth() + ")】:");
+            System.out.printf("  总消耗: $%s | 总充值: $%s | 累计ROI: %s%%%n", lm.getSpend(), lm.getRecharge(), lm.getRoi());
+            System.out.printf("  预测回本天数: %s 天%n", lm.getActualPaybackDays() != null ? lm.getActualPaybackDays() : "未回本/计算中");
+            System.out.printf("  D30 预测 ROI: %s%%%n", lm.getPredictedDay30Roi() != null ? lm.getPredictedDay30Roi().multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP) : "N/A");
+            System.out.printf("  D60 预测 ROI: %s%%%n", lm.getPredictedDay60Roi() != null ? lm.getPredictedDay60Roi().multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP) : "N/A");
+            System.out.printf("  D90 预测 ROI: %s%%%n", lm.getPredictedDay90Roi() != null ? lm.getPredictedDay90Roi().multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP) : "N/A");
+        }
+
+        if (summary.getThisMonth() != null) {
+            com.ltv.stat.dto.SingleMonthSummaryDto tm = summary.getThisMonth();
+            System.out.println("\n【本月指标汇总 (" + tm.getMonth() + ")】:");
+            System.out.printf("  总消耗: $%s | 总充值: $%s | 累计ROI: %s%%%n", tm.getSpend(), tm.getRecharge(), tm.getRoi());
+        }
+        System.out.println("=========================================================================================\n");
+    }
+
+    @Test
+    @DisplayName("基于数据库真实 Cohort 验证 Day 30 / Day 60 / Day 90 ROI 预测精度")
+    void testDatabaseD30D60D90RoiPredictionAccuracy() {
+        System.out.println("\n=========================================================================================");
+        System.out.println("       数据库真实 Cohort：D30 / D60 / D90 ROI 预测精度全景回溯测试 (jarvis 用户视角)");
+        System.out.println("=========================================================================================\n");
+
+        ltvBenchmarkService.recalculateAllBenchmarks();
+
+        List<LtvDailyStat> allStats = ltvDailyStatRepository.findByUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(
+                3L, LocalDate.of(2026, 7, 10));
+
+        assertNotNull(allStats, "无法找到测试 Cohort 记录");
+
+        List<LtvDailyStat> d30Cohorts = new ArrayList<>();
+        for (LtvDailyStat s : allStats) {
+            if (s.getSpend() != null && s.getSpend().compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal actualD30 = CohortStatHelper.getRoiForDay(s, 30);
+                if (actualD30 == null || actualD30.compareTo(BigDecimal.ZERO) <= 0) {
+                    BigDecimal rech30 = CohortStatHelper.getRechargeForDay(s, 30);
+                    if (rech30 != null && rech30.compareTo(BigDecimal.ZERO) > 0) {
+                        actualD30 = rech30.divide(s.getSpend(), 4, RoundingMode.HALF_UP);
+                    }
+                }
+                if (actualD30 != null && actualD30.compareTo(BigDecimal.ZERO) > 0) {
+                    d30Cohorts.add(s);
+                }
+            }
+        }
+
+        System.out.printf("找到 %d 个已产生真实 D30 数据的数据库 Cohort 批次进行回溯验证：%n%n", d30Cohorts.size());
+        System.out.printf("%-12s | %-9s | %-9s | %-9s | %-9s | %-9s | %-9s | %-9s%n",
+                "上线日期", "消耗 ($)", "真实D30", "D3预测D30", "D7预测D30", "D14预测D30", "D21预测D30", "D30修正值");
+        System.out.println("-----------------------------------------------------------------------------------------------------------------");
+
+        int[] cutoffs = {3, 7, 14, 21, 30};
+        Map<Integer, List<Double>> d30ErrorMap = new HashMap<>();
+        Map<Integer, List<Double>> d30AbsDiffMap = new HashMap<>();
+        for (int c : cutoffs) {
+            d30ErrorMap.put(c, new ArrayList<>());
+            d30AbsDiffMap.put(c, new ArrayList<>());
+        }
+
+        for (LtvDailyStat stat : d30Cohorts) {
+            BigDecimal spend = stat.getSpend();
+            BigDecimal actualD30Roi = CohortStatHelper.getRoiForDay(stat, 30);
+            if (actualD30Roi == null || actualD30Roi.compareTo(BigDecimal.ZERO) <= 0) {
+                actualD30Roi = CohortStatHelper.getRechargeForDay(stat, 30).divide(spend, 4, RoundingMode.HALF_UP);
+            }
+            double actual30Val = actualD30Roi.doubleValue();
+
+            String launchStr = stat.getLaunchDate() != null ? stat.getLaunchDate().toString() : "N/A";
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("%-12s | %-9.2f | %-8.2f%% | ", launchStr, spend.doubleValue(), actual30Val * 100));
+
+            for (int c : cutoffs) {
+                LtvDailyStat sliced = createSlicedStat(stat, c);
+                double[] curve = ltvPredictService.predictCohortDailyRechargeCurve(sliced, c);
+                double rawD30 = curve[30] / spend.doubleValue();
+                com.ltv.stat.dto.PredictionResult res = ltvPredictService.predictCohort(sliced, c);
+                BigDecimal predD30 = res.getPredictedDay30Roi();
+                if (predD30 != null) {
+                    double p30 = predD30.doubleValue();
+                    double ape = Math.abs(p30 - actual30Val) / actual30Val * 100.0;
+                    double absDiff = Math.abs(p30 - actual30Val);
+                    d30ErrorMap.get(c).add(ape);
+                    d30AbsDiffMap.get(c).add(absDiff);
+                    sb.append(String.format("%-8.2f%%(raw:%-6.2f%%) | ", p30 * 100, rawD30 * 100));
+                } else {
+                    sb.append(String.format("%-9s | ", "N/A"));
+                }
+            }
+            System.out.println(sb.toString());
+        }
+
+        System.out.println("\n-----------------------------------------------------------------------------------------------------------------");
+        System.out.println("                          数据库真实 Cohort：D30 ROI 预测精度汇总 (Accuracy Summary)");
+        System.out.println("-----------------------------------------------------------------------------------------------------------------");
+        System.out.printf("%-10s | %-12s | %-16s | %-16s | %-14s | %-14s%n",
+                "观察窗口", "样本数", "平均相对误差MAPE", "平均绝对误差MAE", "误差<=10%占比", "误差<=20%占比");
+        System.out.println("-----------------------------------------------------------------------------------------------------------------");
+
+        for (int c : cutoffs) {
+            List<Double> apeList = d30ErrorMap.get(c);
+            List<Double> absList = d30AbsDiffMap.get(c);
+            double mape = apeList.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+            double mae = absList.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+            long hit10 = apeList.stream().filter(e -> e <= 10.0).count();
+            long hit20 = apeList.stream().filter(e -> e <= 20.0).count();
+            double hit10Pct = (double) hit10 / apeList.size() * 100.0;
+            double hit20Pct = (double) hit20 / apeList.size() * 100.0;
+
+            System.out.printf("Day %-6d | %-12d | %-15.2f%% | %-16.4f | %-13.1f%% | %-13.1f%%%n",
+                    c, apeList.size(), mape, mae, hit10Pct, hit20Pct);
+        }
+        System.out.println("=========================================================================================\n");
+    }
+
+    @Test
+    @DisplayName("基于数据库真实 Cohort 验证 Day 7, Day 14, Day 21 ROI 预测精度")
     void testDatabaseRoiPredictionAccuracy() {
         System.out.println("\n=========================================================================================");
         System.out.println("            数据库真实 Cohort：Day 7, Day 14, Day 30 ROI 预测精度比对测试");

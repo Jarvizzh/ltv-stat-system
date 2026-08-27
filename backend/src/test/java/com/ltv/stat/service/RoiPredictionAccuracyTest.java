@@ -255,6 +255,32 @@ public class RoiPredictionAccuracyTest {
         return stat;
     }
 
+    @Test
+    @DisplayName("验证当天数达到 30D/60D 时，ROI 预测精确修正为实际已发生的真实 ROI")
+    void testD30RoiExactMatchWhenDaysElapsedGreaterEqual30() {
+        setupBenchmarkCurves();
+        List<RoiTestCase> cases = createSampleRoiTestCases();
+        for (RoiTestCase c : cases) {
+            // 当天数达到 30 天时
+            LtvDailyStat stat30 = buildDailyStatForWindow(c, 30);
+            PredictionResult res30 = predictService.predictCohort(stat30, 30);
+            double expectedD30Roi = stat30.getDay30Roi().doubleValue();
+            assertEquals(expectedD30Roi, res30.getPredictedDay30Roi().doubleValue(), 0.0001,
+                    "当观察天数达到 30D 时，D30 ROI 预测应精确修正为真实 D30 ROI");
+            assertEquals(stat30.getDay30Recharge().doubleValue(), res30.getPredictedDay30Recharge().doubleValue(), 0.01,
+                    "当观察天数达到 30D 时，D30 充值金额应精确修正为真实 D30 充值");
+
+            // 当天数达到 60 天时
+            LtvDailyStat stat60 = buildDailyStatForWindow(c, 60);
+            PredictionResult res60 = predictService.predictCohort(stat60, 60);
+            double expectedD60Roi = stat60.getDay60Roi().doubleValue();
+            assertEquals(expectedD30Roi, res60.getPredictedDay30Roi().doubleValue(), 0.0001,
+                    "当观察天数达到 60D 时，D30 ROI 预测应保持为真实 D30 ROI");
+            assertEquals(expectedD60Roi, res60.getPredictedDay60Roi().doubleValue(), 0.0001,
+                    "当观察天数达到 60D 时，D60 ROI 预测应精确修正为真实 D60 ROI");
+        }
+    }
+
     private void setRechargeAndRoi(LtvDailyStat stat, int d, BigDecimal rech, BigDecimal roi) {
         switch (d) {
             case 1: stat.setDay1Recharge(rech); stat.setDay1Roi(roi); break;
