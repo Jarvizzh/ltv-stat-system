@@ -1,14 +1,24 @@
 package com.ltv.stat.util;
 
 import com.ltv.stat.dto.TokenInfo;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Base64;
 
+@Component
 public class TokenUtil {
 
-    private static final String SECRET_KEY = "zw-ltv-secret-auth-key-2026";
+    private static String secretKey = "zw-ltv-secret-auth-key-2026";
+
+    @Value("${app.auth.secret-key:zw-ltv-secret-auth-key-2026}")
+    public void setSecretKey(String key) {
+        if (key != null && !key.trim().isEmpty()) {
+            secretKey = key.trim();
+        }
+    }
 
     /**
      * 生成包含 3 天有效期的加密 Token
@@ -94,7 +104,7 @@ public class TokenUtil {
     private static String sign(String payload) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest((payload + SECRET_KEY).getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest((payload + secretKey).getBytes(StandardCharsets.UTF_8));
             return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
         } catch (Exception e) {
             return "sig-err";

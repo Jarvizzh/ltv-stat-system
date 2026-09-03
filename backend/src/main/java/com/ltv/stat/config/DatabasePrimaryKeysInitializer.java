@@ -102,6 +102,54 @@ public class DatabasePrimaryKeysInitializer {
         } catch (Exception e) {
             log.warn("Failed to create user_sub_account table: {}", e.getMessage());
         }
+
+        // 9. 检查并补充 sys_user 表的 perm_settlement 列与 is_settlement 属性列
+        if (!isColumnExist("sys_user", "perm_settlement")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE sys_user ADD COLUMN perm_settlement INT NOT NULL DEFAULT 0");
+                log.info("Successfully added perm_settlement column to sys_user");
+            } catch (Exception e) {
+                log.warn("Failed to add perm_settlement column to sys_user: {}", e.getMessage());
+            }
+        }
+        if (!isColumnExist("sys_user", "is_settlement")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE sys_user ADD COLUMN is_settlement INT NOT NULL DEFAULT 0");
+                log.info("Successfully added is_settlement column to sys_user");
+            } catch (Exception e) {
+                log.warn("Failed to add is_settlement column to sys_user: {}", e.getMessage());
+            }
+        }
+
+        // 10. 检查并创建 monthly_settlement_config 表
+        try {
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS monthly_settlement_config (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "settlement_type VARCHAR(32) NOT NULL, " +
+                    "target_user_id BIGINT DEFAULT NULL, " +
+                    "month_str VARCHAR(16) NOT NULL, " +
+                    "settled_refund_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00, " +
+                    "month_settled_refund_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00, " +
+                    "cross_period_refund_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00, " +
+                    "share_ratio DECIMAL(6,4) NOT NULL DEFAULT 0.9500, " +
+                    "channel_fee_rate DECIMAL(6,4) NOT NULL DEFAULT 0.0700, " +
+                    "remark VARCHAR(500) DEFAULT '', " +
+                    "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                    "UNIQUE KEY uk_settle_type_user_month (settlement_type, target_user_id, month_str)" +
+                    ")");
+            log.info("Successfully checked/created monthly_settlement_config table");
+        } catch (Exception e) {
+            log.warn("Failed to create monthly_settlement_config table: {}", e.getMessage());
+        }
+
+        if (!isColumnExist("monthly_settlement_config", "month_settled_refund_amount")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE monthly_settlement_config ADD COLUMN month_settled_refund_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00");
+                log.info("Successfully added month_settled_refund_amount column to monthly_settlement_config");
+            } catch (Exception e) {
+                log.warn("Failed to add month_settled_refund_amount column: {}", e.getMessage());
+            }
+        }
     }
 
     private void ensurePrimaryKey(String tableName, String expectedCols, String alterSql) {

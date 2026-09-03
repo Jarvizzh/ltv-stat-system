@@ -51,11 +51,13 @@ public class AdminUserController {
             dto.setLandingPageCount(pageIds.size());
             dto.setVisibleUserIds(userService.getUserViewPermissionTargetIds(u.getId()));
             dto.setIsMaster(u.getIsMaster());
+            dto.setIsSettlement(u.getIsSettlement());
             dto.setSubUserIds(userService.getSubUserIdsForMaster(u.getId()));
             dto.setPermPredictPayback(u.hasPermPredictPayback() ? 1 : 0);
             dto.setPermRoiPredict(u.hasPermRoiPredict() ? 1 : 0);
             dto.setPermGlobalDistribution(u.hasPermGlobalDistribution() ? 1 : 0);
             dto.setPermExport(u.hasPermExport() ? 1 : 0);
+            dto.setPermSettlement(u.hasPermSettlement() ? 1 : 0);
             result.add(dto);
         }
 
@@ -85,6 +87,28 @@ public class AdminUserController {
             return ResponseEntity.ok(ApiResponseDto.success("账号类型更新成功！", null));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(ApiResponseDto.error(500, "更新失败: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/settlement-status")
+    public ResponseEntity<?> updateSettlementStatus(@PathVariable("id") Long id, @RequestBody Map<String, Object> body) {
+        if (!checkSuperAdmin()) {
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权操作，仅超级管理员可配置结算账号属性"));
+        }
+        try {
+            Object isSettlementObj = body != null ? body.get("isSettlement") : 0;
+            Integer isSettlement = 0;
+            if (isSettlementObj != null) {
+                if (isSettlementObj instanceof Boolean) {
+                    isSettlement = (Boolean) isSettlementObj ? 1 : 0;
+                } else {
+                    isSettlement = Integer.valueOf(isSettlementObj.toString().trim());
+                }
+            }
+            userService.updateSettlementStatus(id, isSettlement);
+            return ResponseEntity.ok(ApiResponseDto.success("结算账号属性更新成功！", null));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(ApiResponseDto.error(500, "更新结算账号属性失败: " + e.getMessage()));
         }
     }
 
@@ -155,8 +179,9 @@ public class AdminUserController {
             Integer permRoiPredict = body != null ? body.getPermRoiPredict() : 0;
             Integer permGlobalDistribution = body != null ? body.getPermGlobalDistribution() : 0;
             Integer permExport = body != null ? body.getPermExport() : 0;
+            Integer permSettlement = body != null ? body.getPermSettlement() : 0;
 
-            userService.updateUserPermissions(id, permPredictPayback, permRoiPredict, permGlobalDistribution, permExport);
+            userService.updateUserPermissions(id, permPredictPayback, permRoiPredict, permGlobalDistribution, permExport, permSettlement);
             return ResponseEntity.ok(ApiResponseDto.success("功能权限分配保存成功！", null));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(ApiResponseDto.error(500, "更新功能权限失败: " + e.getMessage()));
@@ -179,24 +204,28 @@ public class AdminUserController {
 
         try {
             Integer isMaster = body != null ? body.getIsMaster() : 0;
+            Integer isSettlement = body != null ? body.getIsSettlement() : 0;
             List<Long> visibleUserIds = body != null ? body.getVisibleUserIds() : null;
             List<Long> subUserIds = body != null ? body.getSubUserIds() : null;
             Integer permPredictPayback = body != null ? body.getPermPredictPayback() : 0;
             Integer permRoiPredict = body != null ? body.getPermRoiPredict() : 0;
             Integer permGlobalDistribution = body != null ? body.getPermGlobalDistribution() : 0;
             Integer permExport = body != null ? body.getPermExport() : 0;
+            Integer permSettlement = body != null ? body.getPermSettlement() : 0;
 
             userService.createUser(
                     username.trim(),
                     password.trim(),
                     role,
                     isMaster,
+                    isSettlement,
                     visibleUserIds,
                     subUserIds,
                     permPredictPayback,
                     permRoiPredict,
                     permGlobalDistribution,
-                    permExport
+                    permExport,
+                    permSettlement
             );
             return ResponseEntity.ok(ApiResponseDto.success("创建成功", null));
         } catch (IllegalArgumentException ie) {

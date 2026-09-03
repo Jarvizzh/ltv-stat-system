@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, PieChart, Settings, RefreshCw, Upload, Users, LogOut, Shield, Eye, Globe, Download } from 'lucide-react';
+import { BarChart3, PieChart, Settings, RefreshCw, Upload, Users, LogOut, Shield, Eye, Globe, Download, Receipt } from 'lucide-react';
 import CustomSelect from './CustomSelect';
 
 export default function LtvHeader({
@@ -21,6 +21,7 @@ export default function LtvHeader({
   const isSuperAdmin = currentUser && currentUser.role === 'SUPER_ADMIN';
   const hasPermGlobalDistribution = isSuperAdmin || currentUser?.permGlobalDistribution === 1;
   const hasPermExport = isSuperAdmin || currentUser?.permExport === 1;
+  const hasPermSettlement = isSuperAdmin || currentUser?.permSettlement === 1;
   const isReadOnly = Boolean(targetUserId && currentUser && targetUserId !== currentUser.userId);
   const canSwitchView = (isSuperAdmin || (usersList && usersList.length > 1)) && usersList && usersList.length > 0;
 
@@ -43,7 +44,7 @@ export default function LtvHeader({
             onClick={() => onTabChange('ltv')}
           >
             <BarChart3 size={16} />
-            <span>LTV 报表</span>
+            <span>LTV</span>
           </button>
           <button
             className={`nav-tab-btn ${activeTab === 'distribution' ? 'active' : ''}`}
@@ -60,6 +61,16 @@ export default function LtvHeader({
             >
               <Globe size={16} />
               <span>平台汇总</span>
+            </button>
+          )}
+          {hasPermSettlement && (
+            <button
+              className={`nav-tab-btn ${activeTab === 'settlement' ? 'active' : ''}`}
+              onClick={() => onTabChange('settlement')}
+              title="结算列表（平台汇总、账号分配结算、无关联落地页结算）"
+            >
+              <Receipt size={16} />
+              <span>结算</span>
             </button>
           )}
         </nav>

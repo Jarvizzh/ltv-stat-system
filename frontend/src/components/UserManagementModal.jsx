@@ -13,6 +13,11 @@ const ACCOUNT_TYPE_OPTIONS = [
   { label: '主账号(汇总)', value: 1 },
 ];
 
+const SETTLEMENT_ATTRIBUTE_OPTIONS = [
+  { label: '不结算', value: 0 },
+  { label: '参与结算', value: 1 },
+];
+
 export default function UserManagementModal({ isOpen, onClose, token, currentUser, onRefreshUsers, showToast }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -21,6 +26,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState('USER');
   const [newIsMaster, setNewIsMaster] = useState(0);
+  const [newIsSettlement, setNewIsSettlement] = useState(0);
   const [newVisibleUserIds, setNewVisibleUserIds] = useState([]);
   const [newSubUserIds, setNewSubUserIds] = useState([]);
   const [newPermissions, setNewPermissions] = useState({
@@ -28,6 +34,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
     permRoiPredict: 0,
     permGlobalDistribution: 0,
     permExport: 0,
+    permSettlement: 0,
   });
 
   const [editingPasswordUserId, setEditingPasswordUserId] = useState(null);
@@ -45,6 +52,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
     permRoiPredict: 0,
     permGlobalDistribution: 0,
     permExport: 0,
+    permSettlement: 0,
   });
 
   const expandedRowRef = useRef(null);
@@ -56,6 +64,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
     setNewPassword('');
     setNewRole('USER');
     setNewIsMaster(0);
+    setNewIsSettlement(0);
     setNewVisibleUserIds([]);
     setNewSubUserIds([]);
     setNewPermissions({
@@ -63,6 +72,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
       permRoiPredict: 0,
       permGlobalDistribution: 0,
       permExport: 0,
+      permSettlement: 0,
     });
     setShowAddForm(false);
   };
@@ -125,12 +135,14 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
           password: newPassword.trim(),
           role: newRole,
           isMaster: isSuperAdmin ? newIsMaster : 0,
+          isSettlement: isSuperAdmin ? newIsSettlement : 0,
           visibleUserIds: isSuperAdmin ? newVisibleUserIds : [],
           subUserIds: (isSuperAdmin && newIsMaster === 1) ? newSubUserIds : [],
           permPredictPayback: newRole === 'SUPER_ADMIN' ? 1 : newPermissions.permPredictPayback,
           permRoiPredict: newRole === 'SUPER_ADMIN' ? 1 : newPermissions.permRoiPredict,
           permGlobalDistribution: newRole === 'SUPER_ADMIN' ? 1 : newPermissions.permGlobalDistribution,
           permExport: newRole === 'SUPER_ADMIN' ? 1 : newPermissions.permExport,
+          permSettlement: newRole === 'SUPER_ADMIN' ? 1 : newPermissions.permSettlement,
         })
       });
       const data = await res.json();
@@ -143,6 +155,28 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
       }
     } catch (e) {
       if (showToast) showToast('创建用户请求异常', 'error');
+    }
+  };
+
+  const handleUpdateSettlementStatus = async (userId, isSettlement) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/settlement-status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ isSettlement })
+      });
+      const data = await res.json();
+      if (res.ok && data.code === 0) {
+        if (showToast) showToast(isSettlement === 1 ? '已将该账号设置为参与结算账号！' : '已取消该账号的参与结算属性', 'success');
+        fetchUsers();
+      } else {
+        if (showToast) showToast(data.msg || '更新结算属性失败', 'error');
+      }
+    } catch (e) {
+      if (showToast) showToast('更新结算属性异常', 'error');
     }
   };
 
@@ -422,6 +456,17 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                     />
                   </div>
                 )}
+                {isSuperAdmin && (
+                  <div>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-sub)', marginBottom: '0.25rem', display: 'block', fontWeight: 500 }}>参与结算</label>
+                    <CustomSelect
+                      value={newIsSettlement}
+                      onChange={(val) => setNewIsSettlement(Number(val))}
+                      options={SETTLEMENT_ATTRIBUTE_OPTIONS}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* 第二行：功能权限分配 (4 项) */}
@@ -477,6 +522,17 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                         style={{ accentColor: '#3b82f6', width: 15, height: 15 }}
                       />
                       <span>📥 数据导出</span>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: newRole === 'SUPER_ADMIN' ? 'not-allowed' : 'pointer', userSelect: 'none', color: (newRole === 'SUPER_ADMIN' || newPermissions.permSettlement) ? '#3b82f6' : 'var(--text-main)', fontWeight: (newRole === 'SUPER_ADMIN' || newPermissions.permSettlement) ? 600 : 400 }}>
+                      <input
+                        type="checkbox"
+                        disabled={newRole === 'SUPER_ADMIN'}
+                        checked={newRole === 'SUPER_ADMIN' || Boolean(newPermissions.permSettlement)}
+                        onChange={(e) => setNewPermissions(prev => ({ ...prev, permSettlement: e.target.checked ? 1 : 0 }))}
+                        style={{ accentColor: '#3b82f6', width: 15, height: 15 }}
+                      />
+                      <span>💳 结算</span>
                     </label>
                   </div>
                 </div>
@@ -596,6 +652,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                     <th style={{ minWidth: 120, whiteSpace: 'nowrap' }}>账号名称</th>
                     <th style={{ width: 125, whiteSpace: 'nowrap' }}>角色权限</th>
                     {isSuperAdmin && <th style={{ width: 135, whiteSpace: 'nowrap' }}>账户类型</th>}
+                    {isSuperAdmin && <th style={{ width: 115, whiteSpace: 'nowrap' }}>参与结算</th>}
                     {isSuperAdmin && <th style={{ width: 125, whiteSpace: 'nowrap' }}>视图分配</th>}
                     {isSuperAdmin && <th style={{ width: 125, whiteSpace: 'nowrap' }}>子账号关联</th>}
                     {isSuperAdmin && <th style={{ width: 125, whiteSpace: 'nowrap' }}>功能权限</th>}
@@ -607,7 +664,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                     const visibleCount = u.visibleUserIds ? u.visibleUserIds.length : 0;
                     const subCount = u.subUserIds ? u.subUserIds.length : 0;
                     const isMaster = u.isMaster === 1;
-                    const permCount = [u.permPredictPayback, u.permRoiPredict, u.permGlobalDistribution, u.permExport].filter(p => p === 1).length;
+                    const permCount = [u.permPredictPayback, u.permRoiPredict, u.permGlobalDistribution, u.permExport, u.permSettlement].filter(p => p === 1).length;
 
                     return (
                       <React.Fragment key={u.id}>
@@ -649,6 +706,18 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                                 options={ACCOUNT_TYPE_OPTIONS}
                                 placement="auto"
                                 style={{ width: '120px' }}
+                              />
+                            </td>
+                          )}
+
+                          {isSuperAdmin && (
+                            <td>
+                              <CustomSelect
+                                value={u.isSettlement || 0}
+                                onChange={(val) => handleUpdateSettlementStatus(u.id, val)}
+                                options={SETTLEMENT_ATTRIBUTE_OPTIONS}
+                                placement="auto"
+                                style={{ width: '110px' }}
                               />
                             </td>
                           )}
@@ -721,7 +790,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                                 <button
                                   className="btn btn-secondary"
                                   style={{ padding: '0.25rem 0.45rem', fontSize: '0.75rem', gap: '0.25rem', borderColor: '#3b82f6', color: '#3b82f6' }}
-                                  title="点击分配该账户的 4 项功能权限（预测回本、ROI预测、平台汇总、数据导出）"
+                                  title="点击分配该账户的 5 项功能权限（预测回本、ROI预测、平台汇总、数据导出、月份结算）"
                                   onClick={() => {
                                     if (editingPermissionsUserId === u.id) {
                                       setEditingPermissionsUserId(null);
@@ -735,6 +804,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                                         permRoiPredict: u.permRoiPredict || 0,
                                         permGlobalDistribution: u.permGlobalDistribution || 0,
                                         permExport: u.permExport || 0,
+                                        permSettlement: u.permSettlement || 0,
                                       });
                                     }
                                   }}
@@ -778,7 +848,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                         {/* 修改密码展开行 */}
                         {editingPasswordUserId === u.id && (
                           <tr>
-                            <td colSpan={isSuperAdmin ? 8 : 4} style={{ background: 'var(--bg-secondary)', padding: '0.75rem 1rem' }}>
+                            <td colSpan={isSuperAdmin ? 9 : 4} style={{ background: 'var(--bg-secondary)', padding: '0.75rem 1rem' }}>
                               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'nowrap', width: '100%', maxWidth: 560 }}>
                                 <span style={{ fontSize: '0.85rem', color: 'var(--text-sub)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                                   设置 [{u.username}] 新密码:
@@ -800,7 +870,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                                 </button>
                                 <button
                                   className="btn btn-secondary"
-                                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', whiteSpace: 'nowrap', flexShrink: 0 }}
+                                  style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem', whiteSpace: 'nowrap', flexShrink: 0 }}
                                   onClick={() => setEditingPasswordUserId(null)}
                                 >
                                   取消
@@ -813,7 +883,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                         {/* 分配只读视图权限展开行 */}
                         {isSuperAdmin && editingViewPermissionUserId === u.id && (
                           <tr ref={expandedRowRef}>
-                            <td colSpan={8} style={{ background: 'var(--bg-secondary)', padding: '0.85rem 1rem', borderTop: '1px solid var(--border-color)' }}>
+                            <td colSpan={9} style={{ background: 'var(--bg-secondary)', padding: '0.85rem 1rem', borderTop: '1px solid var(--border-color)' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
@@ -876,7 +946,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                         {/* 分配子账号关联展开行 */}
                         {isSuperAdmin && editingSubAccountsUserId === u.id && (
                           <tr ref={expandedRowRef}>
-                            <td colSpan={8} style={{ background: 'var(--bg-secondary)', padding: '0.85rem 1rem', borderTop: '1px solid var(--border-color)' }}>
+                            <td colSpan={9} style={{ background: 'var(--bg-secondary)', padding: '0.85rem 1rem', borderTop: '1px solid var(--border-color)' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
@@ -939,11 +1009,11 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                         {/* 分配功能权限展开行 */}
                         {isSuperAdmin && editingPermissionsUserId === u.id && (
                           <tr ref={expandedRowRef}>
-                            <td colSpan={8} style={{ background: 'var(--bg-secondary)', padding: '0.85rem 1rem', borderTop: '1px solid var(--border-color)' }}>
+                            <td colSpan={9} style={{ background: 'var(--bg-secondary)', padding: '0.85rem 1rem', borderTop: '1px solid var(--border-color)' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                                    设置账号 <span style={{ color: '#3b82f6' }}>[{u.username}]</span> 的 4 项专属功能权限：
+                                    设置账号 <span style={{ color: '#3b82f6' }}>[{u.username}]</span> 的 5 项专属功能权限：
                                   </span>
                                   <div style={{ display: 'flex', gap: '0.4rem' }}>
                                     <button
@@ -1002,6 +1072,16 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                                       style={{ accentColor: '#3b82f6', width: 16, height: 16 }}
                                     />
                                     <span>📥 数据导出</span>
+                                  </label>
+
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permSettlement ? '#3b82f6' : 'var(--text-main)', fontWeight: selectedPermissions.permSettlement ? 600 : 400 }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(selectedPermissions.permSettlement)}
+                                      onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permSettlement: e.target.checked ? 1 : 0 }))}
+                                      style={{ accentColor: '#3b82f6', width: 16, height: 16 }}
+                                    />
+                                    <span>💳 结算</span>
                                   </label>
                                 </div>
                               </div>

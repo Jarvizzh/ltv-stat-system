@@ -658,13 +658,21 @@ public class LtvStatService {
 
     public MonthlySummaryDto getMonthlySummaryForUser(Long userId, UserCalculationContext ctx) {
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
-        YearMonth thisMonth = YearMonth.from(todayBj);
-        YearMonth lastMonth = thisMonth.minusMonths(1);
+        YearMonth currentMonth = YearMonth.from(todayBj);
+        YearMonth minMonth = YearMonth.from(START_DATE);
 
-        SingleMonthSummaryDto thisMonthSummary = getSingleMonthSummary(userId, thisMonth, false, ctx);
-        SingleMonthSummaryDto lastMonthSummary = getSingleMonthSummary(userId, lastMonth, true, ctx);
+        List<SingleMonthSummaryDto> months = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            YearMonth ym = currentMonth.minusMonths(i);
+            if (ym.isBefore(minMonth)) {
+                break;
+            }
+            boolean isPastMonth = (i > 0);
+            SingleMonthSummaryDto summary = getSingleMonthSummary(userId, ym, isPastMonth, ctx);
+            months.add(summary);
+        }
 
-        return new MonthlySummaryDto(thisMonthSummary, lastMonthSummary);
+        return new MonthlySummaryDto(months);
     }
 
     public RetainedSubscribersDto calculateRetainedSubscribers(Long userId, List<RawOrder> orders, UserCalculationContext ctx) {
@@ -740,16 +748,16 @@ public class LtvStatService {
         return new RetainedSubscribersDto(totalSubCount, retainedCount, rate.setScale(2, RoundingMode.HALF_UP).toString() + "%");
     }
 
-    public SingleMonthSummaryDto getSingleMonthSummary(Long userId, YearMonth yearMonth, boolean isLastMonth, List<LtvDailyStat> allStats, List<RawOrder> userOrders) {
+    public SingleMonthSummaryDto getSingleMonthSummary(Long userId, YearMonth yearMonth, boolean isPastMonth, List<LtvDailyStat> allStats, List<RawOrder> userOrders) {
         List<LandingPageConfigItem> userPages = userService.getUserLandingPageConfigs(userId);
         Map<String, String> tzMap = (userPages != null) ? userPages.stream()
                 .filter(p -> p.getLandingPageId() != null)
                 .collect(Collectors.toMap(p -> p.getLandingPageId().trim(), LandingPageConfigItem::getTimezone, (a, b) -> a)) : Collections.emptyMap();
         UserCalculationContext ctx = new UserCalculationContext(userId, allStats, userOrders, tzMap);
-        return getSingleMonthSummary(userId, yearMonth, isLastMonth, ctx);
+        return getSingleMonthSummary(userId, yearMonth, isPastMonth, ctx);
     }
 
-    public SingleMonthSummaryDto getSingleMonthSummary(Long userId, YearMonth yearMonth, boolean isLastMonth, UserCalculationContext ctx) {
+    public SingleMonthSummaryDto getSingleMonthSummary(Long userId, YearMonth yearMonth, boolean isPastMonth, UserCalculationContext ctx) {
         String monthStr = yearMonth.toString();
 
         List<LtvDailyStat> monthStats = ctx.allStats.stream()
@@ -786,14 +794,14 @@ public class LtvStatService {
 
         RetainedSubscribersDto retentionInfo = calculateRetainedSubscribers(userId, monthOrders, ctx);
 
-        // 仅上月统计实际回本天数与进行 D30/D60/D90 ROI 预测，本月不作预测
-        Integer actualPaybackDays = isLastMonth ? calculateActualPaybackDaysForMonth(userId, yearMonth, monthStats, totalSpend, totalRecharge, ctx) : null;
+        // 仅历史月份统计实际回本天数与进行 D30/D60/D90 ROI 预测，本月进行中不作全月预测
+        Integer actualPaybackDays = isPastMonth ? calculateActualPaybackDaysForMonth(userId, yearMonth, monthStats, totalSpend, totalRecharge, ctx) : null;
 
         BigDecimal predictedDay30Roi = null;
         BigDecimal predictedDay60Roi = null;
         BigDecimal predictedDay90Roi = null;
 
-        if (isLastMonth && totalSpend.compareTo(BigDecimal.ZERO) > 0 && !monthStats.isEmpty()) {
+        if (isPastMonth && totalSpend.compareTo(BigDecimal.ZERO) > 0 && !monthStats.isEmpty()) {
             BigDecimal sumD30Recharge = BigDecimal.ZERO;
             BigDecimal sumD60Recharge = BigDecimal.ZERO;
             BigDecimal sumD90Recharge = BigDecimal.ZERO;

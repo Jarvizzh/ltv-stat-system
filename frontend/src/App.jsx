@@ -10,6 +10,7 @@ import BatchSpendModal from './components/BatchSpendModal';
 import UserManagementModal from './components/UserManagementModal';
 import LogoutConfirmModal from './components/LogoutConfirmModal';
 import ExportModal from './components/ExportModal';
+import MonthlySettlementTable from './components/MonthlySettlementTable';
 import { exportLtvTable, exportDistributionTable } from './utils/exportExcel';
 import Login from './components/Login';
 import Toast from './components/Toast';
@@ -30,6 +31,7 @@ export default function App() {
       permRoiPredict: Number(localStorage.getItem('admin_perm_roi_predict') || 0),
       permGlobalDistribution: Number(localStorage.getItem('admin_perm_global_distribution') || 0),
       permExport: Number(localStorage.getItem('admin_perm_export') || 0),
+      permSettlement: Number(localStorage.getItem('admin_perm_settlement') || 0),
     };
   });
 
@@ -38,6 +40,7 @@ export default function App() {
   const hasPermRoiPredict = isSuperAdmin || Boolean(currentUser?.permRoiPredict === 1);
   const hasPermGlobalDistribution = isSuperAdmin || Boolean(currentUser?.permGlobalDistribution === 1);
   const hasPermExport = isSuperAdmin || Boolean(currentUser?.permExport === 1);
+  const hasPermSettlement = isSuperAdmin || Boolean(currentUser?.permSettlement === 1);
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token');
@@ -52,6 +55,7 @@ export default function App() {
           localStorage.setItem('admin_perm_roi_predict', data.permRoiPredict || 0);
           localStorage.setItem('admin_perm_global_distribution', data.permGlobalDistribution || 0);
           localStorage.setItem('admin_perm_export', data.permExport || 0);
+          localStorage.setItem('admin_perm_settlement', data.permSettlement || 0);
           localStorage.setItem('admin_role', data.role || 'USER');
           setCurrentUser(prev => ({
             ...prev,
@@ -60,6 +64,7 @@ export default function App() {
             permRoiPredict: data.permRoiPredict || 0,
             permGlobalDistribution: data.permGlobalDistribution || 0,
             permExport: data.permExport || 0,
+            permSettlement: data.permSettlement || 0,
           }));
         }
       })
@@ -73,13 +78,15 @@ export default function App() {
   });
 
   const [usersList, setUsersList] = useState([]);
-  const [activeTab, setActiveTab] = useState('ltv'); // 'ltv' | 'distribution'
+  const [activeTab, setActiveTab] = useState('ltv'); // 'ltv' | 'distribution' | 'global-distribution' | 'settlement'
 
   useEffect(() => {
     if (activeTab === 'global-distribution' && !hasPermGlobalDistribution) {
       setActiveTab('ltv');
+    } else if (activeTab === 'settlement' && !hasPermSettlement) {
+      setActiveTab('ltv');
     }
-  }, [activeTab, hasPermGlobalDistribution]);
+  }, [activeTab, hasPermGlobalDistribution, hasPermSettlement]);
   const [data, setData] = useState([]);
   const [distributionData, setDistributionData] = useState([]);
   const [distributionSummary, setDistributionSummary] = useState(null);
@@ -313,6 +320,7 @@ export default function App() {
       permRoiPredict: loginData.permRoiPredict || 0,
       permGlobalDistribution: loginData.permGlobalDistribution || 0,
       permExport: loginData.permExport || 0,
+      permSettlement: loginData.permSettlement || 0,
     };
     setCurrentUser(userObj);
     setTargetUserId(newUid);
@@ -489,40 +497,10 @@ export default function App() {
   const totalSubUsers = data.reduce((acc, cur) => acc + (parseInt(cur.subUserCount) || 0), 0);
   const overallRoi = totalSpend > 0 ? (((totalRecharge - totalRefund) / totalSpend) * 100).toFixed(2) : '0.00';
 
-  // 月度卡片指标完全由后端接口计算并返回 (monthlySummary)，前端不再进行过滤与累加计算
-  const thisMonthStr = monthlySummary?.thisMonth?.month || '';
-  const lastMonthStr = monthlySummary?.lastMonth?.month || '';
-
-  const thisMonthSpend = monthlySummary?.thisMonth?.spend || 0;
-  const lastMonthSpend = monthlySummary?.lastMonth?.spend || 0;
-
-  const thisMonthRecharge = monthlySummary?.thisMonth?.recharge || 0;
-  const lastMonthRecharge = monthlySummary?.lastMonth?.recharge || 0;
-
-  const thisMonthRefund = monthlySummary?.thisMonth?.refund || 0;
-  const lastMonthRefund = monthlySummary?.lastMonth?.refund || 0;
-
-  const thisMonthProfit = monthlySummary?.thisMonth?.profit || 0;
-  const lastMonthProfit = monthlySummary?.lastMonth?.profit || 0;
-
-  const thisMonthRoi = monthlySummary?.thisMonth?.roi !== undefined ? monthlySummary.thisMonth.roi : '0.00';
-  const lastMonthRoi = monthlySummary?.lastMonth?.roi !== undefined ? monthlySummary.lastMonth.roi : '0.00';
-
-  const thisMonthSubUsers = monthlySummary?.thisMonth?.subUsers || 0;
-  const lastMonthSubUsers = monthlySummary?.lastMonth?.subUsers || 0;
-
-  const thisMonthRetainedSubUsers = monthlySummary?.thisMonth?.retainedSubUsers;
-  const thisMonthRetainedRate = monthlySummary?.thisMonth?.retainedRate;
-
-  const lastMonthRetainedSubUsers = monthlySummary?.lastMonth?.retainedSubUsers;
-  const lastMonthRetainedRate = monthlySummary?.lastMonth?.retainedRate;
-
-  const thisMonthActualPaybackDays = monthlySummary?.thisMonth?.actualPaybackDays;
-  const lastMonthActualPaybackDays = monthlySummary?.lastMonth?.actualPaybackDays;
-
-  const lastMonthPredD30 = monthlySummary?.lastMonth?.predictedDay30Roi;
-  const lastMonthPredD60 = monthlySummary?.lastMonth?.predictedDay60Roi;
-  const lastMonthPredD90 = monthlySummary?.lastMonth?.predictedDay90Roi;
+  // 月度卡片指标完全由后端接口计算并返回 (monthlySummary)，支持近4个月动态列表
+  const monthlyList = Array.isArray(monthlySummary?.months) && monthlySummary.months.length > 0
+    ? monthlySummary.months
+    : (monthlySummary?.thisMonth ? [monthlySummary.thisMonth, ...(monthlySummary.lastMonth ? [monthlySummary.lastMonth] : [])] : []);
 
   const calculateOverallPaybackDays = (rows) => {
     if (!rows || rows.length === 0) return null;
@@ -808,14 +786,15 @@ export default function App() {
                   <DollarSign size={18} color="var(--text-sub)" />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.2rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{thisMonthStr}</span>
-                    <span style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)' }}>{formatUsd(thisMonthSpend)}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.25rem' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{lastMonthStr}</span>
-                    <span style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)' }}>{formatUsd(lastMonthSpend)}</span>
-                  </div>
+                  {monthlyList.map((m, idx) => (
+                    <div key={m.month || idx} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderTop: idx > 0 ? '1px dashed var(--border-color)' : 'none', paddingTop: idx > 0 ? '0.25rem' : '0' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{m.month}</span>
+                      <span style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)' }}>{formatUsd(m.spend)}</span>
+                    </div>
+                  ))}
+                  {monthlyList.length === 0 && (
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>暂无月度数据</div>
+                  )}
                 </div>
               </div>
 
@@ -826,24 +805,20 @@ export default function App() {
                   <Wallet size={18} color="var(--text-sub)" />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.2rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{thisMonthStr}</span>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)' }}>{formatUsd(thisMonthRecharge)}</span>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', fontWeight: 500 }}>
-                        （退款：{formatUsd(thisMonthRefund)}）
-                      </span>
+                  {monthlyList.map((m, idx) => (
+                    <div key={m.month || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: idx > 0 ? '1px dashed var(--border-color)' : 'none', paddingTop: idx > 0 ? '0.25rem' : '0', flexWrap: 'nowrap' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{m.month}</span>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
+                        <span style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)' }}>{formatUsd(m.recharge)}</span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', fontWeight: 500 }}>
+                          （退款：{formatUsd(m.refund)}）
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.25rem', flexWrap: 'nowrap' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{lastMonthStr}</span>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)' }}>{formatUsd(lastMonthRecharge)}</span>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', fontWeight: 500 }}>
-                        （退款：{formatUsd(lastMonthRefund)}）
-                      </span>
-                    </div>
-                  </div>
+                  ))}
+                  {monthlyList.length === 0 && (
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>暂无月度数据</div>
+                  )}
                 </div>
               </div>
 
@@ -851,64 +826,62 @@ export default function App() {
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span className="stat-label">月度 ROI / 盈亏</span>
-                  <TrendingUp size={18} color={thisMonthRoi >= 100 ? '#10b981' : '#f43f5e'} />
+                  <TrendingUp size={18} color={monthlyList.length > 0 && parseFloat(monthlyList[0].roi || 0) >= 100 ? '#10b981' : '#f43f5e'} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.2rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{thisMonthStr}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 500, color: thisMonthRoi >= 100 ? '#10b981' : '#f43f5e' }}>
-                        {thisMonthRoi}%
-                      </span>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', fontWeight: 400, opacity: 0.6 }}>/</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: thisMonthProfit >= 0 ? '#10b981' : '#f43f5e' }}>
-                        {formatUsd(thisMonthProfit)}
-                      </span>
-                      {renderActualPaybackTag(thisMonthActualPaybackDays)}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.25rem', flexWrap: 'nowrap' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{lastMonthStr}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 500, color: lastMonthRoi >= 100 ? '#10b981' : '#f43f5e' }}>
-                        {lastMonthRoi}%
-                      </span>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', fontWeight: 400, opacity: 0.6 }}>/</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: lastMonthProfit >= 0 ? '#10b981' : '#f43f5e' }}>
-                        {formatUsd(lastMonthProfit)}
-                      </span>
-                      {renderActualPaybackTag(lastMonthActualPaybackDays, lastMonthStr, lastMonthPredD30, lastMonthPredD60, lastMonthPredD90)}
-                      {hasPermRoiPredict && lastMonthActualPaybackDays === null && lastMonthPredD30 !== null && lastMonthPredD30 !== undefined && (
-                        <span
-                          onMouseEnter={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            setHoveredMonthlyPrediction({
-                              left: rect.left + rect.width / 2,
-                              top: rect.top - 8,
-                              month: lastMonthStr,
-                              d30Roi: lastMonthPredD30,
-                              d60Roi: lastMonthPredD60,
-                              d90Roi: lastMonthPredD90
-                            });
-                          }}
-                          onMouseLeave={() => setHoveredMonthlyPrediction(null)}
-                          style={{
-                            background: 'rgba(99, 102, 241, 0.15)',
-                            color: '#818cf8',
-                            border: '1px solid rgba(99, 102, 241, 0.3)',
-                            padding: '0.1rem 0.35rem',
-                            borderRadius: '0.25rem',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            whiteSpace: 'nowrap',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          🔮 ROI预测
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  {monthlyList.map((m, idx) => {
+                    const roiVal = m.roi !== undefined ? m.roi : '0.00';
+                    const profitVal = m.profit || 0;
+                    const isPaidBack = m.actualPaybackDays !== null && m.actualPaybackDays !== undefined;
+                    const hasPred = hasPermRoiPredict && m.predictedDay30Roi !== null && m.predictedDay30Roi !== undefined;
+                    return (
+                      <div key={m.month || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: idx > 0 ? '1px dashed var(--border-color)' : 'none', paddingTop: idx > 0 ? '0.25rem' : '0', flexWrap: 'nowrap' }}>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{m.month}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <span style={{ fontSize: '1.05rem', fontWeight: 500, color: roiVal >= 100 ? '#10b981' : '#f43f5e' }}>
+                            {roiVal}%
+                          </span>
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', fontWeight: 400, opacity: 0.6 }}>/</span>
+                          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: profitVal >= 0 ? '#10b981' : '#f43f5e' }}>
+                            {formatUsd(profitVal)}
+                          </span>
+                          {renderActualPaybackTag(m.actualPaybackDays, m.month, m.predictedDay30Roi, m.predictedDay60Roi, m.predictedDay90Roi)}
+                          {hasPermRoiPredict && !isPaidBack && hasPred && (
+                            <span
+                              onMouseEnter={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setHoveredMonthlyPrediction({
+                                  left: rect.left + rect.width / 2,
+                                  top: rect.top - 8,
+                                  month: m.month,
+                                  d30Roi: m.predictedDay30Roi,
+                                  d60Roi: m.predictedDay60Roi,
+                                  d90Roi: m.predictedDay90Roi
+                                });
+                              }}
+                              onMouseLeave={() => setHoveredMonthlyPrediction(null)}
+                              style={{
+                                background: 'rgba(99, 102, 241, 0.15)',
+                                color: '#818cf8',
+                                border: '1px solid rgba(99, 102, 241, 0.3)',
+                                padding: '0.1rem 0.35rem',
+                                borderRadius: '0.25rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              🔮 ROI预测
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {monthlyList.length === 0 && (
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>暂无月度数据</div>
+                  )}
                 </div>
               </div>
 
@@ -919,28 +892,22 @@ export default function App() {
                   <Users size={18} color="#10b981" />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.2rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{thisMonthStr}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)' }}>{thisMonthSubUsers}人</span>
-                      {thisMonthRetainedSubUsers !== undefined && (
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', fontWeight: 500 }}>
-                          （留存：{thisMonthRetainedSubUsers}人 / {thisMonthRetainedRate}）
-                        </span>
-                      )}
+                  {monthlyList.map((m, idx) => (
+                    <div key={m.month || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: idx > 0 ? '1px dashed var(--border-color)' : 'none', paddingTop: idx > 0 ? '0.25rem' : '0', flexWrap: 'nowrap' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{m.month}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                        <span style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)' }}>{m.subUsers || 0}人</span>
+                        {m.retainedSubUsers !== undefined && (
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', fontWeight: 500 }}>
+                            （留存：{m.retainedSubUsers}人 / {m.retainedRate || '0.00%'}）
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.25rem', flexWrap: 'nowrap' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{lastMonthStr}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)' }}>{lastMonthSubUsers}人</span>
-                      {lastMonthRetainedSubUsers !== undefined && (
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', fontWeight: 500 }}>
-                          （留存：{lastMonthRetainedSubUsers}人 / {lastMonthRetainedRate}）
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  ))}
+                  {monthlyList.length === 0 && (
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>暂无月度数据</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -980,6 +947,15 @@ export default function App() {
             distributionData={globalDistributionData}
             distributionSummary={globalDistributionSummary}
             isGlobal={true}
+          />
+        )}
+
+        {/* Tab 4: 月份结算 */}
+        {activeTab === 'settlement' && (
+          <MonthlySettlementTable
+            token={localStorage.getItem('admin_token')}
+            currentUser={currentUser}
+            showToast={showToast}
           />
         )}
       </main>

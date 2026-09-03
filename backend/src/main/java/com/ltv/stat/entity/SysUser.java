@@ -26,6 +26,9 @@ public class SysUser {
     @Column(name = "is_master", nullable = false)
     private Integer isMaster = 0; // 0: Normal/Sub, 1: Master Account
 
+    @Column(name = "is_settlement", nullable = false)
+    private Integer isSettlement = 0; // 0: 不参与结算, 1: 参与结算账号 (由超级管理员独立勾选配置)
+
     // 细粒度功能权限 (0: 无权限, 1: 拥有权限，超级管理员默认拥有所有权限)
     @Column(name = "perm_predict_payback", nullable = false)
     private Integer permPredictPayback = 0; // 预测回本（包括LTV表格预测回本列）
@@ -38,6 +41,9 @@ public class SysUser {
 
     @Column(name = "perm_export", nullable = false)
     private Integer permExport = 0; // 数据导出
+
+    @Column(name = "perm_settlement", nullable = false)
+    private Integer permSettlement = 0; // 月份结算
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -74,6 +80,11 @@ public class SysUser {
     public Integer getIsMaster() { return isMaster != null ? isMaster : 0; }
     public void setIsMaster(Integer isMaster) { this.isMaster = isMaster; }
     public boolean isMasterAccount() { return Integer.valueOf(1).equals(this.isMaster); }
+
+    public Integer getIsSettlement() { return isSettlement != null ? isSettlement : 0; }
+    public void setIsSettlement(Integer isSettlement) { this.isSettlement = isSettlement; }
+    public boolean isSettlementAccount() { return Integer.valueOf(1).equals(this.isSettlement); }
+
     public boolean isSuperAdmin() { return "SUPER_ADMIN".equalsIgnoreCase(this.role); }
 
     public Integer getPermPredictPayback() { return permPredictPayback != null ? permPredictPayback : 0; }
@@ -91,6 +102,10 @@ public class SysUser {
     public Integer getPermExport() { return permExport != null ? permExport : 0; }
     public void setPermExport(Integer permExport) { this.permExport = permExport; }
     public boolean hasPermExport() { return isSuperAdmin() || Integer.valueOf(1).equals(this.permExport); }
+
+    public Integer getPermSettlement() { return permSettlement != null ? permSettlement : 0; }
+    public void setPermSettlement(Integer permSettlement) { this.permSettlement = permSettlement; }
+    public boolean hasPermSettlement() { return isSuperAdmin() || Integer.valueOf(1).equals(this.permSettlement); }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

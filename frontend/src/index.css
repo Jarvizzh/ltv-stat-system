@@ -582,6 +582,18 @@ td.sticky-col {
   border-color: var(--accent-blue);
 }
 
+/* Remove number input spinners / stepper arrows */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 .modal-footer {
   padding: 1rem 1.5rem;
   border-top: 1px solid var(--border-color);

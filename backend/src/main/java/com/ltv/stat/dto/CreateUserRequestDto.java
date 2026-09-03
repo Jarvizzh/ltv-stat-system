@@ -10,12 +10,14 @@ public class CreateUserRequestDto {
     private String password;
     private String role;
     private Integer isMaster;
+    private Integer isSettlement;
     private List<Long> visibleUserIds;
     private List<Long> subUserIds;
     private Integer permPredictPayback;
     private Integer permRoiPredict;
     private Integer permGlobalDistribution;
     private Integer permExport;
+    private Integer permSettlement;
 
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
@@ -28,6 +30,9 @@ public class CreateUserRequestDto {
 
     public Integer getIsMaster() { return isMaster; }
     public void setIsMaster(Integer isMaster) { this.isMaster = isMaster; }
+
+    public Integer getIsSettlement() { return isSettlement != null ? isSettlement : 0; }
+    public void setIsSettlement(Integer isSettlement) { this.isSettlement = isSettlement; }
 
     public List<Long> getVisibleUserIds() { return visibleUserIds; }
     public void setVisibleUserIds(List<Long> visibleUserIds) { this.visibleUserIds = visibleUserIds; }
@@ -46,4 +51,7 @@ public class CreateUserRequestDto {
 
     public Integer getPermExport() { return permExport; }
     public void setPermExport(Integer permExport) { this.permExport = permExport; }
+
+    public Integer getPermSettlement() { return permSettlement; }
+    public void setPermSettlement(Integer permSettlement) { this.permSettlement = permSettlement; }
 }

@@ -55,10 +55,12 @@ public class AuthController {
                 response.setUsername(user.getUsername());
                 response.setRole(user.getRole());
                 response.setExpireDays(tokenExpireDays);
+                response.setIsSettlement(user.getIsSettlement());
                 response.setPermPredictPayback(user.hasPermPredictPayback() ? 1 : 0);
                 response.setPermRoiPredict(user.hasPermRoiPredict() ? 1 : 0);
                 response.setPermGlobalDistribution(user.hasPermGlobalDistribution() ? 1 : 0);
                 response.setPermExport(user.hasPermExport() ? 1 : 0);
+                response.setPermSettlement(user.hasPermSettlement() ? 1 : 0);
                 return ResponseEntity.ok(response);
             }
         }
@@ -93,10 +95,12 @@ public class AuthController {
                 if (user.getUsername() != null) {
                     response.setUsername(user.getUsername());
                 }
+                response.setIsSettlement(user.getIsSettlement());
                 response.setPermPredictPayback(user.hasPermPredictPayback() ? 1 : 0);
                 response.setPermRoiPredict(user.hasPermRoiPredict() ? 1 : 0);
                 response.setPermGlobalDistribution(user.hasPermGlobalDistribution() ? 1 : 0);
                 response.setPermExport(user.hasPermExport() ? 1 : 0);
+                response.setPermSettlement(user.hasPermSettlement() ? 1 : 0);
             });
 
             return ResponseEntity.ok(response);

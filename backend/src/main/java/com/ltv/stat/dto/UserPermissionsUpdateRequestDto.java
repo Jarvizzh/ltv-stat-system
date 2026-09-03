@@ -6,14 +6,16 @@ public class UserPermissionsUpdateRequestDto {
     private Integer permRoiPredict;
     private Integer permGlobalDistribution;
     private Integer permExport;
+    private Integer permSettlement;
 
     public UserPermissionsUpdateRequestDto() {}
 
-    public UserPermissionsUpdateRequestDto(Integer permPredictPayback, Integer permRoiPredict, Integer permGlobalDistribution, Integer permExport) {
+    public UserPermissionsUpdateRequestDto(Integer permPredictPayback, Integer permRoiPredict, Integer permGlobalDistribution, Integer permExport, Integer permSettlement) {
         this.permPredictPayback = permPredictPayback;
         this.permRoiPredict = permRoiPredict;
         this.permGlobalDistribution = permGlobalDistribution;
         this.permExport = permExport;
+        this.permSettlement = permSettlement;
     }
 
     public Integer getPermPredictPayback() { return permPredictPayback; }
@@ -27,4 +29,7 @@ public class UserPermissionsUpdateRequestDto {
 
     public Integer getPermExport() { return permExport; }
     public void setPermExport(Integer permExport) { this.permExport = permExport; }
+
+    public Integer getPermSettlement() { return permSettlement; }
+    public void setPermSettlement(Integer permSettlement) { this.permSettlement = permSettlement; }
 }

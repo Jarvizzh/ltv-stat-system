@@ -27,3 +27,4 @@ app:
     username: superadmin
     password: superadmin
     token-expire-days: 7
+    secret-key: zw-ltv-secret-auth-key-2026-v2

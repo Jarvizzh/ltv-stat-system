@@ -10,11 +10,13 @@ public class LoginResponseDto {
     private Long userId;
     private String username;
     private String role;
+    private Integer isSettlement;
     private Integer expireDays;
     private Integer permPredictPayback;
     private Integer permRoiPredict;
     private Integer permGlobalDistribution;
     private Integer permExport;
+    private Integer permSettlement;
 
     public LoginResponseDto() {}
 
@@ -36,6 +38,9 @@ public class LoginResponseDto {
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
 
+    public Integer getIsSettlement() { return isSettlement != null ? isSettlement : 0; }
+    public void setIsSettlement(Integer isSettlement) { this.isSettlement = isSettlement; }
+
     public Integer getExpireDays() { return expireDays; }
     public void setExpireDays(Integer expireDays) { this.expireDays = expireDays; }
 
@@ -50,4 +55,7 @@ public class LoginResponseDto {
 
     public Integer getPermExport() { return permExport != null ? permExport : 0; }
     public void setPermExport(Integer permExport) { this.permExport = permExport; }
+
+    public Integer getPermSettlement() { return permSettlement != null ? permSettlement : 0; }
+    public void setPermSettlement(Integer permSettlement) { this.permSettlement = permSettlement; }
 }

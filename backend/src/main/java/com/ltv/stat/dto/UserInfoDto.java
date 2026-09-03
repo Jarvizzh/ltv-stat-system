@@ -16,11 +16,13 @@ public class UserInfoDto {
     private Integer landingPageCount;
     private List<Long> visibleUserIds;
     private Integer isMaster;
+    private Integer isSettlement;
     private List<Long> subUserIds;
     private Integer permPredictPayback;
     private Integer permRoiPredict;
     private Integer permGlobalDistribution;
     private Integer permExport;
+    private Integer permSettlement;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -49,6 +51,9 @@ public class UserInfoDto {
     public Integer getIsMaster() { return isMaster; }
     public void setIsMaster(Integer isMaster) { this.isMaster = isMaster; }
 
+    public Integer getIsSettlement() { return isSettlement != null ? isSettlement : 0; }
+    public void setIsSettlement(Integer isSettlement) { this.isSettlement = isSettlement; }
+
     public List<Long> getSubUserIds() { return subUserIds; }
     public void setSubUserIds(List<Long> subUserIds) { this.subUserIds = subUserIds; }
 
@@ -63,4 +68,7 @@ public class UserInfoDto {
 
     public Integer getPermExport() { return permExport != null ? permExport : 0; }
     public void setPermExport(Integer permExport) { this.permExport = permExport; }
+
+    public Integer getPermSettlement() { return permSettlement != null ? permSettlement : 0; }
+    public void setPermSettlement(Integer permSettlement) { this.permSettlement = permSettlement; }
 }

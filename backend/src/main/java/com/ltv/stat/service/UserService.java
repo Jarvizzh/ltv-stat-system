@@ -108,7 +108,7 @@ public class UserService {
 
     @Transactional
     public SysUser createUser(String username, String rawPassword, String role) {
-        return createUser(username, rawPassword, role, 0, null, null, 0, 0, 0, 0);
+        return createUser(username, rawPassword, role, 0, 0, null, null, 0, 0, 0, 0, 0);
     }
 
     @Transactional
@@ -117,12 +117,14 @@ public class UserService {
             String rawPassword,
             String role,
             Integer isMaster,
+            Integer isSettlement,
             List<Long> visibleUserIds,
             List<Long> subUserIds,
             Integer permPredictPayback,
             Integer permRoiPredict,
             Integer permGlobalDistribution,
-            Integer permExport
+            Integer permExport,
+            Integer permSettlement
     ) {
         if (sysUserRepository.existsByUsername(username)) {
             throw new IllegalArgumentException("用户名已存在: " + username);
@@ -133,10 +135,12 @@ public class UserService {
         user.setRole(role != null ? role.toUpperCase() : "USER");
         user.setStatus(1);
         user.setIsMaster(isMaster != null ? isMaster : 0);
+        user.setIsSettlement(isSettlement != null ? isSettlement : 0);
         user.setPermPredictPayback(permPredictPayback != null ? permPredictPayback : 0);
         user.setPermRoiPredict(permRoiPredict != null ? permRoiPredict : 0);
         user.setPermGlobalDistribution(permGlobalDistribution != null ? permGlobalDistribution : 0);
         user.setPermExport(permExport != null ? permExport : 0);
+        user.setPermSettlement(permSettlement != null ? permSettlement : 0);
 
         SysUser savedUser = sysUserRepository.save(user);
 
@@ -284,7 +288,7 @@ public class UserService {
     }
 
     @Transactional
-    public void updateUserPermissions(Long userId, Integer permPredictPayback, Integer permRoiPredict, Integer permGlobalDistribution, Integer permExport) {
+    public void updateUserPermissions(Long userId, Integer permPredictPayback, Integer permRoiPredict, Integer permGlobalDistribution, Integer permExport, Integer permSettlement) {
         SysUser user = sysUserRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
 
@@ -292,8 +296,15 @@ public class UserService {
         if (permRoiPredict != null) user.setPermRoiPredict(permRoiPredict);
         if (permGlobalDistribution != null) user.setPermGlobalDistribution(permGlobalDistribution);
         if (permExport != null) user.setPermExport(permExport);
+        if (permSettlement != null) user.setPermSettlement(permSettlement);
 
         sysUserRepository.save(user);
+    }
+
+    public boolean hasPermSettlement(Long userId) {
+        if (userId == null) return false;
+        SysUser user = sysUserRepository.findById(userId).orElse(null);
+        return user != null && user.hasPermSettlement();
     }
 
     public boolean hasPermGlobalDistribution(Long userId) {
@@ -358,6 +369,66 @@ public class UserService {
             if (!u.getId().equals(userId) && visibleSet.contains(u.getId()) && u.getStatus() != null && u.getStatus() == 1) {
                 int subCount = isMasterAccount(u.getId()) ? getSubUserIdsForMaster(u.getId()).size() : 0;
                 result.add(new VisibleAccountDto(u.getId(), u.getUsername(), u.getRole(), false, u.getIsMaster(), subCount));
+            }
+        }
+
+        return result;
+    }
+
+    @Transactional
+    public void updateSettlementStatus(Long userId, Integer isSettlement) {
+        SysUser user = sysUserRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
+        user.setIsSettlement(isSettlement != null ? isSettlement : 0);
+        sysUserRepository.save(user);
+    }
+
+    public List<VisibleAccountDto> getSettlementAccountsForUser(Long userId) {
+        if (userId == null) return Collections.emptyList();
+        SysUser user = sysUserRepository.findById(userId).orElse(null);
+        if (user == null) return Collections.emptyList();
+
+        List<SysUser> allUsers = sysUserRepository.findAllByOrderByCreatedAtDesc();
+
+        // 超级管理员：返回系统中所有被勾选了参与结算属性（isSettlement == 1）的账号，且当前账号置顶
+        if ("SUPER_ADMIN".equalsIgnoreCase(user.getRole())) {
+            List<VisibleAccountDto> list = new ArrayList<>();
+            // 若当前登录超管账号自身也是结算账号，置顶
+            if (user.isSettlementAccount() || user.isSuperAdmin()) {
+                int selfSubCount = isMasterAccount(user.getId()) ? getSubUserIdsForMaster(user.getId()).size() : 0;
+                list.add(new VisibleAccountDto(user.getId(), user.getUsername(), user.getRole(), true, user.getIsMaster(), user.getIsSettlement(), selfSubCount));
+            }
+
+            for (SysUser u : allUsers) {
+                if (!u.getId().equals(userId) && u.getStatus() != null && u.getStatus() == 1 && u.isSettlementAccount()) {
+                    int subCount = isMasterAccount(u.getId()) ? getSubUserIdsForMaster(u.getId()).size() : 0;
+                    list.add(new VisibleAccountDto(u.getId(), u.getUsername(), u.getRole(), false, u.getIsMaster(), u.getIsSettlement(), subCount));
+                }
+            }
+            return list;
+        }
+
+        // 普通管理员 / 普通用户：在可见账号范围内，只保留被超级管理员开启了参与结算属性 (isSettlement == 1) 的账号
+        List<Long> grantedTargetIds = getUserViewPermissionTargetIds(userId);
+        Set<Long> visibleSet = new HashSet<>(grantedTargetIds);
+        visibleSet.add(userId);
+        if (isMasterAccount(userId)) {
+            visibleSet.addAll(getSubUserIdsForMaster(userId));
+        }
+
+        List<VisibleAccountDto> result = new ArrayList<>();
+        // 本人若为结算账号
+        if (user.isSettlementAccount()) {
+            int selfSubCount = isMasterAccount(user.getId()) ? getSubUserIdsForMaster(user.getId()).size() : 0;
+            result.add(new VisibleAccountDto(user.getId(), user.getUsername(), user.getRole(), true, user.getIsMaster(), user.getIsSettlement(), selfSubCount));
+        }
+
+        for (SysUser u : allUsers) {
+            if (!u.getId().equals(userId) && visibleSet.contains(u.getId()) && u.getStatus() != null && u.getStatus() == 1) {
+                if (u.isSettlementAccount()) {
+                    int subCount = isMasterAccount(u.getId()) ? getSubUserIdsForMaster(u.getId()).size() : 0;
+                    result.add(new VisibleAccountDto(u.getId(), u.getUsername(), u.getRole(), false, u.getIsMaster(), u.getIsSettlement(), subCount));
+                }
             }
         }
 

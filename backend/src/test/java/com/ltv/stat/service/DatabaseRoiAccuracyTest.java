@@ -47,21 +47,13 @@ public class DatabaseRoiAccuracyTest {
         com.ltv.stat.dto.MonthlySummaryDto summary = ltvStatService.getMonthlySummaryForUser(3L);
 
         assertNotNull(summary, "无法生成月度汇总数据");
-
-        if (summary.getLastMonth() != null) {
-            com.ltv.stat.dto.SingleMonthSummaryDto lm = summary.getLastMonth();
-            System.out.println("【上月指标汇总 (" + lm.getMonth() + ")】:");
-            System.out.printf("  总消耗: $%s | 总充值: $%s | 累计ROI: %s%%%n", lm.getSpend(), lm.getRecharge(), lm.getRoi());
-            System.out.printf("  预测回本天数: %s 天%n", lm.getActualPaybackDays() != null ? lm.getActualPaybackDays() : "未回本/计算中");
-            System.out.printf("  D30 预测 ROI: %s%%%n", lm.getPredictedDay30Roi() != null ? lm.getPredictedDay30Roi().multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP) : "N/A");
-            System.out.printf("  D60 预测 ROI: %s%%%n", lm.getPredictedDay60Roi() != null ? lm.getPredictedDay60Roi().multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP) : "N/A");
-            System.out.printf("  D90 预测 ROI: %s%%%n", lm.getPredictedDay90Roi() != null ? lm.getPredictedDay90Roi().multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP) : "N/A");
-        }
-
-        if (summary.getThisMonth() != null) {
-            com.ltv.stat.dto.SingleMonthSummaryDto tm = summary.getThisMonth();
-            System.out.println("\n【本月指标汇总 (" + tm.getMonth() + ")】:");
-            System.out.printf("  总消耗: $%s | 总充值: $%s | 累计ROI: %s%%%n", tm.getSpend(), tm.getRecharge(), tm.getRoi());
+        assertNotNull(summary.getMonths(), "月度汇总列表不能为 null");
+        System.out.printf("月度汇总共计 %d 个有效月份 (近4个月，自2026-07-10起):%n", summary.getMonths().size());
+        for (com.ltv.stat.dto.SingleMonthSummaryDto m : summary.getMonths()) {
+            System.out.printf("  - 【月份 %s】: 总消耗: $%s | 总充值: $%s (退款: $%s) | 利润: $%s | ROI: %s%% | 订阅: %d人 (留存: %s / %s) | 回本: %s 天%n",
+                    m.getMonth(), m.getSpend(), m.getRecharge(), m.getRefund(), m.getProfit(), m.getRoi(),
+                    m.getSubUsers(), m.getRetainedSubUsers(), m.getRetainedRate(),
+                    m.getActualPaybackDays() != null ? m.getActualPaybackDays() : "未回本");
         }
         System.out.println("=========================================================================================\n");
     }
