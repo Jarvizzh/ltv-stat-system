@@ -501,7 +501,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
             {formatUsd(totalFinalSettlementSum)}
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', marginTop: '0.2rem', display: 'block' }}>
-            有效基数 × 分成比例 × (1 - 渠道费)
+            有效基数 × 分成比例 × (1 - 渠道费率)
           </span>
         </div>
 
@@ -572,7 +572,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
           <span>核算公式：</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.82rem', color: 'var(--text-sub)', fontWeight: 500 }}>
-          <span>结算金额 = (累计充值 - 当月结算退款 - 跨周期退款) × 分成比例 (默认95.00%) × ( 1 - 渠道费率 7.00% )</span>
+          <span>结算金额 = (累计充值 - 当月结算退款 - 跨周期退款) × 分成比例 × ( 1 - 渠道费率 )</span>
         </div>
       </div>
 
