@@ -476,7 +476,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
             </span>
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', marginTop: '0.2rem', display: 'block' }}>
-            当月结算退款: <strong style={{ color: 'var(--text-main)' }}>{formatUsd(totalSettledRefundSum)}</strong>
+            已结算退款: {formatUsd(totalSettledRefundSum)}
           </span>
         </div>
 
