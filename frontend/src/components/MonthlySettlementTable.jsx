@@ -383,7 +383,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
                 </button>
               </div>
 
-              {/* 当选择 B. 账号分配结算时，账号选择下拉框直接置顶展示于控制栏 */}
+              {/* 当选择 账号分配结算时，账号选择下拉框直接置顶展示于控制栏 */}
               {settlementType === 'USER_ACCOUNT' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', position: 'relative', zIndex: 1001 }}>
                   <span style={{ fontSize: '0.82rem', color: 'var(--text-sub)', fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -407,7 +407,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
               )}
             </>
           ) : (
-            /* 普通用户：仅展示【B. 账号分配结算】及自身登录账号 */
+            /* 普通用户：仅展示【账号分配结算】及自身登录账号 */
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -422,7 +422,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <UserCheck size={16} />
-                <span>B. 账号分配结算</span>
+                <span>账号分配结算</span>
               </div>
               <span style={{ color: 'rgba(59, 130, 246, 0.3)', margin: '0 0.1rem' }}>|</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem', color: 'var(--text-sub)' }}>

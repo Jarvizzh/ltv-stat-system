@@ -43,7 +43,7 @@ public class MonthlySettlementController {
         }
 
         TokenInfo currentUser = UserContext.getCurrentUser();
-        // 普通用户：只可查看【B. 账号分配结算】，且只能查看自身登录账号
+        // 普通用户：只可查看【账号分配结算】，且只能查看自身登录账号
         // 超级管理员、管理员：可见 A/B/C，且在 B 中可查看所有分配结算的账号
         if (!currentUser.isAdmin()) {
             settlementType = "USER_ACCOUNT";
@@ -66,7 +66,7 @@ public class MonthlySettlementController {
         }
 
         TokenInfo currentUser = UserContext.getCurrentUser();
-        // 普通用户：只可修改【B. 账号分配结算】，且只能修改自身登录账号
+        // 普通用户：只可修改【账号分配结算】，且只能修改自身登录账号
         // 超级管理员、管理员：可修改 A/B/C 及所有账号
         if (!currentUser.isAdmin()) {
             body.setSettlementType("USER_ACCOUNT");
