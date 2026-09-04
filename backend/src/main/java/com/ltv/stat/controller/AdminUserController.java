@@ -58,6 +58,7 @@ public class AdminUserController {
             dto.setPermGlobalDistribution(u.hasPermGlobalDistribution() ? 1 : 0);
             dto.setPermExport(u.hasPermExport() ? 1 : 0);
             dto.setPermSettlement(u.hasPermSettlement() ? 1 : 0);
+            dto.setPermVideoGen(u.hasPermVideoGen() ? 1 : 0);
             result.add(dto);
         }
 
@@ -180,8 +181,9 @@ public class AdminUserController {
             Integer permGlobalDistribution = body != null ? body.getPermGlobalDistribution() : 0;
             Integer permExport = body != null ? body.getPermExport() : 0;
             Integer permSettlement = body != null ? body.getPermSettlement() : 0;
+            Integer permVideoGen = body != null ? body.getPermVideoGen() : 0;
 
-            userService.updateUserPermissions(id, permPredictPayback, permRoiPredict, permGlobalDistribution, permExport, permSettlement);
+            userService.updateUserPermissions(id, permPredictPayback, permRoiPredict, permGlobalDistribution, permExport, permSettlement, permVideoGen);
             return ResponseEntity.ok(ApiResponseDto.success("功能权限分配保存成功！", null));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(ApiResponseDto.error(500, "更新功能权限失败: " + e.getMessage()));
@@ -212,6 +214,7 @@ public class AdminUserController {
             Integer permGlobalDistribution = body != null ? body.getPermGlobalDistribution() : 0;
             Integer permExport = body != null ? body.getPermExport() : 0;
             Integer permSettlement = body != null ? body.getPermSettlement() : 0;
+            Integer permVideoGen = body != null ? body.getPermVideoGen() : 0;
 
             userService.createUser(
                     username.trim(),
@@ -225,7 +228,8 @@ public class AdminUserController {
                     permRoiPredict,
                     permGlobalDistribution,
                     permExport,
-                    permSettlement
+                    permSettlement,
+                    permVideoGen
             );
             return ResponseEntity.ok(ApiResponseDto.success("创建成功", null));
         } catch (IllegalArgumentException ie) {

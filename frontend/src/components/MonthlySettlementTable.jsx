@@ -291,7 +291,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
         flexWrap: 'wrap',
         gap: '0.85rem'
       }}>
-        {/* 左侧：三大类型分段按钮 + 账号选择下拉框 (超级管理员、管理员可见 A/B/C及所有账号；普通用户仅展示 B. 账号分配结算 及自身账号) */}
+        {/* 左侧：三大类型分段按钮 + 账号选择下拉框 (超级管理员、管理员可见 A/B/C及所有账号；普通用户仅展示 账号分配结算 及自身账号) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
           {isAdmin ? (
             <>
@@ -634,7 +634,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
         maxWidth: '100%',
         WebkitOverflowScrolling: 'touch'
       }}>
-        <table className="ltv-table" style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <table className="ltv-table" style={{ width: '100%', minWidth: isAdmin ? '1300px' : '1200px', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ background: 'var(--bg-th)', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>
               <th style={{ minWidth: '80px', textAlign: 'center', padding: '0.85rem 0.5rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>月份</th>
@@ -663,13 +663,15 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
               <th style={{ minWidth: '68px', textAlign: 'right', padding: '0.85rem 0.4rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>退款率</th>
               <th style={{ minWidth: '105px', textAlign: 'right', padding: '0.85rem 0.5rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>充值/退款笔数</th>
               <th style={{ minWidth: '130px', textAlign: 'left', padding: '0.85rem 0.6rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>备注说明</th>
-              <th style={{ minWidth: '85px', textAlign: 'center', padding: '0.85rem 0.5rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>操作</th>
+              {isAdmin && (
+                <th style={{ minWidth: '85px', textAlign: 'center', padding: '0.85rem 0.5rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>操作</th>
+              )}
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={14} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-sub)' }}>
+                <td colSpan={isAdmin ? 14 : 13} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-sub)' }}>
                   {loading ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem' }}>
                       <RefreshCw size={24} className="spin" color="#3b82f6" />
@@ -739,27 +741,33 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
                       {formatUsd(row.totalRefund)}
                     </td>
 
-                    {/* 4. 已结算退款金额 (可输入编辑，窄宽度) */}
+                    {/* 4. 已结算退款金额 (管理员可编辑，普通用户只读) */}
                     <td style={{ textAlign: 'right', padding: '0.45rem 0.4rem' }}>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="form-input"
-                        value={row.settledRefundAmount !== undefined ? row.settledRefundAmount : 0}
-                        onChange={(e) => handleCellChange(row.monthStr, 'settledRefundAmount', e.target.value)}
-                        style={{
-                          width: '76px',
-                          textAlign: 'right',
-                          padding: '0.28rem 0.35rem',
-                          fontSize: '0.82rem',
-                          fontFamily: 'monospace',
-                          borderColor: isDirty ? '#3b82f6' : 'var(--border-color)',
-                          background: 'var(--bg-input)',
-                          borderRadius: '0.35rem'
-                        }}
-                        placeholder="0.00"
-                      />
+                      {isAdmin ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="form-input"
+                          value={row.settledRefundAmount !== undefined ? row.settledRefundAmount : 0}
+                          onChange={(e) => handleCellChange(row.monthStr, 'settledRefundAmount', e.target.value)}
+                          style={{
+                            width: '76px',
+                            textAlign: 'right',
+                            padding: '0.28rem 0.35rem',
+                            fontSize: '0.82rem',
+                            fontFamily: 'monospace',
+                            borderColor: isDirty ? '#3b82f6' : 'var(--border-color)',
+                            background: 'var(--bg-input)',
+                            borderRadius: '0.35rem'
+                          }}
+                          placeholder="0.00"
+                        />
+                      ) : (
+                        <span style={{ fontFamily: 'monospace', fontSize: '0.84rem', color: 'var(--text-main)', fontWeight: 500 }}>
+                          {formatUsd(row.settledRefundAmount)}
+                        </span>
+                      )}
                     </td>
 
                     {/* 5. 未结算退款 (系统核算标签) */}
@@ -799,121 +807,145 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
                       )}
                     </td>
 
-                    {/* 6. 当月结算退款金额 (可输入编辑，窄宽度) */}
+                    {/* 6. 当月结算退款金额 (管理员可编辑，普通用户只读) */}
                     <td style={{ textAlign: 'right', padding: '0.45rem 0.4rem' }}>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="form-input"
-                        value={row.monthSettledRefundAmount !== undefined ? row.monthSettledRefundAmount : 0}
-                        onChange={(e) => handleCellChange(row.monthStr, 'monthSettledRefundAmount', e.target.value)}
-                        style={{
-                          width: '76px',
-                          textAlign: 'right',
-                          padding: '0.28rem 0.35rem',
-                          fontSize: '0.82rem',
-                          fontFamily: 'monospace',
-                          borderColor: isDirty ? '#3b82f6' : 'var(--border-color)',
-                          background: 'var(--bg-input)',
-                          borderRadius: '0.35rem'
-                        }}
-                        placeholder="0.00"
-                      />
-                    </td>
-
-                    {/* 7. 跨周期退款金额 (可输入编辑，窄宽度) */}
-                    <td style={{ textAlign: 'right', padding: '0.45rem 0.4rem' }}>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="form-input"
-                        value={row.crossPeriodRefundAmount !== undefined ? row.crossPeriodRefundAmount : 0}
-                        onChange={(e) => handleCellChange(row.monthStr, 'crossPeriodRefundAmount', e.target.value)}
-                        style={{
-                          width: '76px',
-                          textAlign: 'right',
-                          padding: '0.28rem 0.35rem',
-                          fontSize: '0.82rem',
-                          fontFamily: 'monospace',
-                          borderColor: isDirty ? '#3b82f6' : 'var(--border-color)',
-                          background: 'var(--bg-input)',
-                          borderRadius: '0.35rem'
-                        }}
-                        placeholder="0.00"
-                      />
-                    </td>
-
-                    {/* 8. 分成比例 (可输入编辑，单位 %，保留2位小数) */}
-                    <td style={{ textAlign: 'right', padding: '0.5rem 0.5rem' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                      {isAdmin ? (
                         <input
                           type="number"
                           step="0.01"
                           min="0"
-                          max="100"
                           className="form-input"
-                          value={row._displayShareRatio !== undefined ? row._displayShareRatio : (row.shareRatio !== undefined ? (parseFloat(row.shareRatio) * 100).toFixed(2) : '95.00')}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const num = parseFloat(val) || 0;
-                            handleCellChange(row.monthStr, 'shareRatio', (num / 100).toFixed(4), val, '_displayShareRatio');
-                          }}
-                          onBlur={(e) => {
-                            const num = parseFloat(e.target.value) || 0;
-                            handleCellChange(row.monthStr, 'shareRatio', (num / 100).toFixed(4), num.toFixed(2), '_displayShareRatio');
-                          }}
+                          value={row.monthSettledRefundAmount !== undefined ? row.monthSettledRefundAmount : 0}
+                          onChange={(e) => handleCellChange(row.monthStr, 'monthSettledRefundAmount', e.target.value)}
                           style={{
-                            width: '68px',
+                            width: '76px',
                             textAlign: 'right',
-                            padding: '0.3rem 0.35rem',
-                            fontSize: '0.84rem',
+                            padding: '0.28rem 0.35rem',
+                            fontSize: '0.82rem',
                             fontFamily: 'monospace',
                             borderColor: isDirty ? '#3b82f6' : 'var(--border-color)',
                             background: 'var(--bg-input)',
                             borderRadius: '0.35rem'
                           }}
+                          placeholder="0.00"
                         />
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)' }}>%</span>
-                      </div>
+                      ) : (
+                        <span style={{ fontFamily: 'monospace', fontSize: '0.84rem', color: 'var(--text-main)', fontWeight: 500 }}>
+                          {formatUsd(row.monthSettledRefundAmount)}
+                        </span>
+                      )}
                     </td>
 
-                    {/* 8. 渠道费率 (可输入编辑，单位 %，保留2位小数) */}
-                    <td style={{ textAlign: 'right', padding: '0.5rem 0.5rem' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                    {/* 7. 跨周期退款金额 (管理员可编辑，普通用户只读) */}
+                    <td style={{ textAlign: 'right', padding: '0.45rem 0.4rem' }}>
+                      {isAdmin ? (
                         <input
                           type="number"
                           step="0.01"
                           min="0"
-                          max="100"
                           className="form-input"
-                          value={row._displayChannelFeeRate !== undefined ? row._displayChannelFeeRate : (row.channelFeeRate !== undefined ? (parseFloat(row.channelFeeRate) * 100).toFixed(2) : '7.00')}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const num = parseFloat(val) || 0;
-                            handleCellChange(row.monthStr, 'channelFeeRate', (num / 100).toFixed(4), val, '_displayChannelFeeRate');
-                          }}
-                          onBlur={(e) => {
-                            const num = parseFloat(e.target.value) || 0;
-                            handleCellChange(row.monthStr, 'channelFeeRate', (num / 100).toFixed(4), num.toFixed(2), '_displayChannelFeeRate');
-                          }}
+                          value={row.crossPeriodRefundAmount !== undefined ? row.crossPeriodRefundAmount : 0}
+                          onChange={(e) => handleCellChange(row.monthStr, 'crossPeriodRefundAmount', e.target.value)}
                           style={{
-                            width: '68px',
+                            width: '76px',
                             textAlign: 'right',
-                            padding: '0.3rem 0.35rem',
-                            fontSize: '0.84rem',
+                            padding: '0.28rem 0.35rem',
+                            fontSize: '0.82rem',
                             fontFamily: 'monospace',
                             borderColor: isDirty ? '#3b82f6' : 'var(--border-color)',
                             background: 'var(--bg-input)',
                             borderRadius: '0.35rem'
                           }}
+                          placeholder="0.00"
                         />
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)' }}>%</span>
-                      </div>
+                      ) : (
+                        <span style={{ fontFamily: 'monospace', fontSize: '0.84rem', color: 'var(--text-main)', fontWeight: 500 }}>
+                          {formatUsd(row.crossPeriodRefundAmount)}
+                        </span>
+                      )}
                     </td>
 
-                    {/* 9. 最终结算金额 (高亮计算结果) */}
+                    {/* 8. 分成比例 (管理员可编辑，普通用户只读) */}
+                    <td style={{ textAlign: 'right', padding: '0.5rem 0.5rem' }}>
+                      {isAdmin ? (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            className="form-input"
+                            value={row._displayShareRatio !== undefined ? row._displayShareRatio : (row.shareRatio !== undefined ? (parseFloat(row.shareRatio) * 100).toFixed(2) : '95.00')}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const num = parseFloat(val) || 0;
+                              handleCellChange(row.monthStr, 'shareRatio', (num / 100).toFixed(4), val, '_displayShareRatio');
+                            }}
+                            onBlur={(e) => {
+                              const num = parseFloat(e.target.value) || 0;
+                              handleCellChange(row.monthStr, 'shareRatio', (num / 100).toFixed(4), num.toFixed(2), '_displayShareRatio');
+                            }}
+                            style={{
+                              width: '68px',
+                              textAlign: 'right',
+                              padding: '0.3rem 0.35rem',
+                              fontSize: '0.84rem',
+                              fontFamily: 'monospace',
+                              borderColor: isDirty ? '#3b82f6' : 'var(--border-color)',
+                              background: 'var(--bg-input)',
+                              borderRadius: '0.35rem'
+                            }}
+                          />
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)' }}>%</span>
+                        </div>
+                      ) : (
+                        <span style={{ fontFamily: 'monospace', fontSize: '0.84rem', color: 'var(--text-main)', fontWeight: 500 }}>
+                          {row.shareRatio !== undefined ? (parseFloat(row.shareRatio) * 100).toFixed(2) + '%' : '95.00%'}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* 9. 渠道费率 (管理员可编辑，普通用户只读) */}
+                    <td style={{ textAlign: 'right', padding: '0.5rem 0.5rem' }}>
+                      {isAdmin ? (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            className="form-input"
+                            value={row._displayChannelFeeRate !== undefined ? row._displayChannelFeeRate : (row.channelFeeRate !== undefined ? (parseFloat(row.channelFeeRate) * 100).toFixed(2) : '7.00')}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const num = parseFloat(val) || 0;
+                              handleCellChange(row.monthStr, 'channelFeeRate', (num / 100).toFixed(4), val, '_displayChannelFeeRate');
+                            }}
+                            onBlur={(e) => {
+                              const num = parseFloat(e.target.value) || 0;
+                              handleCellChange(row.monthStr, 'channelFeeRate', (num / 100).toFixed(4), num.toFixed(2), '_displayChannelFeeRate');
+                            }}
+                            style={{
+                              width: '68px',
+                              textAlign: 'right',
+                              padding: '0.3rem 0.35rem',
+                              fontSize: '0.84rem',
+                              fontFamily: 'monospace',
+                              borderColor: isDirty ? '#3b82f6' : 'var(--border-color)',
+                              background: 'var(--bg-input)',
+                              borderRadius: '0.35rem'
+                            }}
+                          />
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)' }}>%</span>
+                        </div>
+                      ) : (
+                        <span style={{ fontFamily: 'monospace', fontSize: '0.84rem', color: 'var(--text-main)', fontWeight: 500 }}>
+                          {row.channelFeeRate !== undefined ? (parseFloat(row.channelFeeRate) * 100).toFixed(2) + '%' : '7.00%'}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* 10. 最终结算金额 (高亮计算结果) */}
                     <td style={{
                       textAlign: 'right',
                       fontWeight: 800,
@@ -928,54 +960,62 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
                       {formatUsd(row.finalSettlementAmount)}
                     </td>
 
-                    {/* 10. 退款率 */}
+                    {/* 11. 退款率 */}
                     <td style={{ textAlign: 'right', fontSize: '0.82rem', color: 'var(--text-sub)', fontFamily: 'monospace', padding: '0.65rem 0.4rem' }}>
                       {row.refundRate || '0.00%'}
                     </td>
 
-                    {/* 11. 订单数 */}
+                    {/* 12. 订单数 */}
                     <td style={{ textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-sub)', fontFamily: 'monospace', padding: '0.75rem 0.6rem' }}>
                       {row.totalOrders || 0} / <span style={{ color: '#f43f5e' }}>{row.refundOrders || 0}</span>
                     </td>
 
-                    {/* 12. 备注 */}
+                    {/* 13. 备注 */}
                     <td style={{ textAlign: 'left', padding: '0.5rem 0.6rem' }}>
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={row.remark || ''}
-                        onChange={(e) => handleCellChange(row.monthStr, 'remark', e.target.value)}
-                        placeholder="添加备注..."
-                        style={{
-                          width: '100%',
-                          minWidth: '120px',
-                          padding: '0.3rem 0.5rem',
-                          fontSize: '0.82rem',
-                          background: 'var(--bg-input)',
-                          borderRadius: '0.35rem'
-                        }}
-                      />
+                      {isAdmin ? (
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={row.remark || ''}
+                          onChange={(e) => handleCellChange(row.monthStr, 'remark', e.target.value)}
+                          placeholder="添加备注..."
+                          style={{
+                            width: '100%',
+                            minWidth: '120px',
+                            padding: '0.3rem 0.5rem',
+                            fontSize: '0.82rem',
+                            background: 'var(--bg-input)',
+                            borderRadius: '0.35rem'
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: '0.82rem', color: row.remark ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                          {row.remark || '-'}
+                        </span>
+                      )}
                     </td>
 
-                    {/* 13. 操作按钮 */}
-                    <td style={{ textAlign: 'center', padding: '0.5rem 0.5rem' }}>
-                      <button
-                        className={`btn ${isDirty ? 'btn-primary' : 'btn-secondary'}`}
-                        disabled={isSaving}
-                        onClick={() => handleSaveRow(row)}
-                        style={{
-                          padding: '0.3rem 0.65rem',
-                          fontSize: '0.76rem',
-                          gap: '0.25rem',
-                          whiteSpace: 'nowrap',
-                          borderRadius: '0.35rem'
-                        }}
-                        title={isDirty ? '有未保存修改，点击保存' : '当前配置已存入数据库'}
-                      >
-                        {isDirty ? <Save size={12} /> : <Check size={12} color="#10b981" />}
-                        <span>{isSaving ? '保存中...' : (isDirty ? '保存' : '已存')}</span>
-                      </button>
-                    </td>
+                    {/* 14. 操作按钮 (仅管理员可见) */}
+                    {isAdmin && (
+                      <td style={{ textAlign: 'center', padding: '0.5rem 0.5rem' }}>
+                        <button
+                          className={`btn ${isDirty ? 'btn-primary' : 'btn-secondary'}`}
+                          disabled={isSaving}
+                          onClick={() => handleSaveRow(row)}
+                          style={{
+                            padding: '0.3rem 0.65rem',
+                            fontSize: '0.76rem',
+                            gap: '0.25rem',
+                            whiteSpace: 'nowrap',
+                            borderRadius: '0.35rem'
+                          }}
+                          title={isDirty ? '有未保存修改，点击保存' : '当前配置已存入数据库'}
+                        >
+                          {isDirty ? <Save size={12} /> : <Check size={12} color="#10b981" />}
+                          <span>{isSaving ? '保存中...' : (isDirty ? '保存' : '已存')}</span>
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })

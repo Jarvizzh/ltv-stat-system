@@ -108,7 +108,7 @@ public class UserService {
 
     @Transactional
     public SysUser createUser(String username, String rawPassword, String role) {
-        return createUser(username, rawPassword, role, 0, 0, null, null, 0, 0, 0, 0, 0);
+        return createUser(username, rawPassword, role, 0, 0, null, null, 0, 0, 0, 0, 0, 0);
     }
 
     @Transactional
@@ -124,7 +124,8 @@ public class UserService {
             Integer permRoiPredict,
             Integer permGlobalDistribution,
             Integer permExport,
-            Integer permSettlement
+            Integer permSettlement,
+            Integer permVideoGen
     ) {
         if (sysUserRepository.existsByUsername(username)) {
             throw new IllegalArgumentException("用户名已存在: " + username);
@@ -141,6 +142,7 @@ public class UserService {
         user.setPermGlobalDistribution(permGlobalDistribution != null ? permGlobalDistribution : 0);
         user.setPermExport(permExport != null ? permExport : 0);
         user.setPermSettlement(permSettlement != null ? permSettlement : 0);
+        user.setPermVideoGen(permVideoGen != null ? permVideoGen : 0);
 
         SysUser savedUser = sysUserRepository.save(user);
 
@@ -288,7 +290,7 @@ public class UserService {
     }
 
     @Transactional
-    public void updateUserPermissions(Long userId, Integer permPredictPayback, Integer permRoiPredict, Integer permGlobalDistribution, Integer permExport, Integer permSettlement) {
+    public void updateUserPermissions(Long userId, Integer permPredictPayback, Integer permRoiPredict, Integer permGlobalDistribution, Integer permExport, Integer permSettlement, Integer permVideoGen) {
         SysUser user = sysUserRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
 
@@ -297,8 +299,15 @@ public class UserService {
         if (permGlobalDistribution != null) user.setPermGlobalDistribution(permGlobalDistribution);
         if (permExport != null) user.setPermExport(permExport);
         if (permSettlement != null) user.setPermSettlement(permSettlement);
+        if (permVideoGen != null) user.setPermVideoGen(permVideoGen);
 
         sysUserRepository.save(user);
+    }
+
+    public boolean hasPermVideoGen(Long userId) {
+        if (userId == null) return false;
+        SysUser user = sysUserRepository.findById(userId).orElse(null);
+        return user != null && user.hasPermVideoGen();
     }
 
     public boolean hasPermSettlement(Long userId) {

@@ -112,6 +112,14 @@ public class DatabasePrimaryKeysInitializer {
                 log.warn("Failed to add perm_settlement column to sys_user: {}", e.getMessage());
             }
         }
+        if (!isColumnExist("sys_user", "perm_video_gen")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE sys_user ADD COLUMN perm_video_gen INT NOT NULL DEFAULT 0");
+                log.info("Successfully added perm_video_gen column to sys_user");
+            } catch (Exception e) {
+                log.warn("Failed to add perm_video_gen column to sys_user: {}", e.getMessage());
+            }
+        }
         if (!isColumnExist("sys_user", "is_settlement")) {
             try {
                 jdbcTemplate.execute("ALTER TABLE sys_user ADD COLUMN is_settlement INT NOT NULL DEFAULT 0");

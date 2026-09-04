@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { DollarSign, Users, UserCheck, RefreshCw, Calendar, TrendingUp, Globe, X } from 'lucide-react';
+import { DollarSign, Users, UserCheck, RefreshCw, Calendar, TrendingUp } from 'lucide-react';
 import DailyRechargeCharts from './DailyRechargeCharts';
 import { exportDistributionTable } from '../utils/exportExcel';
 import ExportModal from './ExportModal';
 
 export default function DailyRechargeDistributionTable({ distributionData, distributionSummary, isGlobal = false }) {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [showGlobalTip, setShowGlobalTip] = useState(true);
   const data = Array.isArray(distributionData) ? distributionData : [];
 
   const handleConfirmExport = (dateRange) => {
@@ -103,30 +102,6 @@ export default function DailyRechargeDistributionTable({ distributionData, distr
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', width: '100%' }}>
-      {isGlobal && showGlobalTip && (
-        <div style={{
-          background: 'rgba(99, 102, 241, 0.1)',
-          border: '1px solid rgba(99, 102, 241, 0.3)',
-          borderRadius: '0.5rem',
-          padding: '0.5rem 0.85rem',
-          color: '#6366f1',
-          fontSize: '0.82rem',
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <Globe size={16} style={{ flexShrink: 0 }} />
-          <span style={{ flex: 1 }}>全平台订单汇总模式：正在展示系统所有订单的充值分布数据（包含全量落地页及未绑定落地页的订单数据）。</span>
-          <button
-            onClick={() => setShowGlobalTip(false)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', color: '#6366f1', opacity: 0.6, flexShrink: 0, display: 'flex', alignItems: 'center' }}
-            title="关闭提示"
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
       {/* 顶部统计卡片汇总：全量全局独立去重与今日实时 */}
       <div className="stats-summary" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
         <div className="stat-card">

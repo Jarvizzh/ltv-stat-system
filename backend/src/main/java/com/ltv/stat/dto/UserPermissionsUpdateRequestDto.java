@@ -7,15 +7,17 @@ public class UserPermissionsUpdateRequestDto {
     private Integer permGlobalDistribution;
     private Integer permExport;
     private Integer permSettlement;
+    private Integer permVideoGen;
 
     public UserPermissionsUpdateRequestDto() {}
 
-    public UserPermissionsUpdateRequestDto(Integer permPredictPayback, Integer permRoiPredict, Integer permGlobalDistribution, Integer permExport, Integer permSettlement) {
+    public UserPermissionsUpdateRequestDto(Integer permPredictPayback, Integer permRoiPredict, Integer permGlobalDistribution, Integer permExport, Integer permSettlement, Integer permVideoGen) {
         this.permPredictPayback = permPredictPayback;
         this.permRoiPredict = permRoiPredict;
         this.permGlobalDistribution = permGlobalDistribution;
         this.permExport = permExport;
         this.permSettlement = permSettlement;
+        this.permVideoGen = permVideoGen;
     }
 
     public Integer getPermPredictPayback() { return permPredictPayback; }
@@ -32,4 +34,7 @@ public class UserPermissionsUpdateRequestDto {
 
     public Integer getPermSettlement() { return permSettlement; }
     public void setPermSettlement(Integer permSettlement) { this.permSettlement = permSettlement; }
+
+    public Integer getPermVideoGen() { return permVideoGen; }
+    public void setPermVideoGen(Integer permVideoGen) { this.permVideoGen = permVideoGen; }
 }

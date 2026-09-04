@@ -23,6 +23,7 @@ public class UserInfoDto {
     private Integer permGlobalDistribution;
     private Integer permExport;
     private Integer permSettlement;
+    private Integer permVideoGen;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -71,4 +72,7 @@ public class UserInfoDto {
 
     public Integer getPermSettlement() { return permSettlement != null ? permSettlement : 0; }
     public void setPermSettlement(Integer permSettlement) { this.permSettlement = permSettlement; }
+
+    public Integer getPermVideoGen() { return permVideoGen != null ? permVideoGen : 0; }
+    public void setPermVideoGen(Integer permVideoGen) { this.permVideoGen = permVideoGen; }
 }

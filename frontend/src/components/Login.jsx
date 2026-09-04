@@ -34,6 +34,8 @@ export default function Login({ onLoginSuccess }) {
         localStorage.setItem('admin_perm_roi_predict', data.permRoiPredict || 0);
         localStorage.setItem('admin_perm_global_distribution', data.permGlobalDistribution || 0);
         localStorage.setItem('admin_perm_export', data.permExport || 0);
+        localStorage.setItem('admin_perm_settlement', data.permSettlement || 0);
+        localStorage.setItem('admin_perm_video_gen', data.permVideoGen || 0);
         onLoginSuccess(data);
       } else {
         setErrorMsg(data.msg || '登录失败，请检查账号密码');

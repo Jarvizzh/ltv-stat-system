@@ -45,6 +45,9 @@ public class SysUser {
     @Column(name = "perm_settlement", nullable = false)
     private Integer permSettlement = 0; // 月份结算
 
+    @Column(name = "perm_video_gen", nullable = false)
+    private Integer permVideoGen = 0; // AI视频生成
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -107,6 +110,10 @@ public class SysUser {
     public Integer getPermSettlement() { return permSettlement != null ? permSettlement : 0; }
     public void setPermSettlement(Integer permSettlement) { this.permSettlement = permSettlement; }
     public boolean hasPermSettlement() { return isSuperAdmin() || Integer.valueOf(1).equals(this.permSettlement); }
+
+    public Integer getPermVideoGen() { return permVideoGen != null ? permVideoGen : 0; }
+    public void setPermVideoGen(Integer permVideoGen) { this.permVideoGen = permVideoGen; }
+    public boolean hasPermVideoGen() { return isSuperAdmin() || Integer.valueOf(1).equals(this.permVideoGen); }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

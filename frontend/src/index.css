@@ -101,7 +101,7 @@ body {
   background: var(--header-bg);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-color);
-  padding: 1rem 1.5rem;
+  padding: 0.85rem 1.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -138,20 +138,27 @@ body {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.65rem;
+}
+
+.header-actions .btn {
+  padding: 0.44rem 0.85rem;
+  font-size: 0.86rem;
+  gap: 0.45rem;
+  border-radius: 0.48rem;
 }
 
 .theme-toggle-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
+  gap: 0.45rem;
+  padding: 0.44rem 0.68rem;
+  border-radius: 0.48rem;
   background: var(--bg-secondary);
   color: var(--text-main);
   border: 1px solid var(--border-color);
-  font-size: 0.85rem;
+  font-size: 0.86rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -804,7 +811,7 @@ input[type="number"] {
 .header-left-group {
   display: flex;
   align-items: center;
-  gap: 2rem;
+  gap: 1.8rem;
 }
 
 .header-nav-tabs {
@@ -813,7 +820,7 @@ input[type="number"] {
   gap: 0.35rem;
   background: rgba(15, 23, 42, 0.35);
   padding: 0.25rem;
-  border-radius: 0.6rem;
+  border-radius: 0.55rem;
   border: 1px solid var(--border-color);
 }
 
@@ -826,9 +833,9 @@ input[type="number"] {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.45rem 0.9rem;
+  padding: 0.44rem 0.88rem;
   border-radius: 0.45rem;
-  font-size: 0.875rem;
+  font-size: 0.88rem;
   font-weight: 500;
   color: var(--text-sub);
   background: transparent;
@@ -936,6 +943,19 @@ input[type="number"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 紧凑型下拉框尺寸 */
+.custom-select-sm .custom-select-trigger {
+  padding: 0.34rem 0.65rem;
+  font-size: 0.85rem;
+  border-radius: 0.42rem;
+  gap: 0.42rem;
+}
+
+.custom-select-sm .custom-select-option {
+  padding: 0.42rem 0.72rem;
+  font-size: 0.85rem;
 }
 
 .custom-select-dropdown {

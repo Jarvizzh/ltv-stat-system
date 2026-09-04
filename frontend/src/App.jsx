@@ -32,6 +32,7 @@ export default function App() {
       permGlobalDistribution: Number(localStorage.getItem('admin_perm_global_distribution') || 0),
       permExport: Number(localStorage.getItem('admin_perm_export') || 0),
       permSettlement: Number(localStorage.getItem('admin_perm_settlement') || 0),
+      permVideoGen: Number(localStorage.getItem('admin_perm_video_gen') || 0),
     };
   });
 
@@ -41,6 +42,7 @@ export default function App() {
   const hasPermGlobalDistribution = isSuperAdmin || Boolean(currentUser?.permGlobalDistribution === 1);
   const hasPermExport = isSuperAdmin || Boolean(currentUser?.permExport === 1);
   const hasPermSettlement = isSuperAdmin || Boolean(currentUser?.permSettlement === 1);
+  const hasPermVideoGen = isSuperAdmin || Boolean(currentUser?.permVideoGen === 1);
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token');
@@ -56,6 +58,7 @@ export default function App() {
           localStorage.setItem('admin_perm_global_distribution', data.permGlobalDistribution || 0);
           localStorage.setItem('admin_perm_export', data.permExport || 0);
           localStorage.setItem('admin_perm_settlement', data.permSettlement || 0);
+          localStorage.setItem('admin_perm_video_gen', data.permVideoGen || 0);
           localStorage.setItem('admin_role', data.role || 'USER');
           setCurrentUser(prev => ({
             ...prev,
@@ -65,6 +68,7 @@ export default function App() {
             permGlobalDistribution: data.permGlobalDistribution || 0,
             permExport: data.permExport || 0,
             permSettlement: data.permSettlement || 0,
+            permVideoGen: data.permVideoGen || 0,
           }));
         }
       })
@@ -321,6 +325,7 @@ export default function App() {
       permGlobalDistribution: loginData.permGlobalDistribution || 0,
       permExport: loginData.permExport || 0,
       permSettlement: loginData.permSettlement || 0,
+      permVideoGen: loginData.permVideoGen || 0,
     };
     setCurrentUser(userObj);
     setTargetUserId(newUid);

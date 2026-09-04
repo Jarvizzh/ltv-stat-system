@@ -61,6 +61,7 @@ public class AuthController {
                 response.setPermGlobalDistribution(user.hasPermGlobalDistribution() ? 1 : 0);
                 response.setPermExport(user.hasPermExport() ? 1 : 0);
                 response.setPermSettlement(user.hasPermSettlement() ? 1 : 0);
+                response.setPermVideoGen(user.hasPermVideoGen() ? 1 : 0);
                 return ResponseEntity.ok(response);
             }
         }
@@ -101,6 +102,7 @@ public class AuthController {
                 response.setPermGlobalDistribution(user.hasPermGlobalDistribution() ? 1 : 0);
                 response.setPermExport(user.hasPermExport() ? 1 : 0);
                 response.setPermSettlement(user.hasPermSettlement() ? 1 : 0);
+                response.setPermVideoGen(user.hasPermVideoGen() ? 1 : 0);
             });
 
             return ResponseEntity.ok(response);

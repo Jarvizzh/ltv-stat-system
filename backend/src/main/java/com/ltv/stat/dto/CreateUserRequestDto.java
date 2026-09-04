@@ -18,6 +18,7 @@ public class CreateUserRequestDto {
     private Integer permGlobalDistribution;
     private Integer permExport;
     private Integer permSettlement;
+    private Integer permVideoGen;
 
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
@@ -54,4 +55,7 @@ public class CreateUserRequestDto {
 
     public Integer getPermSettlement() { return permSettlement; }
     public void setPermSettlement(Integer permSettlement) { this.permSettlement = permSettlement; }
+
+    public Integer getPermVideoGen() { return permVideoGen; }
+    public void setPermVideoGen(Integer permVideoGen) { this.permVideoGen = permVideoGen; }
 }

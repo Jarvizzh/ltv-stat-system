@@ -53,6 +53,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
     permGlobalDistribution: 0,
     permExport: 0,
     permSettlement: 0,
+    permVideoGen: 0,
   });
 
   const expandedRowRef = useRef(null);
@@ -73,6 +74,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
       permGlobalDistribution: 0,
       permExport: 0,
       permSettlement: 0,
+      permVideoGen: 0,
     });
     setShowAddForm(false);
   };
@@ -143,6 +145,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
           permGlobalDistribution: newRole === 'SUPER_ADMIN' ? 1 : newPermissions.permGlobalDistribution,
           permExport: newRole === 'SUPER_ADMIN' ? 1 : newPermissions.permExport,
           permSettlement: newRole === 'SUPER_ADMIN' ? 1 : newPermissions.permSettlement,
+          permVideoGen: newRole === 'SUPER_ADMIN' ? 1 : newPermissions.permVideoGen,
         })
       });
       const data = await res.json();
@@ -373,7 +376,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
         <div className="modal-body" style={{ maxHeight: '78vh', overflowY: 'auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-sub)' }}>
-              管理员可管理用户账号。超级管理员可标记「主账号(汇总)」、关联分配子账号、设置跨视图（只读）查看权限以及分配 4 项专属功能权限。
+              管理员可管理用户账号。超级管理员可标记「主账号(汇总)」、关联分配子账号、设置跨视图（只读）查看权限以及分配 6 项专属功能权限。
             </p>
             <button
               className="btn btn-primary"
@@ -534,6 +537,17 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                       />
                       <span>💳 结算</span>
                     </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: newRole === 'SUPER_ADMIN' ? 'not-allowed' : 'pointer', userSelect: 'none', color: (newRole === 'SUPER_ADMIN' || newPermissions.permVideoGen) ? '#8b5cf6' : 'var(--text-main)', fontWeight: (newRole === 'SUPER_ADMIN' || newPermissions.permVideoGen) ? 600 : 400 }}>
+                      <input
+                        type="checkbox"
+                        disabled={newRole === 'SUPER_ADMIN'}
+                        checked={newRole === 'SUPER_ADMIN' || Boolean(newPermissions.permVideoGen)}
+                        onChange={(e) => setNewPermissions(prev => ({ ...prev, permVideoGen: e.target.checked ? 1 : 0 }))}
+                        style={{ accentColor: '#8b5cf6', width: 15, height: 15 }}
+                      />
+                      <span>🎬 AI视频生成</span>
+                    </label>
                   </div>
                 </div>
               )}
@@ -664,7 +678,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                     const visibleCount = u.visibleUserIds ? u.visibleUserIds.length : 0;
                     const subCount = u.subUserIds ? u.subUserIds.length : 0;
                     const isMaster = u.isMaster === 1;
-                    const permCount = [u.permPredictPayback, u.permRoiPredict, u.permGlobalDistribution, u.permExport, u.permSettlement].filter(p => p === 1).length;
+                    const permCount = [u.permPredictPayback, u.permRoiPredict, u.permGlobalDistribution, u.permExport, u.permSettlement, u.permVideoGen].filter(p => p === 1).length;
 
                     return (
                       <React.Fragment key={u.id}>
@@ -790,7 +804,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                                 <button
                                   className="btn btn-secondary"
                                   style={{ padding: '0.25rem 0.45rem', fontSize: '0.75rem', gap: '0.25rem', borderColor: '#3b82f6', color: '#3b82f6' }}
-                                  title="点击分配该账户的 5 项功能权限（预测回本、ROI预测、平台汇总、数据导出、月份结算）"
+                                  title="点击分配该账户的 6 项功能权限（预测回本、ROI预测、平台汇总、数据导出、月份结算、AI视频生成）"
                                   onClick={() => {
                                     if (editingPermissionsUserId === u.id) {
                                       setEditingPermissionsUserId(null);
@@ -805,6 +819,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                                         permGlobalDistribution: u.permGlobalDistribution || 0,
                                         permExport: u.permExport || 0,
                                         permSettlement: u.permSettlement || 0,
+                                        permVideoGen: u.permVideoGen || 0,
                                       });
                                     }
                                   }}
@@ -1013,7 +1028,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                                    设置账号 <span style={{ color: '#3b82f6' }}>[{u.username}]</span> 的 5 项专属功能权限：
+                                    设置账号 <span style={{ color: '#3b82f6' }}>[{u.username}]</span> 的 6 项专属功能权限：
                                   </span>
                                   <div style={{ display: 'flex', gap: '0.4rem' }}>
                                     <button
@@ -1082,6 +1097,16 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                                       style={{ accentColor: '#3b82f6', width: 16, height: 16 }}
                                     />
                                     <span>💳 结算</span>
+                                  </label>
+
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permVideoGen ? '#8b5cf6' : 'var(--text-main)', fontWeight: selectedPermissions.permVideoGen ? 600 : 400 }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(selectedPermissions.permVideoGen)}
+                                      onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permVideoGen: e.target.checked ? 1 : 0 }))}
+                                      style={{ accentColor: '#8b5cf6', width: 16, height: 16 }}
+                                    />
+                                    <span>🎬 AI视频生成</span>
                                   </label>
                                 </div>
                               </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, PieChart, Settings, RefreshCw, Upload, Users, LogOut, Shield, Eye, Globe, Download, Receipt } from 'lucide-react';
+import { BarChart3, PieChart, Settings, RefreshCw, Upload, Users, LogOut, Shield, Eye, Globe, Download, Receipt, Video } from 'lucide-react';
 import CustomSelect from './CustomSelect';
 
 export default function LtvHeader({
@@ -22,6 +22,7 @@ export default function LtvHeader({
   const hasPermGlobalDistribution = isSuperAdmin || currentUser?.permGlobalDistribution === 1;
   const hasPermExport = isSuperAdmin || currentUser?.permExport === 1;
   const hasPermSettlement = isSuperAdmin || currentUser?.permSettlement === 1;
+  const hasPermVideoGen = isSuperAdmin || currentUser?.permVideoGen === 1;
   const isReadOnly = Boolean(targetUserId && currentUser && targetUserId !== currentUser.userId);
   const canSwitchView = (isSuperAdmin || (usersList && usersList.length > 1)) && usersList && usersList.length > 0;
 
@@ -89,11 +90,11 @@ export default function LtvHeader({
               gap: '0.4rem',
               background: isReadOnly ? 'rgba(244, 63, 94, 0.12)' : 'rgba(99, 102, 241, 0.12)',
               border: isReadOnly ? '1px solid rgba(244, 63, 94, 0.3)' : '1px solid rgba(99, 102, 241, 0.3)',
-              borderRadius: '0.5rem',
-              padding: '0.35rem 0.65rem'
+              borderRadius: '0.48rem',
+              padding: '0.25rem 0.55rem'
             }}
           >
-            <Eye size={16} color={isReadOnly ? '#f43f5e' : '#6366f1'} />
+            <Eye size={15} color={isReadOnly ? '#f43f5e' : '#6366f1'} />
             <span style={{ fontSize: '0.78rem', color: isReadOnly ? '#f43f5e' : '#6366f1', fontWeight: 600, whiteSpace: 'nowrap' }}>
               视图
             </span>
@@ -105,7 +106,8 @@ export default function LtvHeader({
                 const labelText = isSelfUser ? u.username : `${u.username} (只读)`;
                 return { label: labelText, value: u.id };
               })}
-              style={{ minWidth: '130px' }}
+              className="custom-select-sm"
+              style={{ minWidth: '120px' }}
             />
           </div>
         )}
@@ -169,14 +171,26 @@ export default function LtvHeader({
             title="导出表格数据 (支持自定义时间段)"
             style={{ cursor: 'pointer' }}
           >
-            <Download size={18} color="#10b981" />
+            <Download size={17} color="#10b981" />
+          </button>
+        )}
+
+        {/* AI视频生成按钮 */}
+        {hasPermVideoGen && (
+          <button
+            className="theme-toggle-btn"
+            onClick={() => window.open('https://video.gether.top', '_blank', 'noopener,noreferrer')}
+            title="AI视频生成"
+            style={{ cursor: 'pointer' }}
+          >
+            <Video size={17} color="#8b5cf6" />
           </button>
         )}
 
         {/* 退出登录按钮 (格式：图标 username) */}
         <button
           className="btn btn-secondary"
-          style={{ color: '#f43f5e', borderColor: 'rgba(244, 63, 94, 0.25)', gap: '0.4rem' }}
+          style={{ color: '#f43f5e', borderColor: 'rgba(244, 63, 94, 0.25)', gap: '0.45rem' }}
           onClick={onLogout}
           title={`当前账号: ${currentUser?.username || localStorage.getItem('admin_username') || ''} (点击退出登录)`}
         >
