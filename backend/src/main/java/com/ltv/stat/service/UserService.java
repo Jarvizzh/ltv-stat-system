@@ -390,11 +390,11 @@ public class UserService {
 
         List<SysUser> allUsers = sysUserRepository.findAllByOrderByCreatedAtDesc();
 
-        // 超级管理员：返回系统中所有被勾选了参与结算属性（isSettlement == 1）的账号，且当前账号置顶
-        if ("SUPER_ADMIN".equalsIgnoreCase(user.getRole())) {
+        // 超级管理员 / 管理员：返回系统中所有被勾选了参与结算属性（isSettlement == 1）的账号，且当前账号置顶
+        if (user.isAdmin()) {
             List<VisibleAccountDto> list = new ArrayList<>();
-            // 若当前登录超管账号自身也是结算账号，置顶
-            if (user.isSettlementAccount() || user.isSuperAdmin()) {
+            // 若当前登录账号自身也是结算账号或者管理员/超管，置顶
+            if (user.isSettlementAccount() || user.isAdmin()) {
                 int selfSubCount = isMasterAccount(user.getId()) ? getSubUserIdsForMaster(user.getId()).size() : 0;
                 list.add(new VisibleAccountDto(user.getId(), user.getUsername(), user.getRole(), true, user.getIsMaster(), user.getIsSettlement(), selfSubCount));
             }
@@ -408,30 +408,10 @@ public class UserService {
             return list;
         }
 
-        // 普通管理员 / 普通用户：在可见账号范围内，只保留被超级管理员开启了参与结算属性 (isSettlement == 1) 的账号
-        List<Long> grantedTargetIds = getUserViewPermissionTargetIds(userId);
-        Set<Long> visibleSet = new HashSet<>(grantedTargetIds);
-        visibleSet.add(userId);
-        if (isMasterAccount(userId)) {
-            visibleSet.addAll(getSubUserIdsForMaster(userId));
-        }
-
+        // 普通用户：若有结算权限，结算账号列表只能查看自身登录账号，不可查看其他结算账号
         List<VisibleAccountDto> result = new ArrayList<>();
-        // 本人若为结算账号
-        if (user.isSettlementAccount()) {
-            int selfSubCount = isMasterAccount(user.getId()) ? getSubUserIdsForMaster(user.getId()).size() : 0;
-            result.add(new VisibleAccountDto(user.getId(), user.getUsername(), user.getRole(), true, user.getIsMaster(), user.getIsSettlement(), selfSubCount));
-        }
-
-        for (SysUser u : allUsers) {
-            if (!u.getId().equals(userId) && visibleSet.contains(u.getId()) && u.getStatus() != null && u.getStatus() == 1) {
-                if (u.isSettlementAccount()) {
-                    int subCount = isMasterAccount(u.getId()) ? getSubUserIdsForMaster(u.getId()).size() : 0;
-                    result.add(new VisibleAccountDto(u.getId(), u.getUsername(), u.getRole(), false, u.getIsMaster(), u.getIsSettlement(), subCount));
-                }
-            }
-        }
-
+        int selfSubCount = isMasterAccount(user.getId()) ? getSubUserIdsForMaster(user.getId()).size() : 0;
+        result.add(new VisibleAccountDto(user.getId(), user.getUsername(), user.getRole(), true, user.getIsMaster(), user.getIsSettlement(), selfSubCount));
         return result;
     }
 

@@ -86,6 +86,7 @@ public class SysUser {
     public boolean isSettlementAccount() { return Integer.valueOf(1).equals(this.isSettlement); }
 
     public boolean isSuperAdmin() { return "SUPER_ADMIN".equalsIgnoreCase(this.role); }
+    public boolean isAdmin() { return "ADMIN".equalsIgnoreCase(this.role) || "SUPER_ADMIN".equalsIgnoreCase(this.role); }
 
     public Integer getPermPredictPayback() { return permPredictPayback != null ? permPredictPayback : 0; }
     public void setPermPredictPayback(Integer permPredictPayback) { this.permPredictPayback = permPredictPayback; }

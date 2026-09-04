@@ -43,12 +43,16 @@ public class MonthlySettlementController {
         }
 
         TokenInfo currentUser = UserContext.getCurrentUser();
-        if ("USER_ACCOUNT".equalsIgnoreCase(settlementType)) {
-            Long effectiveUserId = targetUserId != null ? targetUserId : currentUser.getUserId();
-            if (!userService.canUserViewTarget(currentUser, effectiveUserId)) {
-                return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权查看该账号的结算数据"));
+        // 普通用户：只可查看【B. 账号分配结算】，且只能查看自身登录账号
+        // 超级管理员、管理员：可见 A/B/C，且在 B 中可查看所有分配结算的账号
+        if (!currentUser.isAdmin()) {
+            settlementType = "USER_ACCOUNT";
+            targetUserId = currentUser.getUserId();
+        } else {
+            if ("USER_ACCOUNT".equalsIgnoreCase(settlementType)) {
+                Long effectiveUserId = targetUserId != null ? targetUserId : currentUser.getUserId();
+                targetUserId = effectiveUserId;
             }
-            targetUserId = effectiveUserId;
         }
 
         List<MonthlySettlementItemDto> list = settlementService.getMonthlySettlementList(settlementType, targetUserId);
@@ -62,12 +66,16 @@ public class MonthlySettlementController {
         }
 
         TokenInfo currentUser = UserContext.getCurrentUser();
-        if ("USER_ACCOUNT".equalsIgnoreCase(body.getSettlementType())) {
-            Long targetUserId = body.getTargetUserId() != null ? body.getTargetUserId() : currentUser.getUserId();
-            if (!userService.canUserModifyTarget(currentUser, targetUserId)) {
-                return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权修改该账号的结算配置"));
+        // 普通用户：只可修改【B. 账号分配结算】，且只能修改自身登录账号
+        // 超级管理员、管理员：可修改 A/B/C 及所有账号
+        if (!currentUser.isAdmin()) {
+            body.setSettlementType("USER_ACCOUNT");
+            body.setTargetUserId(currentUser.getUserId());
+        } else {
+            if ("USER_ACCOUNT".equalsIgnoreCase(body.getSettlementType())) {
+                Long targetUserId = body.getTargetUserId() != null ? body.getTargetUserId() : currentUser.getUserId();
+                body.setTargetUserId(targetUserId);
             }
-            body.setTargetUserId(targetUserId);
         }
 
         try {

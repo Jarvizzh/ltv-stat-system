@@ -25,18 +25,26 @@ import {
 import CustomSelect from './CustomSelect';
 
 export default function MonthlySettlementTable({ token, currentUser, showToast }) {
-  const [settlementType, setSettlementType] = useState('PLATFORM_ALL'); // 'PLATFORM_ALL' | 'USER_ACCOUNT' | 'UNLINKED_PID'
+  const isAdmin = currentUser && (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'ADMIN');
+
+  const [settlementType, setSettlementType] = useState(isAdmin ? 'PLATFORM_ALL' : 'USER_ACCOUNT'); // 'PLATFORM_ALL' | 'USER_ACCOUNT' | 'UNLINKED_PID'
   const [accounts, setAccounts] = useState([]);
-  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(isAdmin ? null : (currentUser?.userId || currentUser?.id));
   const [loading, setLoading] = useState(false);
   const [savingRowMonth, setSavingRowMonth] = useState(null);
   const [savingAll, setSavingAll] = useState(false);
   const [rows, setRows] = useState([]);
   const [dirtyMap, setDirtyMap] = useState({}); // { [monthStr]: boolean }
 
-  const isSuperAdmin = currentUser && currentUser.role === 'SUPER_ADMIN';
+  useEffect(() => {
+    if (!isAdmin) {
+      setSettlementType('USER_ACCOUNT');
+      const selfId = currentUser?.userId || currentUser?.id;
+      if (selfId) setSelectedUserId(selfId);
+    }
+  }, [isAdmin, currentUser]);
 
-  // 1. 获取超级管理员配置的可结算账号列表（已在后端置顶当前账号与主账号）
+  // 1. 获取可结算账号列表（管理员和超管获取所有，普通用户仅获取自身账号）
   const fetchAccounts = async () => {
     if (!token) return;
     try {
@@ -46,13 +54,18 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
       const data = await res.json();
       if (res.ok && data.code === 0 && Array.isArray(data.data)) {
         setAccounts(data.data);
-        if (data.data.length > 0) {
-          setSelectedUserId(prev => {
-            const exists = data.data.some(a => a.id === prev);
-            return exists ? prev : data.data[0].id;
-          });
+        if (isAdmin) {
+          if (data.data.length > 0) {
+            setSelectedUserId(prev => {
+              const exists = data.data.some(a => a.id === prev);
+              return exists ? prev : data.data[0].id;
+            });
+          } else {
+            setSelectedUserId(null);
+          }
         } else {
-          setSelectedUserId(null);
+          const selfId = currentUser?.userId || currentUser?.id;
+          setSelectedUserId(selfId || (data.data.length > 0 ? data.data[0].id : null));
         }
       }
     } catch (e) {
@@ -62,15 +75,17 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
 
   useEffect(() => {
     fetchAccounts();
-  }, [token]);
+  }, [token, isAdmin]);
 
   // 2. 获取月度结算数据
   const fetchSettlementList = async (type = settlementType, uid = selectedUserId) => {
     if (!token) return;
     setLoading(true);
     try {
-      const effectiveUid = type === 'USER_ACCOUNT' ? (uid || currentUser?.userId) : '';
-      const res = await fetch(`/api/settlement/list?settlementType=${type}&targetUserId=${effectiveUid || ''}`, {
+      const effectiveType = isAdmin ? type : 'USER_ACCOUNT';
+      const selfId = currentUser?.userId || currentUser?.id;
+      const effectiveUid = effectiveType === 'USER_ACCOUNT' ? (isAdmin ? (uid || selfId) : selfId) : '';
+      const res = await fetch(`/api/settlement/list?settlementType=${effectiveType}&targetUserId=${effectiveUid || ''}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -89,7 +104,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
 
   useEffect(() => {
     fetchSettlementList(settlementType, selectedUserId);
-  }, [settlementType, selectedUserId]);
+  }, [settlementType, selectedUserId, isAdmin]);
 
   // 3. 处理单元格编辑与实时计算
   const handleCellChange = (monthStr, field, rawValue, displayVal, displayField) => {
@@ -139,9 +154,10 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
     if (!token) return;
     setSavingRowMonth(row.monthStr);
     try {
+      const selfId = currentUser?.userId || currentUser?.id;
       const payload = {
-        settlementType,
-        targetUserId: settlementType === 'USER_ACCOUNT' ? selectedUserId : null,
+        settlementType: isAdmin ? settlementType : 'USER_ACCOUNT',
+        targetUserId: isAdmin ? (settlementType === 'USER_ACCOUNT' ? selectedUserId : null) : selfId,
         monthStr: row.monthStr,
         settledRefundAmount: parseFloat(row.settledRefundAmount) || 0,
         monthSettledRefundAmount: parseFloat(row.monthSettledRefundAmount) || 0,
@@ -183,13 +199,14 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
     setSavingAll(true);
     let successCount = 0;
     try {
+      const selfId = currentUser?.userId || currentUser?.id;
       for (const m of dirtyMonths) {
         const row = rows.find(r => r.monthStr === m);
         if (!row) continue;
 
         const payload = {
-          settlementType,
-          targetUserId: settlementType === 'USER_ACCOUNT' ? selectedUserId : null,
+          settlementType: isAdmin ? settlementType : 'USER_ACCOUNT',
+          targetUserId: isAdmin ? (settlementType === 'USER_ACCOUNT' ? selectedUserId : null) : selfId,
           monthStr: row.monthStr,
           settledRefundAmount: parseFloat(row.settledRefundAmount) || 0,
           monthSettledRefundAmount: parseFloat(row.monthSettledRefundAmount) || 0,
@@ -274,116 +291,146 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
         flexWrap: 'wrap',
         gap: '0.85rem'
       }}>
-        {/* 左侧：三大类型分段按钮 + 账号选择下拉框 */}
+        {/* 左侧：三大类型分段按钮 + 账号选择下拉框 (超级管理员、管理员可见 A/B/C及所有账号；普通用户仅展示 B. 账号分配结算 及自身账号) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.35rem',
-            background: 'var(--bg-secondary)',
-            padding: '0.3rem',
-            borderRadius: '0.6rem',
-            border: '1px solid var(--border-light)'
-          }}>
-            <button
-              onClick={() => setSettlementType('PLATFORM_ALL')}
-              style={{
+          {isAdmin ? (
+            <>
+              <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.45rem 0.95rem',
-                borderRadius: '0.45rem',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '0.82rem',
-                fontWeight: settlementType === 'PLATFORM_ALL' ? 600 : 500,
-                background: settlementType === 'PLATFORM_ALL' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'transparent',
-                color: settlementType === 'PLATFORM_ALL' ? '#ffffff' : 'var(--text-sub)',
-                boxShadow: settlementType === 'PLATFORM_ALL' ? '0 2px 8px rgba(37, 99, 235, 0.35)' : 'none',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Globe size={15} />
-              <span>A. 平台汇总</span>
-            </button>
+                gap: '0.35rem',
+                background: 'var(--bg-secondary)',
+                padding: '0.3rem',
+                borderRadius: '0.6rem',
+                border: '1px solid var(--border-light)'
+              }}>
+                <button
+                  onClick={() => setSettlementType('PLATFORM_ALL')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    padding: '0.45rem 0.95rem',
+                    borderRadius: '0.45rem',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: settlementType === 'PLATFORM_ALL' ? 600 : 500,
+                    background: settlementType === 'PLATFORM_ALL' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'transparent',
+                    color: settlementType === 'PLATFORM_ALL' ? '#ffffff' : 'var(--text-sub)',
+                    boxShadow: settlementType === 'PLATFORM_ALL' ? '0 2px 8px rgba(37, 99, 235, 0.35)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <Globe size={15} />
+                  <span>平台汇总</span>
+                </button>
 
-            <button
-              onClick={() => setSettlementType('USER_ACCOUNT')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.45rem 0.95rem',
-                borderRadius: '0.45rem',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '0.82rem',
-                fontWeight: settlementType === 'USER_ACCOUNT' ? 600 : 500,
-                background: settlementType === 'USER_ACCOUNT' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'transparent',
-                color: settlementType === 'USER_ACCOUNT' ? '#ffffff' : 'var(--text-sub)',
-                boxShadow: settlementType === 'USER_ACCOUNT' ? '0 2px 8px rgba(37, 99, 235, 0.35)' : 'none',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <UserCheck size={15} />
-              <span>B. 账号分配结算</span>
-              {accounts.length > 0 && (
-                <span style={{
-                  fontSize: '0.7rem',
-                  padding: '0.1rem 0.35rem',
-                  borderRadius: '0.3rem',
-                  background: settlementType === 'USER_ACCOUNT' ? 'rgba(255,255,255,0.25)' : 'var(--bg-hover)',
-                  color: settlementType === 'USER_ACCOUNT' ? '#ffffff' : 'var(--text-main)',
-                  fontWeight: 700
-                }}>
-                  {accounts.length}
-                </span>
+                <button
+                  onClick={() => setSettlementType('USER_ACCOUNT')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    padding: '0.45rem 0.95rem',
+                    borderRadius: '0.45rem',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: settlementType === 'USER_ACCOUNT' ? 600 : 500,
+                    background: settlementType === 'USER_ACCOUNT' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'transparent',
+                    color: settlementType === 'USER_ACCOUNT' ? '#ffffff' : 'var(--text-sub)',
+                    boxShadow: settlementType === 'USER_ACCOUNT' ? '0 2px 8px rgba(37, 99, 235, 0.35)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <UserCheck size={15} />
+                  <span>账号分配结算</span>
+                  {accounts.length > 0 && (
+                    <span style={{
+                      fontSize: '0.7rem',
+                      padding: '0.1rem 0.35rem',
+                      borderRadius: '0.3rem',
+                      background: settlementType === 'USER_ACCOUNT' ? 'rgba(255,255,255,0.25)' : 'var(--bg-hover)',
+                      color: settlementType === 'USER_ACCOUNT' ? '#ffffff' : 'var(--text-main)',
+                      fontWeight: 700
+                    }}>
+                      {accounts.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setSettlementType('UNLINKED_PID')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    padding: '0.45rem 0.95rem',
+                    borderRadius: '0.45rem',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: settlementType === 'UNLINKED_PID' ? 600 : 500,
+                    background: settlementType === 'UNLINKED_PID' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'transparent',
+                    color: settlementType === 'UNLINKED_PID' ? '#ffffff' : 'var(--text-sub)',
+                    boxShadow: settlementType === 'UNLINKED_PID' ? '0 2px 8px rgba(37, 99, 235, 0.35)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <Unlink size={15} />
+                  <span>无关联落地页订单</span>
+                </button>
+              </div>
+
+              {/* 当选择 B. 账号分配结算时，账号选择下拉框直接置顶展示于控制栏 */}
+              {settlementType === 'USER_ACCOUNT' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', position: 'relative', zIndex: 1001 }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-sub)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    结算账号:
+                  </span>
+                  {accounts.length > 0 ? (
+                    <CustomSelect
+                      value={selectedUserId || ''}
+                      onChange={(val) => setSelectedUserId(Number(val))}
+                      options={accounts.map(a => ({
+                        label: a.username,
+                        value: a.id
+                      }))}
+                      style={{ minWidth: '180px' }}
+                      placement="bottom"
+                    />
+                  ) : (
+                    <span style={{ fontSize: '0.78rem', color: '#f59e0b' }}>（暂无参与结算的账号）</span>
+                  )}
+                </div>
               )}
-            </button>
-
-            <button
-              onClick={() => setSettlementType('UNLINKED_PID')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.45rem 0.95rem',
-                borderRadius: '0.45rem',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '0.82rem',
-                fontWeight: settlementType === 'UNLINKED_PID' ? 600 : 500,
-                background: settlementType === 'UNLINKED_PID' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'transparent',
-                color: settlementType === 'UNLINKED_PID' ? '#ffffff' : 'var(--text-sub)',
-                boxShadow: settlementType === 'UNLINKED_PID' ? '0 2px 8px rgba(37, 99, 235, 0.35)' : 'none',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Unlink size={15} />
-              <span>C. 无关联落地页订单</span>
-            </button>
-          </div>
-
-          {/* 当选择 B. 账号分配结算时，账号选择下拉框直接置顶展示于控制栏 */}
-          {settlementType === 'USER_ACCOUNT' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', position: 'relative', zIndex: 1001 }}>
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-sub)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                结算账号:
-              </span>
-              {accounts.length > 0 ? (
-                <CustomSelect
-                  value={selectedUserId || ''}
-                  onChange={(val) => setSelectedUserId(Number(val))}
-                  options={accounts.map(a => ({
-                    label: a.username,
-                    value: a.id
-                  }))}
-                  style={{ minWidth: '180px' }}
-                  placement="bottom"
-                />
-              ) : (
-                <span style={{ fontSize: '0.78rem', color: '#f59e0b' }}>（暂无参与结算的账号）</span>
-              )}
+            </>
+          ) : (
+            /* 普通用户：仅展示【B. 账号分配结算】及自身登录账号 */
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.65rem',
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(37, 99, 235, 0.06))',
+              padding: '0.45rem 0.95rem',
+              borderRadius: '0.55rem',
+              border: '1px solid rgba(59, 130, 246, 0.25)',
+              color: '#3b82f6',
+              fontWeight: 600,
+              fontSize: '0.84rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <UserCheck size={16} />
+                <span>B. 账号分配结算</span>
+              </div>
+              <span style={{ color: 'rgba(59, 130, 246, 0.3)', margin: '0 0.1rem' }}>|</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem', color: 'var(--text-sub)' }}>
+                <span>结算账号:</span>
+                <strong style={{ color: 'var(--text-main)', fontWeight: 700 }}>
+                  {currentUser?.username || (accounts.length > 0 ? accounts[0].username : '')}
+                </strong>
+              </div>
             </div>
           )}
         </div>
