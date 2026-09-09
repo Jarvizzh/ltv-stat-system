@@ -1,5 +1,6 @@
-import React from 'react';
-import { BarChart3, PieChart, Settings, RefreshCw, Upload, Users, LogOut, Shield, Eye, Globe, Download, Receipt, Video } from 'lucide-react';
+import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { BarChart3, PieChart, Settings, RefreshCw, Upload, Users, LogOut, Shield, Eye, Globe, Download, Receipt, Video, Menu, X } from 'lucide-react';
 import CustomSelect from './CustomSelect';
 
 export default function LtvHeader({
@@ -18,6 +19,8 @@ export default function LtvHeader({
   onLogout,
   loading
 }) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const isSuperAdmin = currentUser && currentUser.role === 'SUPER_ADMIN';
   const hasPermGlobalDistribution = isSuperAdmin || currentUser?.permGlobalDistribution === 1;
   const hasPermExport = isSuperAdmin || currentUser?.permExport === 1;
@@ -25,6 +28,13 @@ export default function LtvHeader({
   const hasPermVideoGen = isSuperAdmin || currentUser?.permVideoGen === 1;
   const isReadOnly = Boolean(targetUserId && currentUser && targetUserId !== currentUser.userId);
   const canSwitchView = (isSuperAdmin || (usersList && usersList.length > 1)) && usersList && usersList.length > 0;
+
+  const handleAction = (callback) => {
+    setIsMobileMenuOpen(false);
+    if (typeof callback === 'function') {
+      callback();
+    }
+  };
 
   return (
     <header className="app-header">
@@ -43,6 +53,7 @@ export default function LtvHeader({
           <button
             className={`nav-tab-btn ${activeTab === 'ltv' ? 'active' : ''}`}
             onClick={() => onTabChange('ltv')}
+            title="LTV 报表"
           >
             <BarChart3 size={16} />
             <span>LTV</span>
@@ -50,6 +61,7 @@ export default function LtvHeader({
           <button
             className={`nav-tab-btn ${activeTab === 'distribution' ? 'active' : ''}`}
             onClick={() => onTabChange('distribution')}
+            title="充值分析"
           >
             <PieChart size={16} />
             <span>充值分析</span>
@@ -77,7 +89,8 @@ export default function LtvHeader({
         </nav>
       </div>
 
-      <div className="header-actions">
+      {/* 桌面端平铺操作区 */}
+      <div className="header-actions desktop-actions">
         {/* 账户视图切换下拉框 (包含被分配只读视图或超级管理员可见) */}
         {canSwitchView && (
           <div
@@ -198,6 +211,154 @@ export default function LtvHeader({
           <span>{currentUser?.username || localStorage.getItem('admin_username') || '未知'}</span>
         </button>
       </div>
+
+      {/* 移动端汉堡菜单触发按钮 */}
+      <button
+        className="mobile-menu-btn"
+        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        aria-label="打开操作菜单"
+      >
+        {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
+      {/* 移动端抽屉浮层 (挂载到 document.body 防止父级容器样式截断) */}
+      {isMobileMenuOpen && typeof document !== 'undefined' && createPortal(
+        <div className="mobile-drawer-overlay" onClick={() => setIsMobileMenuOpen(false)}>
+          <div className="mobile-drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-drawer-header">
+              <div className="mobile-drawer-user">
+                <span className="mobile-user-name">
+                  {currentUser?.username || localStorage.getItem('admin_username') || '用户'}
+                </span>
+                {isSuperAdmin && <span className="mobile-admin-badge">超级管理员</span>}
+                {isReadOnly && <span className="mobile-readonly-badge">只读视图</span>}
+              </div>
+              <button
+                className="mobile-drawer-close"
+                onClick={() => setIsMobileMenuOpen(false)}
+                aria-label="关闭操作菜单"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mobile-drawer-content">
+              {/* 移动端视图切换 */}
+              {canSwitchView && (
+                <div className="mobile-drawer-section">
+                  <div className="mobile-section-title">
+                    <Eye size={14} color="#6366f1" />
+                    <span>切换数据视图</span>
+                  </div>
+                  <CustomSelect
+                    value={targetUserId || currentUser?.userId || ''}
+                    onChange={(val) => {
+                      onSelectTargetUser(Number(val));
+                      setIsMobileMenuOpen(false);
+                    }}
+                    options={usersList.map((u) => {
+                      const isSelfUser = u.isSelf || u.id === currentUser?.userId;
+                      const labelText = isSelfUser ? u.username : `${u.username} (只读)`;
+                      return { label: labelText, value: u.id };
+                    })}
+                    className="custom-select-sm"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              )}
+
+              {/* 移动端功能菜单列表 */}
+              <div className="mobile-drawer-section">
+                <div className="mobile-section-title">常用操作</div>
+                <div className="mobile-actions-list">
+                  {isSuperAdmin && (
+                    <button
+                      className="mobile-action-item"
+                      onClick={() => handleAction(onOpenUserManagement)}
+                    >
+                      <Users size={18} color="#6366f1" />
+                      <span>用户管理</span>
+                    </button>
+                  )}
+
+                  {isSuperAdmin && (
+                    <button
+                      className="mobile-action-item"
+                      onClick={() => handleAction(onOpenTokenModal)}
+                    >
+                      <Settings size={18} />
+                      <span>API 设置</span>
+                    </button>
+                  )}
+
+                  <button
+                    className="mobile-action-item"
+                    onClick={() => handleAction(onOpenConfig)}
+                  >
+                    <Settings size={18} />
+                    <span>落地页配置</span>
+                  </button>
+
+                  <button
+                    className="mobile-action-item"
+                    onClick={() => {
+                      if (isReadOnly) return;
+                      handleAction(onOpenBatchSpend);
+                    }}
+                    disabled={isReadOnly}
+                  >
+                    <Upload size={18} />
+                    <span>消耗导入</span>
+                  </button>
+
+                  <button
+                    className="mobile-action-item"
+                    onClick={() => handleAction(onOpenSyncModal)}
+                    disabled={loading}
+                  >
+                    <RefreshCw size={18} className={loading ? 'spin' : ''} />
+                    <span>{loading ? '数据同步中...' : '数据同步'}</span>
+                  </button>
+
+                  {hasPermExport && (
+                    <button
+                      className="mobile-action-item"
+                      onClick={() => handleAction(onOpenExportModal)}
+                    >
+                      <Download size={18} color="#10b981" />
+                      <span>导出表格</span>
+                    </button>
+                  )}
+
+                  {hasPermVideoGen && (
+                    <button
+                      className="mobile-action-item"
+                      onClick={() => {
+                        window.open('https://video.gether.top', '_blank', 'noopener,noreferrer');
+                        setIsMobileMenuOpen(false);
+                      }}
+                    >
+                      <Video size={18} color="#8b5cf6" />
+                      <span>AI视频生成</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mobile-drawer-footer">
+              <button
+                className="mobile-logout-btn"
+                onClick={() => handleAction(onLogout)}
+              >
+                <LogOut size={16} />
+                <span>退出登录</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       <style>{`
         @keyframes spin {

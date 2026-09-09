@@ -32,20 +32,21 @@ export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuper
   const DAY_COL_WIDTH = 90; // Day1~Day60 所有 120 个子列固定 90px 独立宽度，不允许拖动
 
   const left0 = 0;
-  const left1 = left0 + colWidths.col0;
-  const left2 = left1 + colWidths.col1;
-  const left3 = left2 + colWidths.col2;
-  const left4 = left3 + colWidths.col3;
-  const left5 = left4 + colWidths.col4;
-  const left6 = left5 + colWidths.col5;
-  const left7 = left6 + colWidths.col6;
-  const left8 = left7 + colWidths.col7;
-  const left9 = left8 + colWidths.col8;
-  const left10 = left9 + colWidths.col9;
-  const left11 = left10 + colWidths.col10;
+  const totalBaseWidth =
+    colWidths.col0 +
+    colWidths.col1 +
+    colWidths.col2 +
+    colWidths.col3 +
+    colWidths.col4 +
+    colWidths.col5 +
+    colWidths.col6 +
+    colWidths.col7 +
+    colWidths.col8 +
+    colWidths.col9 +
+    colWidths.col10 +
+    (showPrediction ? colWidths.col11 : 0);
 
-  const totalFrozenWidth = showPrediction ? (left11 + colWidths.col11) : (left10 + colWidths.col10);
-  const totalTableWidth = totalFrozenWidth + (60 * 2 * DAY_COL_WIDTH);
+  const totalTableWidth = totalBaseWidth + (60 * 2 * DAY_COL_WIDTH);
 
   const handleMouseDown = (key, e) => {
     e.preventDefault();
@@ -158,7 +159,7 @@ export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuper
         <thead>
           <tr className="header-row-1">
             <th
-              className="sticky-col col-0 text-center th-resizable"
+              className="sticky-col col-0 text-center th-resizable col-boundary"
               rowSpan={2}
               style={{ left: `${left0}px`, width: `${colWidths.col0}px`, minWidth: `${colWidths.col0}px` }}
             >
@@ -166,100 +167,95 @@ export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuper
               <div className="resize-handle" onMouseDown={(e) => handleMouseDown('col0', e)} />
             </th>
             <th
-              className="sticky-col col-1 text-center th-resizable"
+              className="col-1 text-center th-resizable"
               rowSpan={2}
-              style={{ left: `${left1}px`, width: `${colWidths.col1}px`, minWidth: `${colWidths.col1}px` }}
+              style={{ width: `${colWidths.col1}px`, minWidth: `${colWidths.col1}px` }}
             >
               备注
               <div className="resize-handle" onMouseDown={(e) => handleMouseDown('col1', e)} />
             </th>
             <th
-              className="sticky-col col-2 text-center th-resizable"
+              className="col-2 text-center th-resizable"
               rowSpan={2}
-              style={{ left: `${left2}px`, width: `${colWidths.col2}px`, minWidth: `${colWidths.col2}px` }}
+              style={{ width: `${colWidths.col2}px`, minWidth: `${colWidths.col2}px` }}
             >
               账户消耗
               <div className="resize-handle" onMouseDown={(e) => handleMouseDown('col2', e)} />
             </th>
             <th
-              className="sticky-col col-3 text-center th-resizable"
+              className="col-3 text-center th-resizable"
               rowSpan={2}
-              style={{ left: `${left3}px`, width: `${colWidths.col3}px`, minWidth: `${colWidths.col3}px` }}
+              style={{ width: `${colWidths.col3}px`, minWidth: `${colWidths.col3}px` }}
             >
               累计充值
               <div className="resize-handle" onMouseDown={(e) => handleMouseDown('col3', e)} />
             </th>
             <th
-              className="sticky-col col-4 text-center th-resizable"
+              className="col-4 text-center th-resizable"
               rowSpan={2}
-              style={{ left: `${left4}px`, width: `${colWidths.col4}px`, minWidth: `${colWidths.col4}px` }}
+              style={{ width: `${colWidths.col4}px`, minWidth: `${colWidths.col4}px` }}
             >
               已退款
               <div className="resize-handle" onMouseDown={(e) => handleMouseDown('col4', e)} />
             </th>
             <th
-              className="sticky-col col-5 text-center th-resizable"
+              className="col-5 text-center th-resizable"
               rowSpan={2}
-              style={{ left: `${left5}px`, width: `${colWidths.col5}px`, minWidth: `${colWidths.col5}px` }}
+              style={{ width: `${colWidths.col5}px`, minWidth: `${colWidths.col5}px` }}
             >
               累计盈亏
               <div className="resize-handle" onMouseDown={(e) => handleMouseDown('col5', e)} />
             </th>
             <th
-              className="sticky-col col-6 text-center th-resizable"
+              className="col-6 text-center th-resizable"
               rowSpan={2}
-              style={{ left: `${left6}px`, width: `${colWidths.col6}px`, minWidth: `${colWidths.col6}px` }}
+              style={{ width: `${colWidths.col6}px`, minWidth: `${colWidths.col6}px` }}
             >
               累计 ROI
               <div className="resize-handle" onMouseDown={(e) => handleMouseDown('col6', e)} />
             </th>
             <th
-              className="sticky-col col-7 text-center th-resizable"
+              className="col-7 text-center th-resizable"
               rowSpan={2}
-              style={{ left: `${left7}px`, width: `${colWidths.col7}px`, minWidth: `${colWidths.col7}px` }}
+              style={{ width: `${colWidths.col7}px`, minWidth: `${colWidths.col7}px` }}
             >
               订阅用户
               <div className="resize-handle" onMouseDown={(e) => handleMouseDown('col7', e)} />
             </th>
             <th
-              className="sticky-col col-8 text-center th-resizable"
+              className="col-8 text-center th-resizable"
               rowSpan={2}
-              style={{ left: `${left8}px`, width: `${colWidths.col8}px`, minWidth: `${colWidths.col8}px` }}
+              style={{ width: `${colWidths.col8}px`, minWidth: `${colWidths.col8}px` }}
             >
               订阅成本
               <div className="resize-handle" onMouseDown={(e) => handleMouseDown('col8', e)} />
             </th>
             <th
-              className="sticky-col col-9 text-center th-resizable"
+              className="col-9 text-center th-resizable"
               rowSpan={2}
-              style={{ left: `${left9}px`, width: `${colWidths.col9}px`, minWidth: `${colWidths.col9}px` }}
+              style={{ width: `${colWidths.col9}px`, minWidth: `${colWidths.col9}px` }}
             >
               7日留存
               <div className="resize-handle" onMouseDown={(e) => handleMouseDown('col9', e)} />
             </th>
             <th
-              className="sticky-col col-10 text-center th-resizable"
+              className="col-10 text-center th-resizable"
               rowSpan={2}
-              style={{ left: `${left10}px`, width: `${colWidths.col10}px`, minWidth: `${colWidths.col10}px` }}
+              style={{ width: `${colWidths.col10}px`, minWidth: `${colWidths.col10}px` }}
             >
               15日留存
               <div className="resize-handle" onMouseDown={(e) => handleMouseDown('col10', e)} />
             </th>
             {showPrediction && (
               <th
-                className="sticky-col col-11 text-center th-resizable col-boundary"
+                className="col-11 text-center th-resizable"
                 rowSpan={2}
-                style={{ left: `${left11}px`, width: `${colWidths.col11}px`, minWidth: `${colWidths.col11}px` }}
+                style={{ width: `${colWidths.col11}px`, minWidth: `${colWidths.col11}px` }}
               >
                 预测回本
                 <div className="resize-handle" onMouseDown={(e) => handleMouseDown('col11', e)} />
               </th>
             )}
-            {!showPrediction && <th
-              className="sticky-col col-10 text-center th-resizable col-boundary"
-              rowSpan={2}
-              style={{ display: 'none' }}
-            />}
 
             {days.map((day) => (
               <th key={day} colSpan={2} className="text-center day-header-group" style={{ width: `${DAY_COL_WIDTH * 2}px`, minWidth: `${DAY_COL_WIDTH * 2}px` }}>
@@ -292,13 +288,13 @@ export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuper
             return (
               <tr key={row.launchDate}>
                 <td
-                  className="sticky-col col-0 text-center"
+                  className="sticky-col col-0 text-center col-boundary"
                   style={{ left: `${left0}px`, width: `${colWidths.col0}px`, minWidth: `${colWidths.col0}px`, fontWeight: 600, color: 'var(--text-main)' }}
                 >
                   {row.launchDate}
                 </td>
                 <td
-                  className={`sticky-col col-1 text-left remark-cell ${isReadOnly ? '' : 'editable-cell'}`}
+                  className={`col-1 text-left remark-cell ${isReadOnly ? '' : 'editable-cell'}`}
                   onClick={() => !isReadOnly && onEditRow && onEditRow(row)}
                   onMouseEnter={(e) => {
                     if (row.remark && row.remark.trim()) {
@@ -312,7 +308,7 @@ export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuper
                     }
                   }}
                   onMouseLeave={() => setHoveredRemark(null)}
-                  style={{ left: `${left1}px`, width: `${colWidths.col1}px`, minWidth: `${colWidths.col1}px`, cursor: isReadOnly ? 'default' : 'pointer' }}
+                  style={{ width: `${colWidths.col1}px`, minWidth: `${colWidths.col1}px`, cursor: isReadOnly ? 'default' : 'pointer' }}
                 >
                   <div className="remark-inner-container">
                     <span className="remark-text-content">
@@ -322,63 +318,63 @@ export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuper
                   </div>
                 </td>
                 <td
-                  className={`sticky-col col-2 text-right ${isReadOnly ? '' : 'editable-cell'}`}
+                  className={`col-2 text-right ${isReadOnly ? '' : 'editable-cell'}`}
                   onClick={() => !isReadOnly && onEditRow && onEditRow(row)}
-                  style={{ left: `${left2}px`, width: `${colWidths.col2}px`, minWidth: `${colWidths.col2}px`, cursor: isReadOnly ? 'default' : 'pointer' }}
+                  style={{ width: `${colWidths.col2}px`, minWidth: `${colWidths.col2}px`, cursor: isReadOnly ? 'default' : 'pointer' }}
                 >
                   <span style={{ fontWeight: 600 }}>{formatUsd(row.spend)}</span>
                 </td>
                 <td
-                  className="sticky-col col-3 text-right"
-                  style={{ left: `${left3}px`, width: `${colWidths.col3}px`, minWidth: `${colWidths.col3}px`, fontWeight: 600, color: 'var(--text-main)' }}
+                  className="col-3 text-right"
+                  style={{ width: `${colWidths.col3}px`, minWidth: `${colWidths.col3}px`, fontWeight: 600, color: 'var(--text-main)' }}
                 >
                   {formatUsd(row.totalRecharge)}
                 </td>
                 <td
-                  className="sticky-col col-4 text-right"
-                  style={{ left: `${left4}px`, width: `${colWidths.col4}px`, minWidth: `${colWidths.col4}px`, fontWeight: 600, color: 'var(--text-sub)' }}
+                  className="col-4 text-right"
+                  style={{ width: `${colWidths.col4}px`, minWidth: `${colWidths.col4}px`, fontWeight: 600, color: 'var(--text-sub)' }}
                 >
                   {formatUsd(row.totalRefund)}
                 </td>
                 <td
-                  className="sticky-col col-5 text-right"
-                  style={{ left: `${left5}px`, width: `${colWidths.col5}px`, minWidth: `${colWidths.col5}px`, fontWeight: 700, color: profit >= 0 ? '#10b981' : '#f43f5e' }}
+                  className="col-5 text-right"
+                  style={{ width: `${colWidths.col5}px`, minWidth: `${colWidths.col5}px`, fontWeight: 700, color: profit >= 0 ? '#10b981' : '#f43f5e' }}
                 >
                   {formatUsd(profit)}
                 </td>
                 <td
-                  className="sticky-col col-6 text-center"
-                  style={{ left: `${left6}px`, width: `${colWidths.col6}px`, minWidth: `${colWidths.col6}px` }}
+                  className="col-6 text-center"
+                  style={{ width: `${colWidths.col6}px`, minWidth: `${colWidths.col6}px` }}
                 >
                   {row.spend > 0 ? formatRoi(row.totalRoi) : <span style={{ color: 'var(--text-muted)' }}>-</span>}
                 </td>
                 <td
-                  className="sticky-col col-7 text-center"
-                  style={{ left: `${left7}px`, width: `${colWidths.col7}px`, minWidth: `${colWidths.col7}px`, fontWeight: 600, color: 'var(--text-main)' }}
+                  className="col-7 text-center"
+                  style={{ width: `${colWidths.col7}px`, minWidth: `${colWidths.col7}px`, fontWeight: 600, color: 'var(--text-main)' }}
                 >
                   {row.subUserCount || 0}
                 </td>
                 <td
-                  className="sticky-col col-8 text-right"
-                  style={{ left: `${left8}px`, width: `${colWidths.col8}px`, minWidth: `${colWidths.col8}px`, fontWeight: 500 }}
+                  className="col-8 text-right"
+                  style={{ width: `${colWidths.col8}px`, minWidth: `${colWidths.col8}px`, fontWeight: 500 }}
                 >
                   {formatUsd(row.subUserCost)}
                 </td>
                 <td
-                  className="sticky-col col-9 text-center"
-                  style={{ left: `${left9}px`, width: `${colWidths.col9}px`, minWidth: `${colWidths.col9}px`, fontWeight: 500 }}
+                  className="col-9 text-center"
+                  style={{ width: `${colWidths.col9}px`, minWidth: `${colWidths.col9}px`, fontWeight: 500 }}
                 >
                   {formatDay7Retention(row.day7SubUserCount, row.day7SubUserRetention)}
                 </td>
                 <td
-                  className="sticky-col col-10 text-center"
-                  style={{ left: `${left10}px`, width: `${colWidths.col10}px`, minWidth: `${colWidths.col10}px`, fontWeight: 500 }}
+                  className="col-10 text-center"
+                  style={{ width: `${colWidths.col10}px`, minWidth: `${colWidths.col10}px`, fontWeight: 500 }}
                 >
                   {formatDay7Retention(row.day15SubUserCount, row.day15SubUserRetention)}
                 </td>
                 {showPrediction ? (
                   <td
-                    className="sticky-col col-11 text-center col-boundary"
+                    className="col-11 text-center"
                     onMouseEnter={(e) => {
                       if (row.spend > 0 && showRoiPredict) {
                         const rect = e.currentTarget.getBoundingClientRect();
@@ -397,7 +393,7 @@ export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuper
                       }
                     }}
                     onMouseLeave={() => setHoveredPrediction(null)}
-                    style={{ left: `${left11}px`, width: `${colWidths.col11}px`, minWidth: `${colWidths.col11}px`, cursor: showRoiPredict ? 'pointer' : 'default' }}
+                    style={{ width: `${colWidths.col11}px`, minWidth: `${colWidths.col11}px`, cursor: showRoiPredict ? 'pointer' : 'default' }}
                   >
                     {row.spend > 0 ? formatPaybackDays(row.predictedPaybackDays) : <span style={{ color: 'var(--text-muted)' }}>-</span>}
                   </td>

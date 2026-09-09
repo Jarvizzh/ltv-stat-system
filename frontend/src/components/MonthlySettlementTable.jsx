@@ -637,7 +637,24 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
         <table className="ltv-table" style={{ width: '100%', minWidth: isAdmin ? '1300px' : '1200px', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ background: 'var(--bg-th)', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>
-              <th style={{ minWidth: '80px', textAlign: 'center', padding: '0.85rem 0.5rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>月份</th>
+              <th
+                className="sticky-col col-boundary"
+                style={{
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 30,
+                  background: 'var(--bg-th)',
+                  minWidth: '95px',
+                  textAlign: 'center',
+                  padding: '0.85rem 0.6rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  color: 'var(--text-sub)',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                月份
+              </th>
               <th style={{ minWidth: '95px', textAlign: 'right', padding: '0.85rem 0.6rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>累计充值</th>
               <th style={{ minWidth: '85px', textAlign: 'right', padding: '0.85rem 0.55rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>累计退款</th>
               <th style={{ minWidth: '82px', textAlign: 'right', padding: '0.85rem 0.45rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>已结算退款</th>
@@ -703,14 +720,22 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
                     }}
                   >
                     {/* 1. 月份 */}
-                    <td style={{
-                      textAlign: 'center',
-                      fontWeight: 700,
-                      fontSize: '0.88rem',
-                      color: 'var(--text-main)',
-                      fontFamily: 'monospace',
-                      padding: '0.65rem 0.45rem'
-                    }}>
+                    <td
+                      className="sticky-col col-boundary"
+                      style={{
+                        position: 'sticky',
+                        left: 0,
+                        zIndex: 20,
+                        background: isDirty ? 'rgba(59, 130, 246, 0.12)' : (idx % 2 === 1 ? 'var(--bg-secondary)' : 'var(--bg-sticky-td)'),
+                        textAlign: 'center',
+                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        color: 'var(--text-main)',
+                        fontFamily: 'monospace',
+                        padding: '0.65rem 0.6rem',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                         {isDirty && (
                           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} title="有未保存修改" />
