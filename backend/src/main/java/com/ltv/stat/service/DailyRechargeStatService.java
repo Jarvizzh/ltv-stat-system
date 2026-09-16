@@ -60,7 +60,10 @@ public class DailyRechargeStatService {
                 ? platformCode.trim().toLowerCase() : "ALL";
         LocalDate platformStartDate = getLaunchStartDateForPlatform(pCode);
         List<DailyRechargeDistribution> list = dailyRechargeDistributionRepository.findByPlatformCodeAndUserIdAndDateGreaterThanEqualOrderByDateDesc(pCode, userId, platformStartDate);
-        if (list.isEmpty()) {
+        boolean allZeros = !list.isEmpty() && list.stream().allMatch(s ->
+                (s.getTotalRecharge() == null || s.getTotalRecharge().compareTo(BigDecimal.ZERO) == 0)
+        );
+        if (list.isEmpty() || allZeros) {
             calculateDailyDistributionStatsForUser(pCode, userId);
             list = dailyRechargeDistributionRepository.findByPlatformCodeAndUserIdAndDateGreaterThanEqualOrderByDateDesc(pCode, userId, platformStartDate);
         }

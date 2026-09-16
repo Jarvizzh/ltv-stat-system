@@ -632,7 +632,11 @@ public class LtvStatService {
         String targetPlatform = "ALL".equalsIgnoreCase(pCode) ? "ALL" : pCode.toLowerCase();
         LocalDate platformStartDate = getLaunchStartDateForPlatform(targetPlatform);
         List<LtvDailyStat> list = ltvDailyStatRepository.findByPlatformCodeAndUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(targetPlatform, userId, platformStartDate);
-        if (list.isEmpty()) {
+        boolean allZeros = !list.isEmpty() && list.stream().allMatch(s ->
+                (s.getSpend() == null || s.getSpend().compareTo(BigDecimal.ZERO) == 0) &&
+                (s.getTotalRecharge() == null || s.getTotalRecharge().compareTo(BigDecimal.ZERO) == 0)
+        );
+        if (list.isEmpty() || allZeros) {
             calculateLtvStatsForUser(targetPlatform, userId);
             list = ltvDailyStatRepository.findByPlatformCodeAndUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(targetPlatform, userId, platformStartDate);
         }

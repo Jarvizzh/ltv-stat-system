@@ -59,6 +59,7 @@ public class AdminUserController {
             dto.setPermExport(u.hasPermExport() ? 1 : 0);
             dto.setPermSettlement(u.hasPermSettlement() ? 1 : 0);
             dto.setPermVideoGen(u.hasPermVideoGen() ? 1 : 0);
+            dto.setAllowedPlatforms(u.isSuperAdmin() ? "ALL" : u.getAllowedPlatforms());
             result.add(dto);
         }
 
@@ -173,7 +174,7 @@ public class AdminUserController {
     @PutMapping("/{id}/permissions")
     public ResponseEntity<?> updatePermissions(@PathVariable("id") Long id, @RequestBody UserPermissionsUpdateRequestDto body) {
         if (!checkSuperAdmin()) {
-            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权操作，仅超级管理员可分配功能权限"));
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权操作，仅超级管理员可分配权限"));
         }
         try {
             Integer permPredictPayback = body != null ? body.getPermPredictPayback() : 0;
@@ -182,11 +183,12 @@ public class AdminUserController {
             Integer permExport = body != null ? body.getPermExport() : 0;
             Integer permSettlement = body != null ? body.getPermSettlement() : 0;
             Integer permVideoGen = body != null ? body.getPermVideoGen() : 0;
+            String allowedPlatforms = body != null ? body.getAllowedPlatforms() : null;
 
-            userService.updateUserPermissions(id, permPredictPayback, permRoiPredict, permGlobalDistribution, permExport, permSettlement, permVideoGen);
-            return ResponseEntity.ok(ApiResponseDto.success("功能权限分配保存成功！", null));
+            userService.updateUserPermissions(id, permPredictPayback, permRoiPredict, permGlobalDistribution, permExport, permSettlement, permVideoGen, allowedPlatforms);
+            return ResponseEntity.ok(ApiResponseDto.success("权限分配保存成功！", null));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(ApiResponseDto.error(500, "更新功能权限失败: " + e.getMessage()));
+            return ResponseEntity.status(500).body(ApiResponseDto.error(500, "更新权限失败: " + e.getMessage()));
         }
     }
 
@@ -215,6 +217,7 @@ public class AdminUserController {
             Integer permExport = body != null ? body.getPermExport() : 0;
             Integer permSettlement = body != null ? body.getPermSettlement() : 0;
             Integer permVideoGen = body != null ? body.getPermVideoGen() : 0;
+            String allowedPlatforms = body != null ? body.getAllowedPlatforms() : null;
 
             userService.createUser(
                     username.trim(),
@@ -229,7 +232,8 @@ public class AdminUserController {
                     permGlobalDistribution,
                     permExport,
                     permSettlement,
-                    permVideoGen
+                    permVideoGen,
+                    allowedPlatforms
             );
             return ResponseEntity.ok(ApiResponseDto.success("创建成功", null));
         } catch (IllegalArgumentException ie) {

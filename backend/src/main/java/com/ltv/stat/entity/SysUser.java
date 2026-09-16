@@ -2,6 +2,9 @@ package com.ltv.stat.entity;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "sys_user")
@@ -123,13 +126,22 @@ public class SysUser {
 
     public boolean hasPlatformAccess(String platformCode) {
         if (isSuperAdmin()) return true;
-        if (platformCode == null || platformCode.trim().isEmpty() || "ALL".equalsIgnoreCase(platformCode.trim())) {
-            String platforms = getAllowedPlatforms();
-            return platforms.contains("ALL");
+        String current = getAllowedPlatforms();
+        if (current == null || current.trim().isEmpty()) {
+            return false;
         }
-        String p = platformCode.trim().toLowerCase();
-        String current = getAllowedPlatforms().toLowerCase();
-        return current.contains("all") || current.contains(p);
+        Set<String> set = Arrays.stream(current.split(","))
+                .map(String::trim)
+                .map(String::toLowerCase)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
+        if (set.contains("all")) {
+            return true;
+        }
+        if (platformCode == null || platformCode.trim().isEmpty() || "ALL".equalsIgnoreCase(platformCode.trim())) {
+            return set.contains("all");
+        }
+        return set.contains(platformCode.trim().toLowerCase());
     }
 
     public LocalDateTime getCreatedAt() { return createdAt; }

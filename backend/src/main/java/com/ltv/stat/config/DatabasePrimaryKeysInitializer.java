@@ -20,19 +20,7 @@ public class DatabasePrimaryKeysInitializer {
 
     @PostConstruct
     public void fixPrimaryKeys() {
-        // 1. 检查并修正 ltv_daily_stat 主键为 (user_id, launch_date)
-        ensurePrimaryKey("ltv_daily_stat", "user_id,launch_date",
-                "ALTER TABLE ltv_daily_stat DROP PRIMARY KEY, ADD PRIMARY KEY (user_id, launch_date)");
-
-        // 2. 检查并修正 daily_recharge_distribution 主键为 (user_id, date)
-        ensurePrimaryKey("daily_recharge_distribution", "user_id,date",
-                "ALTER TABLE daily_recharge_distribution DROP PRIMARY KEY, ADD PRIMARY KEY (user_id, date)");
-
-        // 3. 检查并修正 ltv_launch_config 主键为 (user_id, launch_date)
-        ensurePrimaryKey("ltv_launch_config", "user_id,launch_date",
-                "ALTER TABLE ltv_launch_config DROP PRIMARY KEY, ADD PRIMARY KEY (user_id, launch_date)");
-
-        // 4. 检查并补充 day31_recharge ~ day60_recharge & day31_roi ~ day60_roi 列
+        // 1. 检查并补充 day31_recharge ~ day60_recharge & day31_roi ~ day60_roi 列
         boolean needAddColumns = false;
         for (int d = 31; d <= 60; d++) {
             String rechargeCol = "day" + d + "_recharge";
@@ -297,6 +285,21 @@ public class DatabasePrimaryKeysInitializer {
             } catch (Exception e) {
                 log.warn("Failed to add platform_code to user_subscription_period: {}", e.getMessage());
             }
+        }
+
+        // 10. 历史数据平滑迁移与补齐：将历史遗留数据中 platform_code 为 NULL 或 空 或 'ALL' 的历史记录统一补齐更新为 'rocnovel'
+        try {
+            jdbcTemplate.execute("UPDATE IGNORE user_landing_page SET platform_code = 'rocnovel' WHERE platform_code IS NULL OR platform_code = '' OR platform_code = 'ALL'");
+            jdbcTemplate.execute("UPDATE IGNORE raw_order SET platform_code = 'rocnovel' WHERE platform_code IS NULL OR platform_code = '' OR platform_code = 'ALL'");
+            jdbcTemplate.execute("UPDATE IGNORE ltv_launch_config SET platform_code = 'rocnovel' WHERE platform_code IS NULL OR platform_code = '' OR platform_code = 'ALL'");
+            jdbcTemplate.execute("UPDATE IGNORE subscription_config_version SET platform_code = 'rocnovel' WHERE platform_code IS NULL OR platform_code = '' OR platform_code = 'ALL'");
+            jdbcTemplate.execute("UPDATE IGNORE user_subscription_period SET platform_code = 'rocnovel' WHERE platform_code IS NULL OR platform_code = '' OR platform_code = 'ALL'");
+            // 清理此前因落地页/订单未关联而产生的 rocnovel 全零错误缓存行，以便重新聚合计算
+            jdbcTemplate.execute("DELETE FROM ltv_daily_stat WHERE platform_code = 'rocnovel' AND total_recharge = 0 AND spend = 0");
+            jdbcTemplate.execute("DELETE FROM daily_recharge_distribution WHERE platform_code = 'rocnovel' AND total_recharge = 0");
+            log.info("Successfully backfilled historical platform_code = 'rocnovel' and cleaned empty cache rows");
+        } catch (Exception e) {
+            log.warn("Failed to backfill historical platform_code: {}", e.getMessage());
         }
     }
 

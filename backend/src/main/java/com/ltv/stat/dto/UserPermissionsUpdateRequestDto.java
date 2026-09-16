@@ -8,6 +8,7 @@ public class UserPermissionsUpdateRequestDto {
     private Integer permExport;
     private Integer permSettlement;
     private Integer permVideoGen;
+    private String allowedPlatforms;
 
     public UserPermissionsUpdateRequestDto() {}
 
@@ -37,4 +38,7 @@ public class UserPermissionsUpdateRequestDto {
 
     public Integer getPermVideoGen() { return permVideoGen; }
     public void setPermVideoGen(Integer permVideoGen) { this.permVideoGen = permVideoGen; }
+
+    public String getAllowedPlatforms() { return allowedPlatforms; }
+    public void setAllowedPlatforms(String allowedPlatforms) { this.allowedPlatforms = allowedPlatforms; }
 }

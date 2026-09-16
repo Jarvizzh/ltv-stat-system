@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import LtvHeader from './components/LtvHeader';
+import AppSidebar from './components/AppSidebar';
+import AppTopBar from './components/AppTopBar';
 import LtvTable from './components/LtvTable';
 import DailyRechargeDistributionTable from './components/DailyRechargeDistributionTable';
 import LandingPageConfigModal from './components/LandingPageConfigModal';
@@ -17,6 +18,7 @@ import Toast from './components/Toast';
 import { DollarSign, TrendingUp, Users, Wallet, AlertTriangle, Calendar, Info, X } from 'lucide-react';
 
 export default function App() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return !!localStorage.getItem('admin_token');
   });
@@ -86,6 +88,19 @@ export default function App() {
   const [selectedPlatform, setSelectedPlatform] = useState(() => {
     return localStorage.getItem('admin_selected_platform') || 'ALL';
   });
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(() => {
+    const saved = localStorage.getItem('sidebar_expanded');
+    return saved !== null ? saved === 'true' : true; // 默认展开 (true)
+  });
+
+  const toggleSidebar = () => {
+    setIsSidebarExpanded(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebar_expanded', String(next));
+      return next;
+    });
+  };
+
   const [activeTab, setActiveTab] = useState('ltv'); // 'ltv' | 'distribution' | 'global-distribution' | 'settlement'
 
   useEffect(() => {
@@ -114,7 +129,6 @@ export default function App() {
   const [editingRow, setEditingRow] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [toast, setToast] = useState(null);
-  const [showLtvTip, setShowLtvTip] = useState(true);
 
   const handleConfirmExport = (dateRange) => {
     if (activeTab === 'ltv') {
@@ -189,8 +203,15 @@ export default function App() {
     try {
       const res = await authFetch('/api/platform/list');
       const json = await res.json();
-      if (json.code === 0 && Array.isArray(json.data)) {
+      if (json.code === 0 && Array.isArray(json.data) && json.data.length > 0) {
         setPlatformsList(json.data);
+        const currentSaved = localStorage.getItem('admin_selected_platform') || 'ALL';
+        const isCurrentAllowed = json.data.some(p => p.code.toLowerCase() === currentSaved.toLowerCase());
+        if (!isCurrentAllowed) {
+          const fallbackCode = json.data[0].code;
+          setSelectedPlatform(fallbackCode);
+          localStorage.setItem('admin_selected_platform', fallbackCode);
+        }
       }
     } catch (e) {
       console.error('Failed to fetch platforms list:', e);
@@ -680,35 +701,51 @@ export default function App() {
   };
 
   return (
-    <div className="app-container">
+    <div className="app-layout">
       {/* 现代 Toast 全局消息浮层 */}
       <Toast toast={toast} onClose={() => setToast(null)} />
 
-      <LtvHeader
+      {/* 左侧常驻侧边栏 (默认展开，顶部包含 Logo 与 Meta-LTV，点击 Logo 展开/收缩) */}
+      <AppSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        selectedPlatform={selectedPlatform}
-        platformsList={platformsList}
-        onSelectPlatform={handleSelectPlatform}
+        loading={loading}
+        onOpenSyncModal={() => setIsSyncModalOpen(true)}
+        onOpenBatchSpend={() => setIsBatchSpendOpen(true)}
         onOpenConfig={() => {
           setEditingTargetUserLandingPage(null);
           setIsConfigOpen(true);
         }}
-        onOpenTokenModal={() => setIsTokenModalOpen(true)}
-        onOpenSyncModal={() => setIsSyncModalOpen(true)}
-        onOpenBatchSpend={() => setIsBatchSpendOpen(true)}
-        onOpenUserManagement={() => setIsUserManagementOpen(true)}
         onOpenExportModal={() => setIsExportModalOpen(true)}
-        currentUser={currentUser}
-        usersList={usersList}
-        targetUserId={targetUserId}
-        isReadOnly={isReadOnlyView}
-        onSelectTargetUser={handleSelectTargetUser}
-        loading={loading}
+        onOpenUserManagement={() => setIsUserManagementOpen(true)}
+        onOpenTokenModal={() => setIsTokenModalOpen(true)}
         onLogout={() => setIsLogoutModalOpen(true)}
+        currentUser={currentUser}
+        isReadOnly={isReadOnlyView}
+        isExpanded={isSidebarExpanded}
+        onToggleSidebar={toggleSidebar}
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
-      <main className="main-content">
+      {/* 右侧主视口：顶部上下文栏 + 主体内容区 */}
+      <div className="app-main-viewport">
+        <AppTopBar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          selectedPlatform={selectedPlatform}
+          platformsList={platformsList}
+          onSelectPlatform={handleSelectPlatform}
+          usersList={usersList}
+          targetUserId={targetUserId}
+          currentUser={currentUser}
+          onSelectTargetUser={handleSelectTargetUser}
+          isReadOnly={isReadOnlyView}
+          onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+          onLogout={() => setIsLogoutModalOpen(true)}
+        />
+
+        <main className="main-content">
         {errorMessage && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(244, 63, 94, 0.15)', border: '1px solid #f43f5e', color: '#fda4af', padding: '0.75rem 1rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -724,35 +761,6 @@ export default function App() {
         {/* Tab 1: LTV 报表 */}
         {activeTab === 'ltv' && (
           <>
-            {/* LTV 统计逻辑说明 */}
-            {showLtvTip && (
-              <div style={{
-                background: 'rgba(99, 102, 241, 0.08)',
-                border: '1px solid rgba(99, 102, 241, 0.25)',
-                borderRadius: '0.5rem',
-                padding: '0.5rem 0.85rem',
-                color: 'var(--text-sub)',
-                fontSize: '0.82rem',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '0.5rem',
-                lineHeight: '1.6'
-              }}>
-                <Info size={15} color="#6366f1" style={{ marginTop: '0.1rem', flexShrink: 0 }} />
-                <span style={{ flex: 1 }}>
-                  <span style={{ color: '#6366f1', fontWeight: 600 }}>说明：</span>
-                  LTV 报表是基于用户<strong>注册时间</strong>，统计不同批次用户的全生命周期增长价值。「月度充值」是当月注册的用户至今累计充值，与「充值分析」的统计口径（支付时间）不同，两者数据不可对比。
-                </span>
-                <button
-                  onClick={() => setShowLtvTip(false)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', color: '#6366f1', opacity: 0.6, flexShrink: 0, display: 'flex', alignItems: 'center' }}
-                  title="关闭提示"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-
             <div className="stats-summary">
               {/* 卡片 1: 总消耗 */}
               <div className="stat-card">
@@ -1012,6 +1020,7 @@ export default function App() {
           />
         )}
       </main>
+      </div>
 
       {/* 弹窗组件 */}
       <LandingPageConfigModal

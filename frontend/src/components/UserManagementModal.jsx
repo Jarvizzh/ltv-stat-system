@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, UserPlus, KeyRound, Trash2, X, Check, Eye, Network, ShieldCheck } from 'lucide-react';
+import { Users, UserPlus, KeyRound, Trash2, X, Check, Eye, Network, ShieldCheck, Globe } from 'lucide-react';
 import CustomSelect from './CustomSelect';
 
 const ROLE_OPTIONS = [
@@ -21,6 +21,11 @@ const SETTLEMENT_ATTRIBUTE_OPTIONS = [
 export default function UserManagementModal({ isOpen, onClose, token, currentUser, onRefreshUsers, showToast }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [availablePlatforms, setAvailablePlatforms] = useState([
+    { code: 'ALL', name: '综合大盘' },
+    { code: 'rocnovel', name: '中文在线' },
+    { code: 'flicknovel', name: '番茄海外' }
+  ]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -29,6 +34,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
   const [newIsSettlement, setNewIsSettlement] = useState(0);
   const [newVisibleUserIds, setNewVisibleUserIds] = useState([]);
   const [newSubUserIds, setNewSubUserIds] = useState([]);
+  const [newAllowedPlatforms, setNewAllowedPlatforms] = useState(['ALL']);
   const [newPermissions, setNewPermissions] = useState({
     permPredictPayback: 0,
     permRoiPredict: 0,
@@ -47,6 +53,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
   const [selectedSubUserIds, setSelectedSubUserIds] = useState([]);
 
   const [editingPermissionsUserId, setEditingPermissionsUserId] = useState(null);
+  const [selectedAllowedPlatforms, setSelectedAllowedPlatforms] = useState(['ALL']);
   const [selectedPermissions, setSelectedPermissions] = useState({
     permPredictPayback: 0,
     permRoiPredict: 0,
@@ -68,6 +75,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
     setNewIsSettlement(0);
     setNewVisibleUserIds([]);
     setNewSubUserIds([]);
+    setNewAllowedPlatforms(['ALL']);
     setNewPermissions({
       permPredictPayback: 0,
       permRoiPredict: 0,
@@ -79,6 +87,31 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
     setShowAddForm(false);
   };
 
+  const togglePlatformCheckbox = (code, currentPlatforms, setPlatforms) => {
+    if (code === 'ALL') {
+      if (currentPlatforms.includes('ALL')) {
+        setPlatforms([]);
+      } else {
+        const allCodes = availablePlatforms.map(p => p.code);
+        setPlatforms(Array.from(new Set(['ALL', ...allCodes])));
+      }
+      return;
+    }
+
+    let next = currentPlatforms.includes(code)
+      ? currentPlatforms.filter(c => c !== code)
+      : [...currentPlatforms, code];
+
+    const actualCodes = availablePlatforms.filter(p => p.code !== 'ALL').map(p => p.code);
+    const hasAllActual = actualCodes.length > 0 && actualCodes.every(c => next.includes(c));
+    if (hasAllActual) {
+      if (!next.includes('ALL')) next.push('ALL');
+    } else {
+      next = next.filter(c => c !== 'ALL');
+    }
+    setPlatforms(next);
+  };
+
   useEffect(() => {
     if ((editingViewPermissionUserId || editingSubAccountsUserId || editingPermissionsUserId) && expandedRowRef.current) {
       setTimeout(() => {
@@ -86,6 +119,21 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
       }, 50);
     }
   }, [editingViewPermissionUserId, editingSubAccountsUserId, editingPermissionsUserId]);
+
+  const fetchPlatforms = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/platform/list', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.code === 0 && Array.isArray(data.data) && data.data.length > 0) {
+        setAvailablePlatforms(data.data);
+      }
+    } catch (e) {
+      console.error('获取平台列表失败:', e);
+    }
+  };
 
   const fetchUsers = async () => {
     if (!token) return;
@@ -111,6 +159,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
   useEffect(() => {
     if (isOpen) {
       fetchUsers();
+      fetchPlatforms();
       resetAddForm();
       setEditingPasswordUserId(null);
       setEditingViewPermissionUserId(null);
@@ -146,6 +195,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
           permExport: newRole === 'SUPER_ADMIN' ? 1 : newPermissions.permExport,
           permSettlement: newRole === 'SUPER_ADMIN' ? 1 : newPermissions.permSettlement,
           permVideoGen: newRole === 'SUPER_ADMIN' ? 1 : newPermissions.permVideoGen,
+          allowedPlatforms: newRole === 'SUPER_ADMIN' ? 'ALL' : (newAllowedPlatforms.length > 0 ? newAllowedPlatforms.join(',') : 'ALL'),
         })
       });
       const data = await res.json();
@@ -308,18 +358,21 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(selectedPermissions)
+        body: JSON.stringify({
+          ...selectedPermissions,
+          allowedPlatforms: selectedAllowedPlatforms.length > 0 ? selectedAllowedPlatforms.join(',') : 'ALL'
+        })
       });
       const data = await res.json();
       if (res.ok && data.code === 0) {
-        if (showToast) showToast('功能权限分配保存成功！', 'success');
+        if (showToast) showToast('权限分配保存成功！', 'success');
         setEditingPermissionsUserId(null);
         fetchUsers();
       } else {
-        if (showToast) showToast(data.msg || '保存功能权限失败', 'error');
+        if (showToast) showToast(data.msg || '保存权限失败', 'error');
       }
     } catch (e) {
-      if (showToast) showToast('保存功能权限异常', 'error');
+      if (showToast) showToast('保存权限异常', 'error');
     }
   };
 
@@ -366,7 +419,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Users size={20} className="modal-header-icon" />
-            <h3 className="modal-title">用户账号与权限管理</h3>
+            <h3 className="modal-title">用户权限</h3>
           </div>
           <button className="btn btn-secondary" style={{ padding: '0.25rem' }} onClick={onClose}>
             <X size={18} />
@@ -472,7 +525,73 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                 )}
               </div>
 
-              {/* 第二行：功能权限分配 (4 项) */}
+              {/* 第二行：平台数据权限配置 */}
+              {isSuperAdmin && (
+                <div style={{ background: 'var(--bg-hover)', padding: '0.75rem 1rem', borderRadius: '0.4rem', border: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Globe size={14} color="#06b6d4" />
+                      <span>平台数据权限配置</span>
+                      {newRole === 'SUPER_ADMIN' ? (
+                        <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 400 }}>（超级管理员默认拥有所有平台权限）</span>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-sub)', fontWeight: 400 }}>（勾选允许该账号查看与操作的平台数据）</span>
+                      )}
+                    </div>
+                    {newRole !== 'SUPER_ADMIN' && (
+                      <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.75rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => setNewAllowedPlatforms(Array.from(new Set(['ALL', ...availablePlatforms.map(p => p.code)])))}
+                          style={{ background: 'none', border: 'none', color: '#06b6d4', cursor: 'pointer', padding: 0 }}
+                        >
+                          全选
+                        </button>
+                        <span style={{ color: 'var(--border-color)' }}>|</span>
+                        <button
+                          type="button"
+                          onClick={() => setNewAllowedPlatforms([])}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-sub)', cursor: 'pointer', padding: 0 }}
+                        >
+                          清空
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.6rem' }}>
+                    {availablePlatforms.map(p => {
+                      const isSuper = newRole === 'SUPER_ADMIN';
+                      const checked = isSuper || newAllowedPlatforms.includes('ALL') || newAllowedPlatforms.includes(p.code);
+                      return (
+                        <label
+                          key={p.code}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            fontSize: '0.82rem',
+                            cursor: isSuper ? 'not-allowed' : 'pointer',
+                            userSelect: 'none',
+                            color: checked ? '#0891b2' : 'var(--text-main)',
+                            fontWeight: checked ? 600 : 400
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            disabled={isSuper}
+                            checked={checked}
+                            onChange={() => togglePlatformCheckbox(p.code, newAllowedPlatforms, setNewAllowedPlatforms)}
+                            style={{ accentColor: '#06b6d4', width: 15, height: 15 }}
+                          />
+                          <span>{p.name} ({p.code})</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 第三行：功能权限分配 (6 项) */}
               {isSuperAdmin && (
                 <div style={{ background: 'var(--bg-hover)', padding: '0.75rem 1rem', borderRadius: '0.4rem', border: '1px solid var(--border-light)' }}>
                   <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -669,7 +788,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                     {isSuperAdmin && <th style={{ width: 115, whiteSpace: 'nowrap' }}>参与结算</th>}
                     {isSuperAdmin && <th style={{ width: 125, whiteSpace: 'nowrap' }}>视图分配</th>}
                     {isSuperAdmin && <th style={{ width: 125, whiteSpace: 'nowrap' }}>子账号关联</th>}
-                    {isSuperAdmin && <th style={{ width: 125, whiteSpace: 'nowrap' }}>功能权限</th>}
+                    {isSuperAdmin && <th style={{ width: 135, whiteSpace: 'nowrap' }}>权限配置</th>}
                     <th style={{ width: 90, textAlign: 'right', whiteSpace: 'nowrap' }}>操作</th>
                   </tr>
                 </thead>
@@ -797,36 +916,72 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                           {isSuperAdmin && (
                             <td>
                               {u.role === 'SUPER_ADMIN' ? (
-                                <span style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 500 }} title="超级管理员默认拥有所有功能权限">
-                                  全量权限
-                                </span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                                  <span style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 600 }} title="超级管理员默认拥有所有平台与功能权限">
+                                    全量权限
+                                  </span>
+                                  <span style={{ fontSize: '0.7rem', color: '#059669', background: 'rgba(16,185,129,0.12)', padding: '0.05rem 0.35rem', borderRadius: 4, width: 'fit-content' }}>
+                                    默认全平台
+                                  </span>
+                                </div>
                               ) : (
-                                <button
-                                  className="btn btn-secondary"
-                                  style={{ padding: '0.25rem 0.45rem', fontSize: '0.75rem', gap: '0.25rem', borderColor: '#3b82f6', color: '#3b82f6' }}
-                                  title="点击分配该账户的 6 项功能权限（预测回本、ROI预测、平台汇总、数据导出、月份结算、AI视频生成）"
-                                  onClick={() => {
-                                    if (editingPermissionsUserId === u.id) {
-                                      setEditingPermissionsUserId(null);
-                                    } else {
-                                      setEditingPermissionsUserId(u.id);
-                                      setEditingViewPermissionUserId(null);
-                                      setEditingSubAccountsUserId(null);
-                                      setEditingPasswordUserId(null);
-                                      setSelectedPermissions({
-                                        permPredictPayback: u.permPredictPayback || 0,
-                                        permRoiPredict: u.permRoiPredict || 0,
-                                        permGlobalDistribution: u.permGlobalDistribution || 0,
-                                        permExport: u.permExport || 0,
-                                        permSettlement: u.permSettlement || 0,
-                                        permVideoGen: u.permVideoGen || 0,
-                                      });
-                                    }
-                                  }}
-                                >
-                                  <ShieldCheck size={13} color="#3b82f6" />
-                                  <span>{permCount > 0 ? `已开通 ${permCount}项` : '分配权限'}</span>
-                                </button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
+                                  <button
+                                    className="btn btn-secondary"
+                                    style={{
+                                      padding: '0.25rem 0.45rem',
+                                      fontSize: '0.75rem',
+                                      gap: '0.25rem',
+                                      borderColor: editingPermissionsUserId === u.id ? '#0891b2' : '#3b82f6',
+                                      color: editingPermissionsUserId === u.id ? '#0891b2' : '#3b82f6'
+                                    }}
+                                    title="点击分配该账户的平台数据权限与 6 项功能权限"
+                                    onClick={() => {
+                                      if (editingPermissionsUserId === u.id) {
+                                        setEditingPermissionsUserId(null);
+                                      } else {
+                                        setEditingPermissionsUserId(u.id);
+                                        setEditingViewPermissionUserId(null);
+                                        setEditingSubAccountsUserId(null);
+                                        setEditingPasswordUserId(null);
+                                        setSelectedPermissions({
+                                          permPredictPayback: u.permPredictPayback || 0,
+                                          permRoiPredict: u.permRoiPredict || 0,
+                                          permGlobalDistribution: u.permGlobalDistribution || 0,
+                                          permExport: u.permExport || 0,
+                                          permSettlement: u.permSettlement || 0,
+                                          permVideoGen: u.permVideoGen || 0,
+                                        });
+                                        const pList = u.allowedPlatforms
+                                          ? u.allowedPlatforms.split(',').map(s => s.trim()).filter(Boolean)
+                                          : ['ALL'];
+                                        setSelectedAllowedPlatforms(pList);
+                                      }
+                                    }}
+                                  >
+                                    <ShieldCheck size={13} color={editingPermissionsUserId === u.id ? '#0891b2' : '#3b82f6'} />
+                                    <span>{permCount > 0 ? `已开通 ${permCount}项功能` : '分配权限'}</span>
+                                  </button>
+                                  <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                                    {(() => {
+                                      const platStr = u.allowedPlatforms || 'ALL';
+                                      const isAll = platStr.toUpperCase().includes('ALL');
+                                      if (isAll) {
+                                        return (
+                                          <span style={{ fontSize: '0.7rem', color: '#10b981', background: 'rgba(16,185,129,0.12)', padding: '0.05rem 0.35rem', borderRadius: 4, fontWeight: 500 }}>
+                                            全平台
+                                          </span>
+                                        );
+                                      }
+                                      const count = platStr.split(',').map(s => s.trim()).filter(Boolean).length;
+                                      return (
+                                        <span style={{ fontSize: '0.7rem', color: '#0891b2', background: 'rgba(6,182,212,0.12)', padding: '0.05rem 0.35rem', borderRadius: 4, fontWeight: 500 }}>
+                                          {count > 0 ? `${count}个平台` : '无平台权限'}
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
+                                </div>
                               )}
                             </td>
                           )}
@@ -1021,22 +1176,22 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                           </tr>
                         )}
 
-                        {/* 分配功能权限展开行 */}
+                        {/* 分配权限展开行 */}
                         {isSuperAdmin && editingPermissionsUserId === u.id && (
                           <tr ref={expandedRowRef}>
                             <td colSpan={9} style={{ background: 'var(--bg-secondary)', padding: '0.85rem 1rem', borderTop: '1px solid var(--border-color)' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                                    设置账号 <span style={{ color: '#3b82f6' }}>[{u.username}]</span> 的 6 项专属功能权限：
+                                    设置账号 <span style={{ color: '#0891b2' }}>[{u.username}]</span> 的权限配置（平台数据权限 & 6 项功能权限）：
                                   </span>
                                   <div style={{ display: 'flex', gap: '0.4rem' }}>
                                     <button
                                       className="btn btn-primary"
-                                      style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', backgroundColor: '#3b82f6', borderColor: '#3b82f6' }}
+                                      style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', backgroundColor: '#0891b2', borderColor: '#0891b2' }}
                                       onClick={() => handleSavePermissions(u.id)}
                                     >
-                                      保存权限
+                                      保存权限配置
                                     </button>
                                     <button
                                       className="btn btn-secondary"
@@ -1048,66 +1203,140 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
                                   </div>
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', background: 'var(--bg-hover)', padding: '0.85rem 1rem', borderRadius: '0.4rem', border: '1px solid var(--border-light)' }}>
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permPredictPayback ? '#3b82f6' : 'var(--text-main)', fontWeight: selectedPermissions.permPredictPayback ? 600 : 400 }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={Boolean(selectedPermissions.permPredictPayback)}
-                                      onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permPredictPayback: e.target.checked ? 1 : 0 }))}
-                                      style={{ accentColor: '#3b82f6', width: 16, height: 16 }}
-                                    />
-                                    <span>📈 预测回本（含LTV表格列）</span>
-                                  </label>
+                                {/* 板块1：平台数据权限配置 */}
+                                <div style={{ background: 'var(--bg-hover)', padding: '0.75rem 1rem', borderRadius: '0.4rem', border: '1px solid var(--border-light)' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                                      <Globe size={14} color="#06b6d4" />
+                                      <span>平台数据权限（控制该账号可切换与查看的平台）：</span>
+                                      {u.role === 'SUPER_ADMIN' && (
+                                        <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 400 }}>（超级管理员默认拥有所有平台权限）</span>
+                                      )}
+                                    </div>
+                                    {u.role !== 'SUPER_ADMIN' && (
+                                      <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.75rem' }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedAllowedPlatforms(Array.from(new Set(['ALL', ...availablePlatforms.map(p => p.code)])))}
+                                          style={{ background: 'none', border: 'none', color: '#06b6d4', cursor: 'pointer', padding: 0 }}
+                                        >
+                                          全选所有平台
+                                        </button>
+                                        <span style={{ color: 'var(--border-color)' }}>|</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedAllowedPlatforms([])}
+                                          style={{ background: 'none', border: 'none', color: 'var(--text-sub)', cursor: 'pointer', padding: 0 }}
+                                        >
+                                          清空
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
 
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permRoiPredict ? '#3b82f6' : 'var(--text-main)', fontWeight: selectedPermissions.permRoiPredict ? 600 : 400 }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={Boolean(selectedPermissions.permRoiPredict)}
-                                      onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permRoiPredict: e.target.checked ? 1 : 0 }))}
-                                      style={{ accentColor: '#3b82f6', width: 16, height: 16 }}
-                                    />
-                                    <span>🎯（D30~D90）ROI 预测</span>
-                                  </label>
+                                  {u.role === 'SUPER_ADMIN' ? (
+                                    <div style={{ fontSize: '0.8rem', color: '#10b981', padding: '0.35rem 0' }}>
+                                      👑 该账号为超级管理员，系统默认放行所有平台的数据查询与操作权限（包含综合大盘及所有独立业务平台）。
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.65rem' }}>
+                                      {availablePlatforms.map(p => {
+                                        const checked = selectedAllowedPlatforms.includes('ALL') || selectedAllowedPlatforms.includes(p.code);
+                                        return (
+                                          <label
+                                            key={p.code}
+                                            style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '0.45rem',
+                                              fontSize: '0.82rem',
+                                              cursor: 'pointer',
+                                              userSelect: 'none',
+                                              color: checked ? '#0891b2' : 'var(--text-main)',
+                                              fontWeight: checked ? 600 : 400
+                                            }}
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={checked}
+                                              onChange={() => togglePlatformCheckbox(p.code, selectedAllowedPlatforms, setSelectedAllowedPlatforms)}
+                                              style={{ accentColor: '#06b6d4', width: 16, height: 16 }}
+                                            />
+                                            <span>{p.name} ({p.code})</span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
 
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permGlobalDistribution ? '#3b82f6' : 'var(--text-main)', fontWeight: selectedPermissions.permGlobalDistribution ? 600 : 400 }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={Boolean(selectedPermissions.permGlobalDistribution)}
-                                      onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permGlobalDistribution: e.target.checked ? 1 : 0 }))}
-                                      style={{ accentColor: '#3b82f6', width: 16, height: 16 }}
-                                    />
-                                    <span>🌐 平台汇总</span>
-                                  </label>
+                                {/* 板块2：功能模块权限配置 */}
+                                <div style={{ background: 'var(--bg-hover)', padding: '0.75rem 1rem', borderRadius: '0.4rem', border: '1px solid var(--border-light)' }}>
+                                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <ShieldCheck size={14} color="#3b82f6" />
+                                    <span>功能模块权限（控制该账号可操作的高级功能）：</span>
+                                  </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permPredictPayback ? '#3b82f6' : 'var(--text-main)', fontWeight: selectedPermissions.permPredictPayback ? 600 : 400 }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(selectedPermissions.permPredictPayback)}
+                                        onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permPredictPayback: e.target.checked ? 1 : 0 }))}
+                                        style={{ accentColor: '#3b82f6', width: 16, height: 16 }}
+                                      />
+                                      <span>📈 预测回本（含LTV表格列）</span>
+                                    </label>
 
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permExport ? '#3b82f6' : 'var(--text-main)', fontWeight: selectedPermissions.permExport ? 600 : 400 }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={Boolean(selectedPermissions.permExport)}
-                                      onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permExport: e.target.checked ? 1 : 0 }))}
-                                      style={{ accentColor: '#3b82f6', width: 16, height: 16 }}
-                                    />
-                                    <span>📥 数据导出</span>
-                                  </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permRoiPredict ? '#3b82f6' : 'var(--text-main)', fontWeight: selectedPermissions.permRoiPredict ? 600 : 400 }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(selectedPermissions.permRoiPredict)}
+                                        onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permRoiPredict: e.target.checked ? 1 : 0 }))}
+                                        style={{ accentColor: '#3b82f6', width: 16, height: 16 }}
+                                      />
+                                      <span>🎯（D30~D90）ROI 预测</span>
+                                    </label>
 
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permSettlement ? '#3b82f6' : 'var(--text-main)', fontWeight: selectedPermissions.permSettlement ? 600 : 400 }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={Boolean(selectedPermissions.permSettlement)}
-                                      onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permSettlement: e.target.checked ? 1 : 0 }))}
-                                      style={{ accentColor: '#3b82f6', width: 16, height: 16 }}
-                                    />
-                                    <span>💳 结算</span>
-                                  </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permGlobalDistribution ? '#3b82f6' : 'var(--text-main)', fontWeight: selectedPermissions.permGlobalDistribution ? 600 : 400 }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(selectedPermissions.permGlobalDistribution)}
+                                        onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permGlobalDistribution: e.target.checked ? 1 : 0 }))}
+                                        style={{ accentColor: '#3b82f6', width: 16, height: 16 }}
+                                      />
+                                      <span>🌐 平台汇总</span>
+                                    </label>
 
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permVideoGen ? '#8b5cf6' : 'var(--text-main)', fontWeight: selectedPermissions.permVideoGen ? 600 : 400 }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={Boolean(selectedPermissions.permVideoGen)}
-                                      onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permVideoGen: e.target.checked ? 1 : 0 }))}
-                                      style={{ accentColor: '#8b5cf6', width: 16, height: 16 }}
-                                    />
-                                    <span>🎬 AI视频生成</span>
-                                  </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permExport ? '#3b82f6' : 'var(--text-main)', fontWeight: selectedPermissions.permExport ? 600 : 400 }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(selectedPermissions.permExport)}
+                                        onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permExport: e.target.checked ? 1 : 0 }))}
+                                        style={{ accentColor: '#3b82f6', width: 16, height: 16 }}
+                                      />
+                                      <span>📥 数据导出</span>
+                                    </label>
+
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permSettlement ? '#3b82f6' : 'var(--text-main)', fontWeight: selectedPermissions.permSettlement ? 600 : 400 }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(selectedPermissions.permSettlement)}
+                                        onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permSettlement: e.target.checked ? 1 : 0 }))}
+                                        style={{ accentColor: '#3b82f6', width: 16, height: 16 }}
+                                      />
+                                      <span>💳 结算</span>
+                                    </label>
+
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: selectedPermissions.permVideoGen ? '#8b5cf6' : 'var(--text-main)', fontWeight: selectedPermissions.permVideoGen ? 600 : 400 }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(selectedPermissions.permVideoGen)}
+                                        onChange={(e) => setSelectedPermissions(prev => ({ ...prev, permVideoGen: e.target.checked ? 1 : 0 }))}
+                                        style={{ accentColor: '#8b5cf6', width: 16, height: 16 }}
+                                      />
+                                      <span>🎬 AI视频生成</span>
+                                    </label>
+                                  </div>
                                 </div>
                               </div>
                             </td>

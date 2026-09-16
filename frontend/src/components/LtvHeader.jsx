@@ -47,7 +47,7 @@ export default function LtvHeader({
             <BarChart3 size={22} />
           </div>
           <div>
-            <h1 className="brand-title">Meta-LTV</h1>
+            <h1 className="brand-title">DataHub</h1>
           </div>
         </div>
 
@@ -97,7 +97,7 @@ export default function LtvHeader({
         {/* 平台切换下拉框 */}
         {platformsList && platformsList.length > 0 && (
           <div
-            title="选择数据源平台（默认全平台综合大盘）"
+            title="选择数据源平台（默认综合大盘）"
             style={{
               position: 'relative',
               zIndex: 1002,

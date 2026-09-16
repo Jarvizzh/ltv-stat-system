@@ -54,8 +54,8 @@ export default function Login({ onLoginSuccess }) {
           <div className="login-brand-icon">
             <ShieldCheck size={28} color="#ffffff" />
           </div>
-          <h2 className="login-title">META LTV 报表系统</h2>
-          <p className="login-subtitle">请登录账号以访问您的落地页数据</p>
+          <h2 className="login-title">DataHub 数据平台</h2>
+          <p className="login-subtitle">请登录账号以访问您的多平台业务数据</p>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">

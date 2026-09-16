@@ -12,8 +12,12 @@ import java.util.List;
 @Repository
 public interface UserLandingPageRepository extends JpaRepository<UserLandingPage, Long> {
     List<UserLandingPage> findByUserId(Long userId);
-    List<UserLandingPage> findByPlatformCode(String platformCode);
-    List<UserLandingPage> findByPlatformCodeAndUserId(String platformCode, Long userId);
+
+    @Query("SELECT p FROM UserLandingPage p WHERE (p.platformCode = :platformCode OR (:platformCode = 'rocnovel' AND (p.platformCode IS NULL OR p.platformCode = '' OR p.platformCode = 'ALL')))")
+    List<UserLandingPage> findByPlatformCode(@Param("platformCode") String platformCode);
+
+    @Query("SELECT p FROM UserLandingPage p WHERE (p.platformCode = :platformCode OR (:platformCode = 'rocnovel' AND (p.platformCode IS NULL OR p.platformCode = '' OR p.platformCode = 'ALL'))) AND p.userId = :userId")
+    List<UserLandingPage> findByPlatformCodeAndUserId(@Param("platformCode") String platformCode, @Param("userId") Long userId);
 
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM UserLandingPage p WHERE p.userId = :userId")

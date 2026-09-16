@@ -15,10 +15,14 @@ import java.util.Optional;
 @Repository
 public interface LtvLaunchConfigRepository extends JpaRepository<LtvLaunchConfig, LtvLaunchConfigId> {
     Optional<LtvLaunchConfig> findByUserIdAndLaunchDate(Long userId, LocalDate launchDate);
-    Optional<LtvLaunchConfig> findByPlatformCodeAndUserIdAndLaunchDate(String platformCode, Long userId, LocalDate launchDate);
+
+    @Query("SELECT c FROM LtvLaunchConfig c WHERE (c.platformCode = :platformCode OR (:platformCode = 'rocnovel' AND (c.platformCode IS NULL OR c.platformCode = '' OR c.platformCode = 'ALL'))) AND c.userId = :userId AND c.launchDate = :launchDate")
+    Optional<LtvLaunchConfig> findByPlatformCodeAndUserIdAndLaunchDate(@Param("platformCode") String platformCode, @Param("userId") Long userId, @Param("launchDate") LocalDate launchDate);
 
     List<LtvLaunchConfig> findByUserId(Long userId);
-    List<LtvLaunchConfig> findByPlatformCodeAndUserId(String platformCode, Long userId);
+
+    @Query("SELECT c FROM LtvLaunchConfig c WHERE (c.platformCode = :platformCode OR (:platformCode = 'rocnovel' AND (c.platformCode IS NULL OR c.platformCode = '' OR c.platformCode = 'ALL'))) AND c.userId = :userId")
+    List<LtvLaunchConfig> findByPlatformCodeAndUserId(@Param("platformCode") String platformCode, @Param("userId") Long userId);
 
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM LtvLaunchConfig c WHERE c.userId = :userId")

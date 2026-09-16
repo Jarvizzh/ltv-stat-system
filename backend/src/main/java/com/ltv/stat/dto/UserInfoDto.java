@@ -24,6 +24,7 @@ public class UserInfoDto {
     private Integer permExport;
     private Integer permSettlement;
     private Integer permVideoGen;
+    private String allowedPlatforms;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -75,4 +76,7 @@ public class UserInfoDto {
 
     public Integer getPermVideoGen() { return permVideoGen != null ? permVideoGen : 0; }
     public void setPermVideoGen(Integer permVideoGen) { this.permVideoGen = permVideoGen; }
+
+    public String getAllowedPlatforms() { return allowedPlatforms != null ? allowedPlatforms : "ALL"; }
+    public void setAllowedPlatforms(String allowedPlatforms) { this.allowedPlatforms = allowedPlatforms; }
 }

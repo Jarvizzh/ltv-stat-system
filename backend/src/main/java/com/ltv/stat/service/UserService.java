@@ -130,6 +130,27 @@ public class UserService {
             Integer permSettlement,
             Integer permVideoGen
     ) {
+        return createUser(username, rawPassword, role, isMaster, isSettlement, visibleUserIds, subUserIds,
+                permPredictPayback, permRoiPredict, permGlobalDistribution, permExport, permSettlement, permVideoGen, null);
+    }
+
+    @Transactional
+    public SysUser createUser(
+            String username,
+            String rawPassword,
+            String role,
+            Integer isMaster,
+            Integer isSettlement,
+            List<Long> visibleUserIds,
+            List<Long> subUserIds,
+            Integer permPredictPayback,
+            Integer permRoiPredict,
+            Integer permGlobalDistribution,
+            Integer permExport,
+            Integer permSettlement,
+            Integer permVideoGen,
+            String allowedPlatforms
+    ) {
         if (sysUserRepository.existsByUsername(username)) {
             throw new IllegalArgumentException("用户名已存在: " + username);
         }
@@ -146,6 +167,14 @@ public class UserService {
         user.setPermExport(permExport != null ? permExport : 0);
         user.setPermSettlement(permSettlement != null ? permSettlement : 0);
         user.setPermVideoGen(permVideoGen != null ? permVideoGen : 0);
+
+        if (user.isSuperAdmin()) {
+            user.setAllowedPlatforms("ALL");
+        } else if (allowedPlatforms != null && !allowedPlatforms.trim().isEmpty()) {
+            user.setAllowedPlatforms(allowedPlatforms.trim());
+        } else {
+            user.setAllowedPlatforms("ALL");
+        }
 
         SysUser savedUser = sysUserRepository.save(user);
 
@@ -294,6 +323,11 @@ public class UserService {
 
     @Transactional
     public void updateUserPermissions(Long userId, Integer permPredictPayback, Integer permRoiPredict, Integer permGlobalDistribution, Integer permExport, Integer permSettlement, Integer permVideoGen) {
+        updateUserPermissions(userId, permPredictPayback, permRoiPredict, permGlobalDistribution, permExport, permSettlement, permVideoGen, null);
+    }
+
+    @Transactional
+    public void updateUserPermissions(Long userId, Integer permPredictPayback, Integer permRoiPredict, Integer permGlobalDistribution, Integer permExport, Integer permSettlement, Integer permVideoGen, String allowedPlatforms) {
         SysUser user = sysUserRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
 
@@ -303,6 +337,12 @@ public class UserService {
         if (permExport != null) user.setPermExport(permExport);
         if (permSettlement != null) user.setPermSettlement(permSettlement);
         if (permVideoGen != null) user.setPermVideoGen(permVideoGen);
+
+        if (user.isSuperAdmin()) {
+            user.setAllowedPlatforms("ALL");
+        } else if (allowedPlatforms != null && !allowedPlatforms.trim().isEmpty()) {
+            user.setAllowedPlatforms(allowedPlatforms.trim());
+        }
 
         sysUserRepository.save(user);
     }
