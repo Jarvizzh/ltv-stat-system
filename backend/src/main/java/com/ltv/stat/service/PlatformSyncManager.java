@@ -153,4 +153,15 @@ public class PlatformSyncManager {
         LocalDate endDate = LocalDate.parse(endTimeStr);
         return syncOrdersForSinglePlatform(platform, startDate, endDate);
     }
+
+    public int syncConfigsForPlatform(PlatformEnum platform) {
+        if (platform == null || platform.isAll()) {
+            syncAllConfigs();
+            return 1;
+        }
+        PlatformConfig config = platformConfigRepository.findByPlatformCode(platform.getCode()).orElse(null);
+        return adapterRegistry.getAdapter(platform)
+                .map(adapter -> adapter.syncConfigs(config))
+                .orElse(0);
+    }
 }

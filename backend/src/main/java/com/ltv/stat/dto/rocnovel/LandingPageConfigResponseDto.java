@@ -1,15 +1,16 @@
-package com.ltv.stat.dto;
+package com.ltv.stat.dto.rocnovel;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class OrderReportResponseDto {
+public class LandingPageConfigResponseDto {
 
     private Integer code;
     private String msg;
-    private OrderData data;
+    private LandingPageData data;
 
     public Integer getCode() { return code; }
     public void setCode(Integer code) { this.code = code; }
@@ -17,16 +18,16 @@ public class OrderReportResponseDto {
     public String getMsg() { return msg; }
     public void setMsg(String msg) { this.msg = msg; }
 
-    public OrderData getData() { return data; }
-    public void setData(OrderData data) { this.data = data; }
+    public LandingPageData getData() { return data; }
+    public void setData(LandingPageData data) { this.data = data; }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class OrderData {
+    public static class LandingPageData {
         private Integer current;
         private Integer pages;
         private Integer size;
         private Integer total;
-        private List<OrderReportRecordDto> records;
+        private List<LandingPageRecordDto> records;
 
         public Integer getCurrent() { return current; }
         public void setCurrent(Integer current) { this.current = current; }
@@ -40,7 +41,7 @@ public class OrderReportResponseDto {
         public Integer getTotal() { return total; }
         public void setTotal(Integer total) { this.total = total; }
 
-        public List<OrderReportRecordDto> getRecords() { return records; }
-        public void setRecords(List<OrderReportRecordDto> records) { this.records = records; }
+        public List<LandingPageRecordDto> getRecords() { return records; }
+        public void setRecords(List<LandingPageRecordDto> records) { this.records = records; }
     }
 }

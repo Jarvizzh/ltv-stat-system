@@ -282,6 +282,16 @@ public class DatabasePrimaryKeysInitializer {
                 log.warn("Failed to add platform_code to subscription_config_version: {}", e.getMessage());
             }
         }
+
+        // 9. 检查并补充 user_subscription_period 表的 platform_code
+        if (!isColumnExist("user_subscription_period", "platform_code")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE user_subscription_period ADD COLUMN platform_code VARCHAR(32) NOT NULL DEFAULT 'rocnovel'");
+                log.info("Successfully added platform_code to user_subscription_period");
+            } catch (Exception e) {
+                log.warn("Failed to add platform_code to user_subscription_period: {}", e.getMessage());
+            }
+        }
     }
 
     private boolean isIndexExist(String tableName, String indexName) {

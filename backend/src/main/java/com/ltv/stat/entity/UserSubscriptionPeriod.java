@@ -5,7 +5,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "user_subscription_period", indexes = {
-    @Index(name = "idx_member_id", columnList = "member_id")
+    @Index(name = "idx_member_id", columnList = "member_id"),
+    @Index(name = "idx_platform_member", columnList = "platform_code, member_id")
 })
 public class UserSubscriptionPeriod {
 
@@ -13,8 +14,14 @@ public class UserSubscriptionPeriod {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "member_id", nullable = false, unique = true)
+    @Column(name = "platform_code", nullable = false, length = 32)
+    private String platformCode = "rocnovel";
+
+    @Column(name = "member_id", nullable = false)
     private String memberId;
+
+    public String getPlatformCode() { return platformCode != null ? platformCode : "rocnovel"; }
+    public void setPlatformCode(String platformCode) { this.platformCode = platformCode; }
 
     @Column(name = "landing_page_id")
     private String landingPageId;

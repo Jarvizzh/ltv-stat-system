@@ -2,6 +2,7 @@ package com.ltv.stat.controller;
 
 import com.ltv.stat.dto.*;
 import com.ltv.stat.entity.DailyRechargeDistribution;
+import com.ltv.stat.enums.PlatformEnum;
 import com.ltv.stat.entity.LtvDailyStat;
 import com.ltv.stat.entity.LtvLaunchConfig;
 import com.ltv.stat.entity.LtvPredictBenchmark;
@@ -11,7 +12,6 @@ import com.ltv.stat.service.LtvPredictService;
 import com.ltv.stat.service.LtvStatService;
 import com.ltv.stat.service.PlatformSyncManager;
 import com.ltv.stat.service.RocnovelOrderSyncService;
-import com.ltv.stat.service.RocnovelSubscribeConfigSyncService;
 import com.ltv.stat.service.UserService;
 import com.ltv.stat.util.UserContext;
 import org.springframework.http.ResponseEntity;
@@ -32,22 +32,19 @@ public class LtvController {
     private final RocnovelOrderSyncService orderSyncService;
     private final PlatformSyncManager platformSyncManager;
     private final LtvBenchmarkService ltvBenchmarkService;
-    private final RocnovelSubscribeConfigSyncService subscribeConfigSyncService;
     private final UserService userService;
 
     public LtvController(LtvStatService ltvStatService,
                          DailyRechargeStatService dailyRechargeStatService,
-                         RocnovelOrderSyncService orderSyncService,
+                         @org.springframework.beans.factory.annotation.Autowired(required = false) RocnovelOrderSyncService orderSyncService,
                          PlatformSyncManager platformSyncManager,
                          LtvBenchmarkService ltvBenchmarkService,
-                         RocnovelSubscribeConfigSyncService subscribeConfigSyncService,
                          UserService userService) {
         this.ltvStatService = ltvStatService;
         this.dailyRechargeStatService = dailyRechargeStatService;
         this.orderSyncService = orderSyncService;
         this.platformSyncManager = platformSyncManager;
         this.ltvBenchmarkService = ltvBenchmarkService;
-        this.subscribeConfigSyncService = subscribeConfigSyncService;
         this.userService = userService;
     }
 
@@ -451,11 +448,13 @@ public class LtvController {
      * 手动触发拉取落地页配置与订阅产品明细版本库
      */
     @PostMapping("/sync-subscribe-configs")
-    public ResponseEntity<Map<String, Object>> syncSubscribeConfigs() {
-        int count = subscribeConfigSyncService.syncAllSubscribeConfigs();
+    public ResponseEntity<Map<String, Object>> syncSubscribeConfigs(
+            @RequestParam(value = "platformCode", required = false) String platformCode) {
+        PlatformEnum platform = PlatformEnum.fromCode(platformCode).orElse(PlatformEnum.ROCNOVEL);
+        int count = platformSyncManager.syncConfigsForPlatform(platform);
         Map<String, Object> response = new HashMap<>();
         response.put("code", 0);
-        response.put("msg", "落地页与订阅配置版本数据同步完成，更新/保存 " + count + " 条版本快照！");
+        response.put("msg", "平台 [" + platform.getDisplayName() + "] 落地页与订阅配置版本数据同步完成，更新/保存 " + count + " 条版本快照！");
         response.put("savedVersionCount", count);
         return ResponseEntity.ok(response);
     }

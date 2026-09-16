@@ -56,7 +56,6 @@ public class LtvStatService {
     private final UserSubscriptionPeriodRepository userSubscriptionPeriodRepository;
     private final UserService userService;
     private final LtvPredictService ltvPredictService;
-    private final RocnovelOrderSyncService orderSyncService;
     private final LtvBenchmarkService ltvBenchmarkService;
     private final AsyncRecalculateService asyncRecalculateService;
 
@@ -67,7 +66,6 @@ public class LtvStatService {
                           UserSubscriptionPeriodRepository userSubscriptionPeriodRepository,
                           UserService userService,
                           LtvPredictService ltvPredictService,
-                          @org.springframework.context.annotation.Lazy RocnovelOrderSyncService orderSyncService,
                           @org.springframework.beans.factory.annotation.Autowired(required = false) LtvBenchmarkService ltvBenchmarkService,
                           @org.springframework.context.annotation.Lazy AsyncRecalculateService asyncRecalculateService) {
         this.rawOrderRepository = rawOrderRepository;
@@ -77,7 +75,6 @@ public class LtvStatService {
         this.userSubscriptionPeriodRepository = userSubscriptionPeriodRepository;
         this.userService = userService;
         this.ltvPredictService = ltvPredictService;
-        this.orderSyncService = orderSyncService;
         this.ltvBenchmarkService = ltvBenchmarkService;
         this.asyncRecalculateService = asyncRecalculateService;
     }
@@ -296,10 +293,6 @@ public class LtvStatService {
 
         if (ltvBenchmarkService != null) {
             ltvBenchmarkService.recalculateBenchmarksForUser(userId);
-        }
-
-        if (userSubscriptionPeriodRepository.count() == 0 && orderSyncService != null) {
-            orderSyncService.backfillUserSubscriptionPeriods();
         }
 
         Map<LocalDate, List<RawOrder>> ordersByDate = orders.stream()

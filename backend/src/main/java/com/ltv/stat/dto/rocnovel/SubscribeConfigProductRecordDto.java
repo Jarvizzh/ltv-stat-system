@@ -1,4 +1,4 @@
-package com.ltv.stat.dto;
+package com.ltv.stat.dto.rocnovel;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;

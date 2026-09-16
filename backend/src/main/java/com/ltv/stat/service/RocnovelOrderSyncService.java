@@ -1,7 +1,7 @@
 package com.ltv.stat.service;
 
-import com.ltv.stat.dto.OrderReportRecordDto;
-import com.ltv.stat.dto.OrderReportResponseDto;
+import com.ltv.stat.dto.rocnovel.OrderReportRecordDto;
+import com.ltv.stat.dto.rocnovel.OrderReportResponseDto;
 import com.ltv.stat.entity.RawOrder;
 import com.ltv.stat.entity.SubscriptionConfigVersion;
 import com.ltv.stat.entity.SystemConfig;
