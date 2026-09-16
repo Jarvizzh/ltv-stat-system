@@ -2,8 +2,8 @@ package com.ltv.stat.adapter;
 
 import com.ltv.stat.entity.PlatformConfig;
 import com.ltv.stat.enums.PlatformEnum;
-import com.ltv.stat.service.OrderSyncService;
-import com.ltv.stat.service.SubscribeConfigSyncService;
+import com.ltv.stat.service.RocnovelOrderSyncService;
+import com.ltv.stat.service.RocnovelSubscribeConfigSyncService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
@@ -21,11 +21,11 @@ public class RocnovelPlatformAdapter implements PlatformSyncAdapter {
     private static final Logger log = LoggerFactory.getLogger(RocnovelPlatformAdapter.class);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    private final OrderSyncService orderSyncService;
-    private final SubscribeConfigSyncService subscribeConfigSyncService;
+    private final RocnovelOrderSyncService orderSyncService;
+    private final RocnovelSubscribeConfigSyncService subscribeConfigSyncService;
 
-    public RocnovelPlatformAdapter(@Lazy OrderSyncService orderSyncService,
-                                   @Lazy SubscribeConfigSyncService subscribeConfigSyncService) {
+    public RocnovelPlatformAdapter(@Lazy RocnovelOrderSyncService orderSyncService,
+                                   @Lazy RocnovelSubscribeConfigSyncService subscribeConfigSyncService) {
         this.orderSyncService = orderSyncService;
         this.subscribeConfigSyncService = subscribeConfigSyncService;
     }

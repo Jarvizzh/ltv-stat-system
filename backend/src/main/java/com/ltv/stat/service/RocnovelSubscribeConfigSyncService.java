@@ -25,9 +25,9 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 @Service
-public class SubscribeConfigSyncService {
+public class RocnovelSubscribeConfigSyncService {
 
-    private static final Logger log = LoggerFactory.getLogger(SubscribeConfigSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(RocnovelSubscribeConfigSyncService.class);
 
     private final RestTemplate restTemplate;
     private final SubscriptionConfigVersionRepository versionRepository;
@@ -48,9 +48,9 @@ public class SubscribeConfigSyncService {
     private static final String LANDING_PAGE_LIST_URL = "https://admin-api.rocnovel.com/landingPage/config/list";
     private static final String SUBSCRIBE_PRODUCT_LIST_URL = "https://admin-api.rocnovel.com/subscribe-config/product/list";
 
-    public SubscribeConfigSyncService(RestTemplate restTemplate,
-                                      SubscriptionConfigVersionRepository versionRepository,
-                                      SystemConfigRepository systemConfigRepository) {
+    public RocnovelSubscribeConfigSyncService(RestTemplate restTemplate,
+                                              SubscriptionConfigVersionRepository versionRepository,
+                                              SystemConfigRepository systemConfigRepository) {
         this.restTemplate = restTemplate;
         this.versionRepository = versionRepository;
         this.systemConfigRepository = systemConfigRepository;

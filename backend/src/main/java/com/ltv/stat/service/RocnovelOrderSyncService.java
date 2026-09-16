@@ -34,9 +34,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
-public class OrderSyncService {
+public class RocnovelOrderSyncService {
 
-    private static final Logger log = LoggerFactory.getLogger(OrderSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(RocnovelOrderSyncService.class);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final RestTemplate restTemplate;
@@ -58,12 +58,12 @@ public class OrderSyncService {
     @Value("${order.api.client-group-id}")
     private String clientGroupId;
 
-    public OrderSyncService(RestTemplate restTemplate,
-                            RawOrderRepository rawOrderRepository,
-                            SystemConfigRepository systemConfigRepository,
-                            SubscriptionConfigVersionRepository versionRepository,
-                            UserSubscriptionPeriodRepository userSubscriptionPeriodRepository,
-                            @Qualifier("orderSyncExecutor") Executor syncExecutor) {
+    public RocnovelOrderSyncService(RestTemplate restTemplate,
+                                   RawOrderRepository rawOrderRepository,
+                                   SystemConfigRepository systemConfigRepository,
+                                   SubscriptionConfigVersionRepository versionRepository,
+                                   UserSubscriptionPeriodRepository userSubscriptionPeriodRepository,
+                                   @Qualifier("orderSyncExecutor") Executor syncExecutor) {
         this.restTemplate = restTemplate;
         this.rawOrderRepository = rawOrderRepository;
         this.systemConfigRepository = systemConfigRepository;

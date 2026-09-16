@@ -9,9 +9,9 @@ import com.ltv.stat.service.DailyRechargeStatService;
 import com.ltv.stat.service.LtvBenchmarkService;
 import com.ltv.stat.service.LtvPredictService;
 import com.ltv.stat.service.LtvStatService;
-import com.ltv.stat.service.OrderSyncService;
 import com.ltv.stat.service.PlatformSyncManager;
-import com.ltv.stat.service.SubscribeConfigSyncService;
+import com.ltv.stat.service.RocnovelOrderSyncService;
+import com.ltv.stat.service.RocnovelSubscribeConfigSyncService;
 import com.ltv.stat.service.UserService;
 import com.ltv.stat.util.UserContext;
 import org.springframework.http.ResponseEntity;
@@ -29,18 +29,18 @@ public class LtvController {
 
     private final LtvStatService ltvStatService;
     private final DailyRechargeStatService dailyRechargeStatService;
-    private final OrderSyncService orderSyncService;
+    private final RocnovelOrderSyncService orderSyncService;
     private final PlatformSyncManager platformSyncManager;
     private final LtvBenchmarkService ltvBenchmarkService;
-    private final SubscribeConfigSyncService subscribeConfigSyncService;
+    private final RocnovelSubscribeConfigSyncService subscribeConfigSyncService;
     private final UserService userService;
 
     public LtvController(LtvStatService ltvStatService,
                          DailyRechargeStatService dailyRechargeStatService,
-                         OrderSyncService orderSyncService,
+                         RocnovelOrderSyncService orderSyncService,
                          PlatformSyncManager platformSyncManager,
                          LtvBenchmarkService ltvBenchmarkService,
-                         SubscribeConfigSyncService subscribeConfigSyncService,
+                         RocnovelSubscribeConfigSyncService subscribeConfigSyncService,
                          UserService userService) {
         this.ltvStatService = ltvStatService;
         this.dailyRechargeStatService = dailyRechargeStatService;

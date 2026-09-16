@@ -56,7 +56,7 @@ public class LtvStatService {
     private final UserSubscriptionPeriodRepository userSubscriptionPeriodRepository;
     private final UserService userService;
     private final LtvPredictService ltvPredictService;
-    private final OrderSyncService orderSyncService;
+    private final RocnovelOrderSyncService orderSyncService;
     private final LtvBenchmarkService ltvBenchmarkService;
     private final AsyncRecalculateService asyncRecalculateService;
 
@@ -67,7 +67,7 @@ public class LtvStatService {
                           UserSubscriptionPeriodRepository userSubscriptionPeriodRepository,
                           UserService userService,
                           LtvPredictService ltvPredictService,
-                          @org.springframework.context.annotation.Lazy OrderSyncService orderSyncService,
+                          @org.springframework.context.annotation.Lazy RocnovelOrderSyncService orderSyncService,
                           @org.springframework.beans.factory.annotation.Autowired(required = false) LtvBenchmarkService ltvBenchmarkService,
                           @org.springframework.context.annotation.Lazy AsyncRecalculateService asyncRecalculateService) {
         this.rawOrderRepository = rawOrderRepository;

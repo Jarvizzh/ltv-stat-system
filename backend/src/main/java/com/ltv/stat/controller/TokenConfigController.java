@@ -3,7 +3,7 @@ package com.ltv.stat.controller;
 import com.ltv.stat.dto.ApiResponseDto;
 import com.ltv.stat.dto.TokenConfigDto;
 import com.ltv.stat.dto.TokenInfo;
-import com.ltv.stat.service.OrderSyncService;
+import com.ltv.stat.service.RocnovelOrderSyncService;
 import com.ltv.stat.util.UserContext;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,9 +12,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/token")
 public class TokenConfigController {
 
-    private final OrderSyncService orderSyncService;
+    private final RocnovelOrderSyncService orderSyncService;
 
-    public TokenConfigController(OrderSyncService orderSyncService) {
+    public TokenConfigController(RocnovelOrderSyncService orderSyncService) {
         this.orderSyncService = orderSyncService;
     }
 
