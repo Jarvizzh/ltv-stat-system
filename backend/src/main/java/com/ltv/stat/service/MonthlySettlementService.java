@@ -93,7 +93,20 @@ public class MonthlySettlementService {
             }
         }
 
-        List<MonthlySettlementItemDto> resultList = new ArrayList<>();
+        // 预先计算各月份充值、退款以及历史月份未结算退款之和
+        BigDecimal sumHistoricalUnsettledRefund = BigDecimal.ZERO;
+
+        class MonthCalculationData {
+            String monthStr;
+            YearMonth ym;
+            BigDecimal totalRecharge;
+            BigDecimal totalRefund;
+            int totalOrders;
+            int refundOrders;
+            Optional<MonthlySettlementConfig> configOpt;
+        }
+
+        List<MonthCalculationData> calculationDataList = new ArrayList<>();
 
         for (String monthStr : monthsSet) {
             YearMonth ym = YearMonth.parse(monthStr, MONTH_FORMATTER);
@@ -149,6 +162,33 @@ public class MonthlySettlementService {
                 configOpt = configRepository.findBySettlementTypeAndTargetUserIdIsNullAndMonthStr(type, monthStr);
             }
 
+            MonthCalculationData mcd = new MonthCalculationData();
+            mcd.monthStr = monthStr;
+            mcd.ym = ym;
+            mcd.totalRecharge = totalRecharge;
+            mcd.totalRefund = totalRefund;
+            mcd.totalOrders = totalOrders;
+            mcd.refundOrders = refundOrders;
+            mcd.configOpt = configOpt;
+            calculationDataList.add(mcd);
+
+            // 累加历史月份（早于当前月）的未结算退款：未结算退款 = 累计退款 - 已结算退款
+            if (ym.isBefore(currentYm)) {
+                BigDecimal settledRefund = configOpt.map(MonthlySettlementConfig::getSettledRefundAmount).orElse(BigDecimal.ZERO);
+                BigDecimal unsettledRefund = totalRefund.subtract(settledRefund);
+                sumHistoricalUnsettledRefund = sumHistoricalUnsettledRefund.add(unsettledRefund);
+            }
+        }
+
+        List<MonthlySettlementItemDto> resultList = new ArrayList<>();
+
+        for (MonthCalculationData mcd : calculationDataList) {
+            String monthStr = mcd.monthStr;
+            YearMonth ym = mcd.ym;
+            BigDecimal totalRecharge = mcd.totalRecharge;
+            BigDecimal totalRefund = mcd.totalRefund;
+            Optional<MonthlySettlementConfig> configOpt = mcd.configOpt;
+
             BigDecimal settledRefundAmount = BigDecimal.ZERO;
             BigDecimal monthSettledRefundAmount = BigDecimal.ZERO;
             BigDecimal crossPeriodRefundAmount = BigDecimal.ZERO;
@@ -166,6 +206,15 @@ public class MonthlySettlementService {
                 channelFeeRate = cfg.getChannelFeeRate();
                 remark = cfg.getRemark();
                 updatedAt = cfg.getUpdatedAt();
+            }
+
+            // 当月份自动填写逻辑：
+            // 例如当前是9月，则9月份的当月结算退款和跨周期退款自动填写，已结算退款暂时不填
+            // 当月结算退款 = 累计退款
+            // 跨周期退款 = 历史月份未结算退款之和
+            if (ym.equals(currentYm)) {
+                monthSettledRefundAmount = totalRefund;
+                crossPeriodRefundAmount = sumHistoricalUnsettledRefund.setScale(2, RoundingMode.HALF_UP);
             }
 
             // 计算未结算退款 = 累计退款 - 已结算退款
@@ -206,8 +255,8 @@ public class MonthlySettlementService {
             item.setEffectiveBaseAmount(effectiveBaseAmount);
             item.setFinalSettlementAmount(finalSettlementAmount);
             item.setRefundRate(refundRate);
-            item.setTotalOrders(totalOrders);
-            item.setRefundOrders(refundOrders);
+            item.setTotalOrders(mcd.totalOrders);
+            item.setRefundOrders(mcd.refundOrders);
             item.setRemark(remark);
             item.setUpdatedAt(updatedAt);
 

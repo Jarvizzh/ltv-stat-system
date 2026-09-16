@@ -25,6 +25,7 @@ frontend/dist/
 # Maven & Backend build outputs
 target/
 backend/target/
+backend/src/main/resources/static/
 *.jar
 *.war
 
