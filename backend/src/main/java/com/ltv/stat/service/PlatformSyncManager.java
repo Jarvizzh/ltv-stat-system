@@ -62,8 +62,11 @@ public class PlatformSyncManager {
             PlatformSyncAdapter adapter = adapterOpt.get();
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
                 try {
-                    log.info("[PlatformSyncManager] Starting sync for platform: {} (from {} to {})", platform, startDate, endDate);
-                    int count = adapter.syncOrders(startDate, endDate, config);
+                    LocalDate effectiveStartDate = (startDate != null && startDate.isAfter(platform.getLaunchStartDate()))
+                            ? startDate
+                            : platform.getLaunchStartDate();
+                    log.info("[PlatformSyncManager] Starting sync for platform: {} (from {} to {})", platform, effectiveStartDate, endDate);
+                    int count = adapter.syncOrders(effectiveStartDate, endDate, config);
                     results.put(platform.getCode(), count);
                     log.info("[PlatformSyncManager] Finished sync for platform: {}, saved/updated orders: {}", platform, count);
                 } catch (Exception e) {
@@ -101,7 +104,10 @@ public class PlatformSyncManager {
         }
 
         try {
-            return adapterOpt.get().syncOrders(startDate, endDate, config);
+            LocalDate effectiveStartDate = (startDate != null && startDate.isAfter(platform.getLaunchStartDate()))
+                    ? startDate
+                    : platform.getLaunchStartDate();
+            return adapterOpt.get().syncOrders(effectiveStartDate, endDate, config);
         } catch (Exception e) {
             log.error("[PlatformSyncManager] Error syncing single platform: {}", platform, e);
             throw new RuntimeException("平台 [" + platform.getDisplayName() + "] 同步失败: " + e.getMessage(), e);

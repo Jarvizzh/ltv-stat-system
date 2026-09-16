@@ -7,6 +7,7 @@ import com.ltv.stat.dto.PredictionResult;
 import com.ltv.stat.dto.RetainedSubscribersDto;
 import com.ltv.stat.dto.SingleMonthSummaryDto;
 import com.ltv.stat.entity.*;
+import com.ltv.stat.enums.PlatformEnum;
 import com.ltv.stat.repository.*;
 import com.ltv.stat.util.TimeUtils;
 import org.slf4j.Logger;
@@ -33,6 +34,13 @@ public class LtvStatService {
 
     private static final Logger log = LoggerFactory.getLogger(LtvStatService.class);
     public static final LocalDate START_DATE = LocalDate.of(2026, 7, 10);
+
+    /**
+     * 根据平台代码安全获取投放起始日期，中文在线为 2026-07-10，番茄海外为 2026-09-16，ALL 为 2026-07-10
+     */
+    public static LocalDate getLaunchStartDateForPlatform(String platformCode) {
+        return PlatformEnum.getLaunchStartDateForPlatform(platformCode);
+    }
 
     // =========================================================================
     // 方案一：高性能内存缓存结构与主动失效机制 (Memory Cache & Active Invalidation)
@@ -297,10 +305,12 @@ public class LtvStatService {
             ltvBenchmarkService.recalculateBenchmarksForUser(userId);
         }
 
+        LocalDate platformStartDate = getLaunchStartDateForPlatform(targetPlatform);
+
         Map<LocalDate, List<RawOrder>> ordersByDate = orders.stream()
                 .filter(o -> {
                     LocalDate regDate = getEffectiveRegisterDate(o, tzMap);
-                    return regDate != null && !regDate.isBefore(START_DATE);
+                    return regDate != null && !regDate.isBefore(platformStartDate);
                 })
                 .collect(Collectors.groupingBy(o -> getEffectiveRegisterDate(o, tzMap)));
 
@@ -368,7 +378,7 @@ public class LtvStatService {
             }
         }
 
-        LocalDate currDate = START_DATE;
+        LocalDate currDate = platformStartDate;
         List<LtvDailyStat> statList = new ArrayList<>();
 
         while (!currDate.isAfter(maxToday)) {
@@ -620,10 +630,11 @@ public class LtvStatService {
         if (userId == null) userId = 1L;
         String pCode = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim().toUpperCase() : "ALL";
         String targetPlatform = "ALL".equalsIgnoreCase(pCode) ? "ALL" : pCode.toLowerCase();
-        List<LtvDailyStat> list = ltvDailyStatRepository.findByPlatformCodeAndUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(targetPlatform, userId, START_DATE);
+        LocalDate platformStartDate = getLaunchStartDateForPlatform(targetPlatform);
+        List<LtvDailyStat> list = ltvDailyStatRepository.findByPlatformCodeAndUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(targetPlatform, userId, platformStartDate);
         if (list.isEmpty()) {
             calculateLtvStatsForUser(targetPlatform, userId);
-            list = ltvDailyStatRepository.findByPlatformCodeAndUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(targetPlatform, userId, START_DATE);
+            list = ltvDailyStatRepository.findByPlatformCodeAndUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(targetPlatform, userId, platformStartDate);
         }
         return list;
     }
@@ -715,7 +726,7 @@ public class LtvStatService {
                 .filter(p -> p.getLandingPageId() != null)
                 .collect(Collectors.toMap(p -> p.getLandingPageId().trim(), LandingPageConfigItem::getTimezone, (a, b) -> a)) : Collections.emptyMap();
 
-        UserCalculationContext ctx = new UserCalculationContext(userId, list, userOrders, tzMap);
+        UserCalculationContext ctx = new UserCalculationContext(pCode, userId, list, userOrders, tzMap);
 
         PredictionResult overallPred = ltvPredictService.predictOverallCohort(list);
         Integer overallPayback = overallPred != null ? overallPred.getPredictedPaybackDays() : null;
@@ -746,23 +757,29 @@ public class LtvStatService {
         return response;
     }
 
-    public MonthlySummaryDto getMonthlySummaryForUser(Long userId) {
+    public MonthlySummaryDto getMonthlySummaryForUser(String platformCode, Long userId) {
         if (userId == null) userId = 1L;
-        List<LtvDailyStat> allStats = ltvDailyStatRepository.findByUserIdOrderByLaunchDateAsc(userId);
-        List<RawOrder> userOrders = getOrdersFilteredForUser(userId);
-        List<LandingPageConfigItem> userPages = userService.getUserLandingPageConfigs(userId);
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim() : "ALL";
+        List<LtvDailyStat> allStats = getLtvDailyStats(pCode, userId);
+        List<RawOrder> userOrders = getOrdersFilteredForUser(pCode, userId);
+        List<LandingPageConfigItem> userPages = userService.getUserLandingPageConfigs(pCode, userId);
         Map<String, String> tzMap = (userPages != null) ? userPages.stream()
                 .filter(p -> p.getLandingPageId() != null)
                 .collect(Collectors.toMap(p -> p.getLandingPageId().trim(), LandingPageConfigItem::getTimezone, (a, b) -> a)) : Collections.emptyMap();
 
-        UserCalculationContext ctx = new UserCalculationContext(userId, allStats, userOrders, tzMap);
+        UserCalculationContext ctx = new UserCalculationContext(pCode, userId, allStats, userOrders, tzMap);
         return getMonthlySummaryForUser(userId, ctx);
+    }
+
+    public MonthlySummaryDto getMonthlySummaryForUser(Long userId) {
+        return getMonthlySummaryForUser("ALL", userId);
     }
 
     public MonthlySummaryDto getMonthlySummaryForUser(Long userId, UserCalculationContext ctx) {
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
         YearMonth currentMonth = YearMonth.from(todayBj);
-        YearMonth minMonth = YearMonth.from(START_DATE);
+        LocalDate platStartDate = getLaunchStartDateForPlatform(ctx != null ? ctx.platformCode : "ALL");
+        YearMonth minMonth = YearMonth.from(platStartDate);
 
         List<SingleMonthSummaryDto> months = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
@@ -774,7 +791,6 @@ public class LtvStatService {
             SingleMonthSummaryDto summary = getSingleMonthSummary(userId, ym, isPastMonth, ctx);
             months.add(summary);
         }
-
         return new MonthlySummaryDto(months);
     }
 
@@ -987,11 +1003,14 @@ public class LtvStatService {
         }
 
         // 3. 过滤出上月份 (yearMonth) 注册/投放的用户订单，且支付日期严格截至今天 (绝不上摸未来时间)
+        String pCode = (monthStats != null && !monthStats.isEmpty() && monthStats.get(0).getPlatformCode() != null)
+                ? monthStats.get(0).getPlatformCode() : "ALL";
+        LocalDate platStartDate = getLaunchStartDateForPlatform(pCode);
         List<RawOrder> monthOrders = filteredOrders.stream()
                 .filter(o -> {
                     LocalDate regDate = getEffectiveRegisterDate(o, tzMap);
                     LocalDate payDate = getEffectivePayDate(o, tzMap);
-                    return regDate != null && !regDate.isBefore(START_DATE) && YearMonth.from(regDate).equals(yearMonth) 
+                    return regDate != null && !regDate.isBefore(platStartDate) && YearMonth.from(regDate).equals(yearMonth) 
                             && payDate != null && !payDate.isAfter(todayBj);
                 })
                 .collect(Collectors.toList());

@@ -34,6 +34,15 @@ export default function SyncModal({
   const [startTime, setStartTime] = useState(getPastDateStr(3));
   const [endTime, setEndTime] = useState(getTodayStr());
 
+  const getPlatformLaunchStartDate = (code) => {
+    const platObj = platforms?.find(p => p.code?.toLowerCase() === (code || 'ALL').toLowerCase());
+    if (platObj?.launchStartDate) return platObj.launchStartDate;
+    if ((code || '').toLowerCase() === 'flicknovel') return '2026-09-16';
+    return '2026-07-10';
+  };
+
+  const currentPlatformStartDate = getPlatformLaunchStartDate(syncPlatform);
+
   // Update syncPlatform when modal opens
   React.useEffect(() => {
     if (isOpen) {
@@ -47,7 +56,7 @@ export default function SyncModal({
     setEndTime(getTodayStr());
 
     if (daysAgo === 'all') {
-      setStartTime('2026-07-10');
+      setStartTime(currentPlatformStartDate);
     } else {
       setStartTime(getPastDateStr(daysAgo));
     }
@@ -151,7 +160,7 @@ export default function SyncModal({
                     近 30 天
                   </button>
                   <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.3rem 0.65rem' }} onClick={() => handleApplyShortcut('all')}>
-                    全量 (2026-07-10 至今)
+                    全量 ({currentPlatformStartDate} 至今)
                   </button>
                 </div>
               </div>
@@ -196,7 +205,7 @@ export default function SyncModal({
           {activeTab === 'calc' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-main)', background: 'rgba(59, 130, 246, 0.1)', padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
-                📊 <strong>全量报表本地重算：</strong> 读取数据库已有的全量订单，重新计算 2026-07-10 至今投放日期的 LTV Cohort (Day1~60 ROI) 以及 充值分析 (新老用户占比、ARPU、复充率)。适用于修改消耗/备注或更新落地页配置后快速刷新报表。
+                📊 <strong>全量报表本地重算：</strong> 读取数据库已有的全量订单，重新计算 {currentPlatformStartDate} 至今投放日期的 LTV Cohort (Day1~60 ROI) 以及 充值分析 (新老用户占比、ARPU、复充率)。适用于修改消耗/备注或更新落地页配置后快速刷新报表。
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.1rem 1rem', background: 'var(--bg-primary)', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>

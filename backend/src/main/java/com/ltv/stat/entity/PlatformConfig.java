@@ -1,6 +1,7 @@
 package com.ltv.stat.entity;
 
 import javax.persistence.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -25,6 +26,9 @@ public class PlatformConfig {
 
     @Column(name = "sync_cron", length = 32)
     private String syncCron = "0 5 * * * ?";
+
+    @Column(name = "launch_start_date")
+    private LocalDate launchStartDate;
 
     @Column(name = "status", nullable = false)
     private Integer status = 1; // 1: 启用, 0: 停用
@@ -63,6 +67,9 @@ public class PlatformConfig {
 
     public String getSyncCron() { return syncCron; }
     public void setSyncCron(String syncCron) { this.syncCron = syncCron; }
+
+    public LocalDate getLaunchStartDate() { return launchStartDate; }
+    public void setLaunchStartDate(LocalDate launchStartDate) { this.launchStartDate = launchStartDate; }
 
     public Integer getStatus() { return status; }
     public void setStatus(Integer status) { this.status = status; }

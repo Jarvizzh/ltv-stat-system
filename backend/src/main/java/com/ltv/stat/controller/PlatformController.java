@@ -44,6 +44,7 @@ public class PlatformController {
             allItem.put("code", PlatformEnum.ALL.getCode());
             allItem.put("name", PlatformEnum.ALL.getDisplayName());
             allItem.put("enabled", true);
+            allItem.put("launchStartDate", PlatformEnum.ALL.getLaunchStartDateStr());
             result.add(allItem);
         }
 
@@ -58,6 +59,10 @@ public class PlatformController {
                     item.put("code", config.getPlatformCode());
                     item.put("name", config.getPlatformName());
                     item.put("enabled", true);
+                    String startDateStr = config.getLaunchStartDate() != null
+                            ? config.getLaunchStartDate().toString()
+                            : PlatformEnum.fromCode(config.getPlatformCode()).map(PlatformEnum::getLaunchStartDateStr).orElse("2026-07-10");
+                    item.put("launchStartDate", startDateStr);
                     result.add(item);
                     addedCodes.add(config.getPlatformCode().toLowerCase());
                 }
@@ -72,6 +77,7 @@ public class PlatformController {
                     item.put("code", p.getCode());
                     item.put("name", p.getDisplayName());
                     item.put("enabled", true);
+                    item.put("launchStartDate", p.getLaunchStartDateStr());
                     result.add(item);
                     addedCodes.add(p.getCode().toLowerCase());
                 }

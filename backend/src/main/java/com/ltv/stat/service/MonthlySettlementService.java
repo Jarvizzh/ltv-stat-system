@@ -6,6 +6,7 @@ import com.ltv.stat.entity.MonthlySettlementConfig;
 import com.ltv.stat.entity.RawOrder;
 import com.ltv.stat.entity.SysUser;
 import com.ltv.stat.entity.UserLandingPage;
+import com.ltv.stat.enums.PlatformEnum;
 import com.ltv.stat.repository.MonthlySettlementConfigRepository;
 import com.ltv.stat.repository.RawOrderRepository;
 import com.ltv.stat.repository.UserLandingPageRepository;
@@ -82,9 +83,9 @@ public class MonthlySettlementService {
             targetUsername = userService.findById(targetUserId).map(SysUser::getUsername).orElse("用户#" + targetUserId);
         }
 
-        // 获取现有月份列表（2026-07 至今所有月份）
+        // 获取现有月份列表（该平台投放起始月份 至今所有月份）
         TreeSet<String> monthsSet = new TreeSet<>(Comparator.reverseOrder());
-        YearMonth startYm = YearMonth.of(2026, 7);
+        YearMonth startYm = YearMonth.from(PlatformEnum.getLaunchStartDateForPlatform(pCode));
         YearMonth currentYm = YearMonth.now();
         YearMonth maxYm = currentYm.isAfter(startYm) ? currentYm : startYm;
 

@@ -186,21 +186,16 @@ public class LtvController {
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
         String defaultEndTimeStr = todayBj.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
-        String startTimeStr = "2026-07-10";
-        String endTimeStr = defaultEndTimeStr;
         String platformCode = null;
-
-        if (body != null) {
-            if (body.get("startTime") != null && !body.get("startTime").trim().isEmpty()) {
-                startTimeStr = body.get("startTime").trim();
-            }
-            if (body.get("endTime") != null && !body.get("endTime").trim().isEmpty()) {
-                endTimeStr = body.get("endTime").trim();
-            }
-            if (body.get("platformCode") != null && !body.get("platformCode").trim().isEmpty()) {
-                platformCode = body.get("platformCode").trim();
-            }
+        if (body != null && body.get("platformCode") != null && !body.get("platformCode").trim().isEmpty()) {
+            platformCode = body.get("platformCode").trim();
         }
+
+        String defaultStartTimeStr = PlatformEnum.fromCode(platformCode).map(PlatformEnum::getLaunchStartDateStr).orElse("2026-07-10");
+        String startTimeStr = (body != null && body.get("startTime") != null && !body.get("startTime").trim().isEmpty())
+                ? body.get("startTime").trim() : defaultStartTimeStr;
+        String endTimeStr = (body != null && body.get("endTime") != null && !body.get("endTime").trim().isEmpty())
+                ? body.get("endTime").trim() : defaultEndTimeStr;
 
         int totalSyncedOrders = 0;
         try {
@@ -354,21 +349,16 @@ public class LtvController {
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
         String defaultEndTimeStr = todayBj.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
-        String startTimeStr = "2026-07-10";
-        String endTimeStr = defaultEndTimeStr;
         String platformCode = null;
-
-        if (body != null) {
-            if (body.get("startTime") != null && !body.get("startTime").trim().isEmpty()) {
-                startTimeStr = body.get("startTime").trim();
-            }
-            if (body.get("endTime") != null && !body.get("endTime").trim().isEmpty()) {
-                endTimeStr = body.get("endTime").trim();
-            }
-            if (body.get("platformCode") != null && !body.get("platformCode").trim().isEmpty()) {
-                platformCode = body.get("platformCode").trim();
-            }
+        if (body != null && body.get("platformCode") != null && !body.get("platformCode").trim().isEmpty()) {
+            platformCode = body.get("platformCode").trim();
         }
+
+        String defaultStartTimeStr = PlatformEnum.fromCode(platformCode).map(PlatformEnum::getLaunchStartDateStr).orElse("2026-07-10");
+        String startTimeStr = (body != null && body.get("startTime") != null && !body.get("startTime").trim().isEmpty())
+                ? body.get("startTime").trim() : defaultStartTimeStr;
+        String endTimeStr = (body != null && body.get("endTime") != null && !body.get("endTime").trim().isEmpty())
+                ? body.get("endTime").trim() : defaultEndTimeStr;
 
         int totalSyncedOrders = 0;
         try {

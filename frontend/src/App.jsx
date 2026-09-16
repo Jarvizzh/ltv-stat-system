@@ -543,6 +543,9 @@ export default function App() {
   const totalSubUsers = data.reduce((acc, cur) => acc + (parseInt(cur.subUserCount) || 0), 0);
   const overallRoi = totalSpend > 0 ? (((totalRecharge - totalRefund) / totalSpend) * 100).toFixed(2) : '0.00';
 
+  const currentPlatformObj = platformsList?.find(p => p.code?.toLowerCase() === (selectedPlatform || 'ALL').toLowerCase());
+  const currentPlatformLaunchDate = currentPlatformObj?.launchStartDate || (selectedPlatform?.toLowerCase() === 'flicknovel' ? '2026-09-16' : '2026-07-10');
+
   // 月度卡片指标完全由后端接口计算并返回 (monthlySummary)，支持近4个月动态列表
   const monthlyList = Array.isArray(monthlySummary?.months) && monthlySummary.months.length > 0
     ? monthlySummary.months
@@ -754,7 +757,7 @@ export default function App() {
               {/* 卡片 1: 总消耗 */}
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-label" style={{ fontSize: '0.76rem' }}>总消耗 (2026-07-10至今)</span>
+                  <span className="stat-label" style={{ fontSize: '0.76rem' }}>总消耗 ({currentPlatformLaunchDate}至今)</span>
                   <DollarSign size={16} color="var(--text-sub)" />
                 </div>
                 <div className="stat-value" style={{ fontSize: '1.15rem' }}>{formatUsd(totalSpend)}</div>

@@ -173,17 +173,23 @@ public class DatabasePrimaryKeysInitializer {
                     "auth_type VARCHAR(32) NOT NULL DEFAULT 'TOKEN_COOKIE', " +
                     "auth_credentials TEXT, " +
                     "sync_cron VARCHAR(32) DEFAULT '0 5 * * * ?', " +
+                    "launch_start_date DATE DEFAULT NULL, " +
                     "status INT NOT NULL DEFAULT 1, " +
                     "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
                     "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
                     ")");
-            jdbcTemplate.execute("INSERT INTO platform_config (platform_code, platform_name, auth_type, status) " +
-                    "VALUES ('rocnovel', '中文在线', 'TOKEN_COOKIE', 1) " +
-                    "ON DUPLICATE KEY UPDATE platform_name = VALUES(platform_name)");
-            jdbcTemplate.execute("INSERT INTO platform_config (platform_code, platform_name, auth_type, status) " +
-                    "VALUES ('flicknovel', '番茄海外', 'TOKEN_COOKIE', 1) " +
-                    "ON DUPLICATE KEY UPDATE platform_name = VALUES(platform_name)");
-            log.info("Checked/initialized platform_config table with default platforms");
+
+            if (!isColumnExist("platform_config", "launch_start_date")) {
+                jdbcTemplate.execute("ALTER TABLE platform_config ADD COLUMN launch_start_date DATE DEFAULT NULL AFTER sync_cron");
+            }
+
+            jdbcTemplate.execute("INSERT INTO platform_config (platform_code, platform_name, auth_type, launch_start_date, status) " +
+                    "VALUES ('rocnovel', '中文在线', 'TOKEN_COOKIE', '2026-07-10', 1) " +
+                    "ON DUPLICATE KEY UPDATE platform_name = VALUES(platform_name), launch_start_date = VALUES(launch_start_date)");
+            jdbcTemplate.execute("INSERT INTO platform_config (platform_code, platform_name, auth_type, launch_start_date, status) " +
+                    "VALUES ('flicknovel', '番茄海外', 'TOKEN_COOKIE', '2026-09-16', 1) " +
+                    "ON DUPLICATE KEY UPDATE platform_name = VALUES(platform_name), launch_start_date = VALUES(launch_start_date)");
+            log.info("Checked/initialized platform_config table with default platforms and launch_start_date");
         } catch (Exception e) {
             log.warn("Failed to create/init platform_config table: {}", e.getMessage());
         }

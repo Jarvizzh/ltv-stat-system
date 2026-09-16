@@ -1,5 +1,6 @@
 package com.ltv.stat.enums;
 
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -11,18 +12,20 @@ import java.util.stream.Collectors;
  */
 public enum PlatformEnum {
 
-    ALL("ALL", "全平台综合大盘", true),
-    ROCNOVEL("rocnovel", "中文在线", true),
-    FLICKNOVEL("flicknovel", "番茄海外", true);
+    ALL("ALL", "全平台综合大盘", true, LocalDate.of(2026, 7, 10)),
+    ROCNOVEL("rocnovel", "中文在线", true, LocalDate.of(2026, 7, 10)),
+    FLICKNOVEL("flicknovel", "番茄海外", true, LocalDate.of(2026, 9, 16));
 
     private final String code;
     private final String displayName;
     private final boolean enabled;
+    private final LocalDate launchStartDate;
 
-    PlatformEnum(String code, String displayName, boolean enabled) {
+    PlatformEnum(String code, String displayName, boolean enabled, LocalDate launchStartDate) {
         this.code = code;
         this.displayName = displayName;
         this.enabled = enabled;
+        this.launchStartDate = launchStartDate;
     }
 
     public String getCode() {
@@ -35,6 +38,14 @@ public enum PlatformEnum {
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public LocalDate getLaunchStartDate() {
+        return launchStartDate;
+    }
+
+    public String getLaunchStartDateStr() {
+        return launchStartDate != null ? launchStartDate.toString() : "2026-07-10";
     }
 
     public boolean isAll() {
@@ -63,5 +74,12 @@ public enum PlatformEnum {
         return Arrays.stream(values())
                 .filter(p -> p != ALL && p.isEnabled())
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 根据平台代码安全获取投放起始日期，若未指定或无法匹配默认返回 ROCNOVEL (2026-07-10)
+     */
+    public static LocalDate getLaunchStartDateForPlatform(String code) {
+        return fromCode(code).map(PlatformEnum::getLaunchStartDate).orElse(ROCNOVEL.getLaunchStartDate());
     }
 }

@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 import static com.ltv.stat.service.LtvStatService.START_DATE;
 import static com.ltv.stat.service.LtvStatService.getBjPayDate;
 import static com.ltv.stat.service.LtvStatService.getBjRegisterDate;
+import static com.ltv.stat.service.LtvStatService.getLaunchStartDateForPlatform;
 
 /**
  * 每日充值统计与平台汇总服务类 (遵循单一职责原则 SRP)
@@ -57,10 +58,11 @@ public class DailyRechargeStatService {
         if (userId == null) userId = 1L;
         String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
                 ? platformCode.trim().toLowerCase() : "ALL";
-        List<DailyRechargeDistribution> list = dailyRechargeDistributionRepository.findByPlatformCodeAndUserIdAndDateGreaterThanEqualOrderByDateDesc(pCode, userId, START_DATE);
+        LocalDate platformStartDate = getLaunchStartDateForPlatform(pCode);
+        List<DailyRechargeDistribution> list = dailyRechargeDistributionRepository.findByPlatformCodeAndUserIdAndDateGreaterThanEqualOrderByDateDesc(pCode, userId, platformStartDate);
         if (list.isEmpty()) {
             calculateDailyDistributionStatsForUser(pCode, userId);
-            list = dailyRechargeDistributionRepository.findByPlatformCodeAndUserIdAndDateGreaterThanEqualOrderByDateDesc(pCode, userId, START_DATE);
+            list = dailyRechargeDistributionRepository.findByPlatformCodeAndUserIdAndDateGreaterThanEqualOrderByDateDesc(pCode, userId, platformStartDate);
         }
         return list;
     }
@@ -77,6 +79,7 @@ public class DailyRechargeStatService {
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
         String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
                 ? platformCode.trim().toLowerCase() : "ALL";
+        LocalDate platformStartDate = getLaunchStartDateForPlatform(pCode);
         List<RawOrder> allOrders = "ALL".equals(pCode)
                 ? rawOrderRepository.findAll()
                 : rawOrderRepository.findByPlatformCode(pCode);
@@ -84,12 +87,12 @@ public class DailyRechargeStatService {
         Map<LocalDate, List<RawOrder>> ordersByPayDate = allOrders.stream()
                 .filter(o -> {
                     LocalDate payDate = getBjPayDate(o);
-                    return payDate != null && !payDate.isBefore(START_DATE);
+                    return payDate != null && !payDate.isBefore(platformStartDate);
                 })
                 .collect(Collectors.groupingBy(LtvStatService::getBjPayDate));
 
         List<DailyRechargeDistribution> statList = new ArrayList<>();
-        LocalDate currDate = START_DATE;
+        LocalDate currDate = platformStartDate;
 
         while (!currDate.isAfter(todayBj)) {
             List<RawOrder> dayOrders = ordersByPayDate.getOrDefault(currDate, Collections.emptyList());
@@ -109,10 +112,11 @@ public class DailyRechargeStatService {
     public DailyDistributionSummaryDto getGlobalDailyDistributionSummary(String platformCode) {
         String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
                 ? platformCode.trim().toLowerCase() : "ALL";
+        LocalDate platformStartDate = getLaunchStartDateForPlatform(pCode);
         List<RawOrder> orders = ("ALL".equals(pCode) ? rawOrderRepository.findAll() : rawOrderRepository.findByPlatformCode(pCode)).stream()
                 .filter(o -> {
                     LocalDate payDate = getBjPayDate(o);
-                    return payDate != null && !payDate.isBefore(START_DATE);
+                    return payDate != null && !payDate.isBefore(platformStartDate);
                 })
                 .collect(Collectors.toList());
         return calculateDistributionSummaryFromOrders(orders);
@@ -126,10 +130,11 @@ public class DailyRechargeStatService {
         if (userId == null) userId = 1L;
         String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
                 ? platformCode.trim().toLowerCase() : "ALL";
+        LocalDate platformStartDate = getLaunchStartDateForPlatform(pCode);
         List<RawOrder> orders = ltvStatService.getOrdersFilteredForUser(pCode, userId).stream()
                 .filter(o -> {
                     LocalDate payDate = getBjPayDate(o);
-                    return payDate != null && !payDate.isBefore(START_DATE);
+                    return payDate != null && !payDate.isBefore(platformStartDate);
                 })
                 .collect(Collectors.toList());
         return calculateDistributionSummaryFromOrders(orders);
@@ -254,18 +259,19 @@ public class DailyRechargeStatService {
         String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
                 ? platformCode.trim().toLowerCase() : "ALL";
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
+        LocalDate platformStartDate = getLaunchStartDateForPlatform(pCode);
 
         List<RawOrder> orders = ltvStatService.getOrdersFilteredForUser(pCode, userId);
 
         Map<LocalDate, List<RawOrder>> ordersByPayDate = orders.stream()
                 .filter(o -> {
                     LocalDate payDate = getBjPayDate(o);
-                    return payDate != null && !payDate.isBefore(START_DATE);
+                    return payDate != null && !payDate.isBefore(platformStartDate);
                 })
                 .collect(Collectors.groupingBy(LtvStatService::getBjPayDate));
 
         List<DailyRechargeDistribution> statList = new ArrayList<>();
-        LocalDate currDate = START_DATE;
+        LocalDate currDate = platformStartDate;
 
         while (!currDate.isAfter(todayBj)) {
             List<RawOrder> dayOrders = ordersByPayDate.getOrDefault(currDate, Collections.emptyList());

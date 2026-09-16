@@ -11,15 +11,21 @@ import java.util.Map;
  * 在单次 /list 请求链路中，全量订单与时区映射仅提取解析 1 次，后续各子计算方法复用共享。
  */
 public class UserCalculationContext {
+    public final String platformCode;
     public final Long userId;
     public final List<LtvDailyStat> allStats;
     public final List<RawOrder> userOrders;
     public final Map<String, String> tzMap;
 
-    public UserCalculationContext(Long userId, List<LtvDailyStat> allStats, List<RawOrder> userOrders, Map<String, String> tzMap) {
+    public UserCalculationContext(String platformCode, Long userId, List<LtvDailyStat> allStats, List<RawOrder> userOrders, Map<String, String> tzMap) {
+        this.platformCode = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim() : "ALL";
         this.userId = userId;
         this.allStats = allStats;
         this.userOrders = userOrders;
         this.tzMap = tzMap;
+    }
+
+    public UserCalculationContext(Long userId, List<LtvDailyStat> allStats, List<RawOrder> userOrders, Map<String, String> tzMap) {
+        this("ALL", userId, allStats, userOrders, tzMap);
     }
 }
