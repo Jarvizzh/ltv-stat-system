@@ -3,7 +3,9 @@ package com.ltv.stat.service;
 import com.ltv.stat.dto.PredictionResult;
 import com.ltv.stat.entity.LtvDailyStat;
 import com.ltv.stat.entity.LtvDailyStatId;
+import com.ltv.stat.entity.SysUser;
 import com.ltv.stat.repository.LtvDailyStatRepository;
+import com.ltv.stat.repository.SysUserRepository;
 import com.ltv.stat.util.CohortStatHelper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +31,7 @@ public class DatabaseScenario5BacktestTest {
     private LtvDailyStatRepository ltvDailyStatRepository;
 
     @Autowired
-    private com.ltv.stat.repository.SysUserRepository sysUserRepository;
+    private SysUserRepository sysUserRepository;
 
     @Autowired
     private LtvBenchmarkService ltvBenchmarkService;
@@ -47,7 +49,7 @@ public class DatabaseScenario5BacktestTest {
         System.out.println("          场景 5：数据库已回本 Cohort 回溯测试明细 (仅 jarvis 用户视角)");
         System.out.println("=========================================================================================\n");
 
-        java.util.Optional<com.ltv.stat.entity.SysUser> jarvisOpt = sysUserRepository.findByUsername("jarvis");
+        Optional<SysUser> jarvisOpt = sysUserRepository.findByUsername("jarvis");
         Long targetUserId = jarvisOpt.isPresent() ? jarvisOpt.get().getId() : 3L;
         String username = jarvisOpt.isPresent() ? jarvisOpt.get().getUsername() : "jarvis";
 

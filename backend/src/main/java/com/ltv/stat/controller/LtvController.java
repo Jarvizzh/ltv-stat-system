@@ -29,20 +29,17 @@ public class LtvController {
 
     private final LtvStatService ltvStatService;
     private final DailyRechargeStatService dailyRechargeStatService;
-    private final RocnovelOrderSyncService orderSyncService;
     private final PlatformSyncManager platformSyncManager;
     private final LtvBenchmarkService ltvBenchmarkService;
     private final UserService userService;
 
     public LtvController(LtvStatService ltvStatService,
                          DailyRechargeStatService dailyRechargeStatService,
-                         @org.springframework.beans.factory.annotation.Autowired(required = false) RocnovelOrderSyncService orderSyncService,
                          PlatformSyncManager platformSyncManager,
                          LtvBenchmarkService ltvBenchmarkService,
                          UserService userService) {
         this.ltvStatService = ltvStatService;
         this.dailyRechargeStatService = dailyRechargeStatService;
-        this.orderSyncService = orderSyncService;
         this.platformSyncManager = platformSyncManager;
         this.ltvBenchmarkService = ltvBenchmarkService;
         this.userService = userService;
@@ -208,7 +205,7 @@ public class LtvController {
         int totalSyncedOrders = 0;
         try {
             if (platformCode != null && !"ALL".equalsIgnoreCase(platformCode)) {
-                com.ltv.stat.enums.PlatformEnum pEnum = com.ltv.stat.enums.PlatformEnum.fromCode(platformCode).orElse(null);
+                PlatformEnum pEnum = PlatformEnum.fromCode(platformCode).orElse(null);
                 if (pEnum != null) {
                     totalSyncedOrders = platformSyncManager.syncOrdersForPlatform(pEnum, startTimeStr, endTimeStr);
                 } else {
@@ -232,18 +229,6 @@ public class LtvController {
         response.put("msg", "订单同步完成(" + startTimeStr + " ~ " + endTimeStr + ")，共抓取/更新 " + totalSyncedOrders + " 笔订单！");
         response.put("totalSyncedOrders", totalSyncedOrders);
         return ResponseEntity.ok(response);
-    }
-
-    /**
-     * 测试拉取指定日期（默认今日）订单（不传 landingPageId）
-     */
-    @PostMapping("/test-fetch-today-orders")
-    public ResponseEntity<?> testFetchTodayOrders(@RequestBody(required = false) Map<String, String> body) {
-        String dateStr = (body != null && body.containsKey("date") && !body.get("date").trim().isEmpty())
-                ? body.get("date").trim()
-                : LocalDate.now().toString();
-        Map<String, Object> result = orderSyncService.testFetchTodayOrdersNoPid(dateStr);
-        return ResponseEntity.ok(result);
     }
 
     /**
@@ -388,7 +373,7 @@ public class LtvController {
         int totalSyncedOrders = 0;
         try {
             if (platformCode != null && !"ALL".equalsIgnoreCase(platformCode)) {
-                com.ltv.stat.enums.PlatformEnum pEnum = com.ltv.stat.enums.PlatformEnum.fromCode(platformCode).orElse(null);
+                PlatformEnum pEnum = PlatformEnum.fromCode(platformCode).orElse(null);
                 if (pEnum != null) {
                     totalSyncedOrders = platformSyncManager.syncOrdersForPlatform(pEnum, startTimeStr, endTimeStr);
                 } else {

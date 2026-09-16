@@ -1,6 +1,9 @@
 package com.ltv.stat.service;
 
 import com.ltv.stat.LtvApplication;
+import com.ltv.stat.dto.MonthlySummaryDto;
+import com.ltv.stat.dto.PredictionResult;
+import com.ltv.stat.dto.SingleMonthSummaryDto;
 import com.ltv.stat.entity.LtvDailyStat;
 import com.ltv.stat.repository.LtvDailyStatRepository;
 import com.ltv.stat.util.CohortStatHelper;
@@ -44,12 +47,12 @@ public class DatabaseRoiAccuracyTest {
         System.out.println("=========================================================================================\n");
 
         ltvBenchmarkService.recalculateAllBenchmarks();
-        com.ltv.stat.dto.MonthlySummaryDto summary = ltvStatService.getMonthlySummaryForUser(3L);
+        MonthlySummaryDto summary = ltvStatService.getMonthlySummaryForUser(3L);
 
         assertNotNull(summary, "无法生成月度汇总数据");
         assertNotNull(summary.getMonths(), "月度汇总列表不能为 null");
         System.out.printf("月度汇总共计 %d 个有效月份 (近4个月，自2026-07-10起):%n", summary.getMonths().size());
-        for (com.ltv.stat.dto.SingleMonthSummaryDto m : summary.getMonths()) {
+        for (SingleMonthSummaryDto m : summary.getMonths()) {
             System.out.printf("  - 【月份 %s】: 总消耗: $%s | 总充值: $%s (退款: $%s) | 利润: $%s | ROI: %s%% | 订阅: %d人 (留存: %s / %s) | 回本: %s 天%n",
                     m.getMonth(), m.getSpend(), m.getRecharge(), m.getRefund(), m.getProfit(), m.getRoi(),
                     m.getSubUsers(), m.getRetainedSubUsers(), m.getRetainedRate(),
@@ -117,7 +120,7 @@ public class DatabaseRoiAccuracyTest {
                 LtvDailyStat sliced = createSlicedStat(stat, c);
                 double[] curve = ltvPredictService.predictCohortDailyRechargeCurve(sliced, c);
                 double rawD30 = curve[30] / spend.doubleValue();
-                com.ltv.stat.dto.PredictionResult res = ltvPredictService.predictCohort(sliced, c);
+                PredictionResult res = ltvPredictService.predictCohort(sliced, c);
                 BigDecimal predD30 = res.getPredictedDay30Roi();
                 if (predD30 != null) {
                     double p30 = predD30.doubleValue();

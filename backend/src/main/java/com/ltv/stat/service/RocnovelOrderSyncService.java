@@ -5,6 +5,7 @@ import com.ltv.stat.dto.rocnovel.OrderReportResponseDto;
 import com.ltv.stat.entity.RawOrder;
 import com.ltv.stat.entity.SubscriptionConfigVersion;
 import com.ltv.stat.entity.SystemConfig;
+import com.ltv.stat.entity.UserSubscriptionPeriod;
 import com.ltv.stat.repository.RawOrderRepository;
 import com.ltv.stat.repository.SubscriptionConfigVersionRepository;
 import com.ltv.stat.repository.SystemConfigRepository;
@@ -43,7 +44,7 @@ public class RocnovelOrderSyncService {
     private final RawOrderRepository rawOrderRepository;
     private final SystemConfigRepository systemConfigRepository;
     private final SubscriptionConfigVersionRepository versionRepository;
-    private final com.ltv.stat.repository.UserSubscriptionPeriodRepository userSubscriptionPeriodRepository;
+    private final UserSubscriptionPeriodRepository userSubscriptionPeriodRepository;
     private final Executor syncExecutor;
 
     @Value("${order.api.url}")
@@ -444,9 +445,9 @@ public class RocnovelOrderSyncService {
     public void saveOrUpdateUserSubscriptionPeriod(String memberId, String landingPageId, int priceCent, LocalDateTime regTime) {
         if (memberId == null || memberId.trim().isEmpty()) return;
 
-        com.ltv.stat.entity.UserSubscriptionPeriod userSub = userSubscriptionPeriodRepository.findByMemberId(memberId)
+        UserSubscriptionPeriod userSub = userSubscriptionPeriodRepository.findByMemberId(memberId)
                 .orElseGet(() -> {
-                    com.ltv.stat.entity.UserSubscriptionPeriod p = new com.ltv.stat.entity.UserSubscriptionPeriod();
+                    UserSubscriptionPeriod p = new UserSubscriptionPeriod();
                     p.setMemberId(memberId);
                     return p;
                 });

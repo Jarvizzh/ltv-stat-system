@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 
 /**
@@ -42,7 +43,7 @@ public class PlatformSyncManager {
      */
     public Map<String, Integer> syncOrdersAllPlatforms(LocalDate startDate, LocalDate endDate) {
         List<PlatformConfig> activeConfigs = platformConfigRepository.findByStatusOrderByCreatedAtAsc(1);
-        Map<String, Integer> results = new java.util.concurrent.ConcurrentHashMap<>();
+        Map<String, Integer> results = new ConcurrentHashMap<>();
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
         for (PlatformConfig config : activeConfigs) {

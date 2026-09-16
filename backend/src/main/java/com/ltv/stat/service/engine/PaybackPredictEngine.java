@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 
@@ -91,7 +92,7 @@ public class PaybackPredictEngine {
             for (LtvDailyStat s : validStats) {
                 LocalDate lDate = s.getLaunchDate() != null ? s.getLaunchDate() : minLaunchDate;
                 if (!currentDate.isBefore(lDate)) {
-                    int cohortDay = (int) java.time.temporal.ChronoUnit.DAYS.between(lDate, currentDate) + 1;
+                    int cohortDay = (int) ChronoUnit.DAYS.between(lDate, currentDate) + 1;
                     cohortDay = Math.min(cohortDay, 365);
 
                     double[] curve = cohortCurves.get(s);
@@ -105,7 +106,7 @@ public class PaybackPredictEngine {
                 if (!currentDate.isAfter(today)) {
                     return 0; // 历史已回本
                 }
-                int remainingDays = (int) java.time.temporal.ChronoUnit.DAYS.between(today, currentDate);
+                int remainingDays = (int) ChronoUnit.DAYS.between(today, currentDate);
                 return Math.max(1, remainingDays);
             }
 

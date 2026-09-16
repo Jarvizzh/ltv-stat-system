@@ -10,6 +10,8 @@ import com.ltv.stat.util.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -74,7 +76,7 @@ public class RocnovelSubscribeConfigSyncService {
     /**
      * 服务启动完成后，异步触发一次全量落地页配置与订阅产品明细同步 (不阻塞服务启动)
      */
-    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         CompletableFuture.runAsync(() -> {
             log.info("Application ready, starting asynchronous initial sync of landing page & subscribe configs...");

@@ -4,9 +4,12 @@ import com.ltv.stat.dto.DailyDistributionSummaryDto;
 import com.ltv.stat.entity.LtvDailyStat;
 import com.ltv.stat.entity.LtvDailyStatId;
 import com.ltv.stat.entity.RawOrder;
+import com.ltv.stat.entity.UserLandingPage;
 import com.ltv.stat.repository.LtvDailyStatRepository;
 import com.ltv.stat.repository.LtvLaunchConfigRepository;
 import com.ltv.stat.repository.RawOrderRepository;
+import com.ltv.stat.repository.UserLandingPageRepository;
+import com.ltv.stat.service.DailyRechargeStatService;
 import com.ltv.stat.service.LtvStatService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,13 +38,13 @@ public class LtvStatServiceTest {
     private LtvStatService ltvStatService;
 
     @Autowired
-    private com.ltv.stat.service.DailyRechargeStatService dailyRechargeStatService;
+    private DailyRechargeStatService dailyRechargeStatService;
 
     @Autowired
     private LtvDailyStatRepository ltvDailyStatRepository;
 
     @Autowired
-    private com.ltv.stat.repository.UserLandingPageRepository userLandingPageRepository;
+    private UserLandingPageRepository userLandingPageRepository;
 
     @Test
     public void testLtvCalculationEngine() {
@@ -54,7 +57,7 @@ public class LtvStatServiceTest {
         ltvLaunchConfigRepository.deleteAll();
 
         // 绑定落地页给用户 1L
-        com.ltv.stat.entity.UserLandingPage ulp = new com.ltv.stat.entity.UserLandingPage();
+        UserLandingPage ulp = new UserLandingPage();
         ulp.setUserId(1L);
         ulp.setLandingPageId("lp_999");
         ulp.setTimezone("BJ");
@@ -176,9 +179,9 @@ public class LtvStatServiceTest {
 
     @Test
     public void testDiagnoseCohort() {
-        List<com.ltv.stat.entity.UserLandingPage> ulps = userLandingPageRepository.findAll();
+        List<UserLandingPage> ulps = userLandingPageRepository.findAll();
         System.out.println("====== USER LANDING PAGES ======");
-        for (com.ltv.stat.entity.UserLandingPage ulp : ulps) {
+        for (UserLandingPage ulp : ulps) {
             System.out.printf("USER_ID: %d | LP_ID: %s | TZ: %s%n", ulp.getUserId(), ulp.getLandingPageId(), ulp.getTimezone());
         }
 

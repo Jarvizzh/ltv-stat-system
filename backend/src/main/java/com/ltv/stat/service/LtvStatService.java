@@ -11,6 +11,8 @@ import com.ltv.stat.repository.*;
 import com.ltv.stat.util.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,8 +68,8 @@ public class LtvStatService {
                           UserSubscriptionPeriodRepository userSubscriptionPeriodRepository,
                           UserService userService,
                           LtvPredictService ltvPredictService,
-                          @org.springframework.beans.factory.annotation.Autowired(required = false) LtvBenchmarkService ltvBenchmarkService,
-                          @org.springframework.context.annotation.Lazy AsyncRecalculateService asyncRecalculateService) {
+                          @Autowired(required = false) LtvBenchmarkService ltvBenchmarkService,
+                          @Lazy AsyncRecalculateService asyncRecalculateService) {
         this.rawOrderRepository = rawOrderRepository;
         this.ltvLaunchConfigRepository = ltvLaunchConfigRepository;
         this.ltvDailyStatRepository = ltvDailyStatRepository;

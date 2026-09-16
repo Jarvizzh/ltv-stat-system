@@ -1,12 +1,15 @@
 package com.ltv.stat.service;
 
+import com.ltv.stat.dto.LandingPageConfigItem;
 import com.ltv.stat.dto.TokenInfo;
 import com.ltv.stat.dto.VisibleAccountDto;
 import com.ltv.stat.entity.SysUser;
 import com.ltv.stat.entity.UserLandingPage;
+import com.ltv.stat.entity.UserSubAccount;
 import com.ltv.stat.entity.UserViewPermission;
 import com.ltv.stat.repository.SysUserRepository;
 import com.ltv.stat.repository.UserLandingPageRepository;
+import com.ltv.stat.repository.UserSubAccountRepository;
 import com.ltv.stat.repository.UserViewPermissionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +32,7 @@ public class UserService {
     private final SysUserRepository sysUserRepository;
     private final UserLandingPageRepository userLandingPageRepository;
     private final UserViewPermissionRepository userViewPermissionRepository;
-    private final com.ltv.stat.repository.UserSubAccountRepository userSubAccountRepository;
+    private final UserSubAccountRepository userSubAccountRepository;
 
     @Value("${app.auth.username:superadmin}")
     private String defaultSuperAdminUsername;
@@ -40,7 +43,7 @@ public class UserService {
     public UserService(SysUserRepository sysUserRepository,
                        UserLandingPageRepository userLandingPageRepository,
                        UserViewPermissionRepository userViewPermissionRepository,
-                       com.ltv.stat.repository.UserSubAccountRepository userSubAccountRepository) {
+                       UserSubAccountRepository userSubAccountRepository) {
         this.sysUserRepository = sysUserRepository;
         this.userLandingPageRepository = userLandingPageRepository;
         this.userViewPermissionRepository = userViewPermissionRepository;
@@ -202,14 +205,14 @@ public class UserService {
     public List<Long> getSubUserIdsForMaster(Long masterUserId) {
         if (masterUserId == null) return Collections.emptyList();
         return userSubAccountRepository.findByMasterUserId(masterUserId).stream()
-                .map(com.ltv.stat.entity.UserSubAccount::getSubUserId)
+                .map(UserSubAccount::getSubUserId)
                 .collect(Collectors.toList());
     }
 
     public List<Long> getMasterUserIdsForSub(Long subUserId) {
         if (subUserId == null) return Collections.emptyList();
         return userSubAccountRepository.findBySubUserId(subUserId).stream()
-                .map(com.ltv.stat.entity.UserSubAccount::getMasterUserId)
+                .map(UserSubAccount::getMasterUserId)
                 .collect(Collectors.toList());
     }
 
@@ -237,13 +240,13 @@ public class UserService {
         userSubAccountRepository.flush();
 
         if (subUserIds != null && !subUserIds.isEmpty()) {
-            List<com.ltv.stat.entity.UserSubAccount> list = new ArrayList<>();
+            List<UserSubAccount> list = new ArrayList<>();
             Set<Long> uniqueSubs = new HashSet<>(subUserIds);
             for (Long subId : uniqueSubs) {
                 if (subId != null && !subId.equals(masterUserId)) {
                     SysUser subUser = sysUserRepository.findById(subId).orElse(null);
                     if (subUser != null && !subUser.isMasterAccount()) {
-                        list.add(new com.ltv.stat.entity.UserSubAccount(masterUserId, subId));
+                        list.add(new UserSubAccount(masterUserId, subId));
                     }
                 }
             }
@@ -473,15 +476,15 @@ public class UserService {
     public List<String> getUserLandingPageIds(String platformCode, Long userId) {
         if (userId == null) return Collections.emptyList();
         return getUserLandingPageConfigs(platformCode, userId).stream()
-                .map(com.ltv.stat.dto.LandingPageConfigItem::getLandingPageId)
+                .map(LandingPageConfigItem::getLandingPageId)
                 .collect(Collectors.toList());
     }
 
-    public List<com.ltv.stat.dto.LandingPageConfigItem> getUserLandingPageConfigs(Long userId) {
+    public List<LandingPageConfigItem> getUserLandingPageConfigs(Long userId) {
         return getUserLandingPageConfigs("ALL", userId);
     }
 
-    public List<com.ltv.stat.dto.LandingPageConfigItem> getUserLandingPageConfigs(String platformCode, Long userId) {
+    public List<LandingPageConfigItem> getUserLandingPageConfigs(String platformCode, Long userId) {
         if (userId == null) return Collections.emptyList();
         SysUser user = sysUserRepository.findById(userId).orElse(null);
         if (user == null) return Collections.emptyList();
@@ -493,10 +496,10 @@ public class UserService {
         if (user.isMasterAccount()) {
             List<Long> subUserIds = getSubUserIdsForMaster(userId);
             Set<String> uniquePids = new HashSet<>();
-            List<com.ltv.stat.dto.LandingPageConfigItem> aggregated = new ArrayList<>();
+            List<LandingPageConfigItem> aggregated = new ArrayList<>();
             for (Long subId : subUserIds) {
-                List<com.ltv.stat.dto.LandingPageConfigItem> subConfigs = getUserLandingPageConfigs(platformCode, subId);
-                for (com.ltv.stat.dto.LandingPageConfigItem item : subConfigs) {
+                List<LandingPageConfigItem> subConfigs = getUserLandingPageConfigs(platformCode, subId);
+                for (LandingPageConfigItem item : subConfigs) {
                     if (item != null && item.getLandingPageId() != null && !item.getLandingPageId().trim().isEmpty()) {
                         String pid = item.getLandingPageId().trim();
                         if (!uniquePids.contains(pid)) {
@@ -525,12 +528,12 @@ public class UserService {
         }
 
         return list.stream()
-                .map(ulp -> new com.ltv.stat.dto.LandingPageConfigItem(ulp.getPlatformCode(), ulp.getLandingPageId(), ulp.getTimezone()))
+                .map(ulp -> new LandingPageConfigItem(ulp.getPlatformCode(), ulp.getLandingPageId(), ulp.getTimezone()))
                 .collect(Collectors.toList());
     }
 
     @Transactional
-    public void updateUserLandingPageConfigs(Long userId, List<com.ltv.stat.dto.LandingPageConfigItem> items) {
+    public void updateUserLandingPageConfigs(Long userId, List<LandingPageConfigItem> items) {
         SysUser user = sysUserRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
 
@@ -542,7 +545,7 @@ public class UserService {
         if ("USER".equalsIgnoreCase(user.getRole())) {
             Set<String> adminPids = getAdminLandingPageIds(userId);
             if (items != null) {
-                for (com.ltv.stat.dto.LandingPageConfigItem item : items) {
+                for (LandingPageConfigItem item : items) {
                     if (item != null && item.getLandingPageId() != null) {
                         String pid = item.getLandingPageId().trim();
                         if (adminPids.contains(pid)) {
@@ -558,7 +561,7 @@ public class UserService {
         if (items != null) {
             List<UserLandingPage> list = new ArrayList<>();
             Set<String> seenPlatformPid = new HashSet<>();
-            for (com.ltv.stat.dto.LandingPageConfigItem item : items) {
+            for (LandingPageConfigItem item : items) {
                 if (item != null && item.getLandingPageId() != null && !item.getLandingPageId().trim().isEmpty()) {
                     String pCode = (item.getPlatformCode() != null && !item.getPlatformCode().trim().isEmpty()) ? item.getPlatformCode().trim().toLowerCase() : "rocnovel";
                     String pid = item.getLandingPageId().trim();
@@ -589,9 +592,9 @@ public class UserService {
             updateUserLandingPageConfigs(userId, Collections.emptyList());
             return;
         }
-        List<com.ltv.stat.dto.LandingPageConfigItem> items = pageIds.stream()
+        List<LandingPageConfigItem> items = pageIds.stream()
                 .filter(id -> id != null && !id.trim().isEmpty())
-                .map(id -> new com.ltv.stat.dto.LandingPageConfigItem(pCode, id.trim(), "BJ"))
+                .map(id -> new LandingPageConfigItem(pCode, id.trim(), "BJ"))
                 .collect(Collectors.toList());
         updateUserLandingPageConfigs(userId, items);
     }

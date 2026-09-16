@@ -8,6 +8,7 @@ import com.ltv.stat.repository.DailyRechargeDistributionRepository;
 import com.ltv.stat.repository.RawOrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -43,7 +45,7 @@ public class DailyRechargeStatService {
                                     DailyRechargeDistributionRepository dailyRechargeDistributionRepository,
                                     UserService userService,
                                     LtvStatService ltvStatService,
-                                    @org.springframework.context.annotation.Lazy AsyncRecalculateService asyncRecalculateService) {
+                                    @Lazy AsyncRecalculateService asyncRecalculateService) {
         this.rawOrderRepository = rawOrderRepository;
         this.dailyRechargeDistributionRepository = dailyRechargeDistributionRepository;
         this.userService = userService;
@@ -182,8 +184,9 @@ public class DailyRechargeStatService {
         BigDecimal repeatRate = totalPaidUsers > 0 ? BigDecimal.valueOf(repeatPaidUsers).divide(BigDecimal.valueOf(totalPaidUsers), 4, RoundingMode.HALF_UP) : BigDecimal.ZERO;
 
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
-        String thisMonthStr = todayBj.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
-        String lastMonthStr = todayBj.minusMonths(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
+        DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
+        String thisMonthStr = todayBj.format(monthFormatter);
+        String lastMonthStr = todayBj.minusMonths(1).format(monthFormatter);
 
         BigDecimal thisMonthRecharge = orders.stream()
                 .filter(o -> {
