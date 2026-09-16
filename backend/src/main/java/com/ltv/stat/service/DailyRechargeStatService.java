@@ -51,23 +51,33 @@ public class DailyRechargeStatService {
         this.asyncRecalculateService = asyncRecalculateService;
     }
 
-    public List<DailyRechargeDistribution> getDailyDistributionStats(Long userId) {
+    public List<DailyRechargeDistribution> getDailyDistributionStats(String platformCode, Long userId) {
         if (userId == null) userId = 1L;
-        List<DailyRechargeDistribution> list = dailyRechargeDistributionRepository.findByUserIdAndDateGreaterThanEqualOrderByDateDesc(userId, START_DATE);
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
+                ? platformCode.trim().toLowerCase() : "ALL";
+        List<DailyRechargeDistribution> list = dailyRechargeDistributionRepository.findByPlatformCodeAndUserIdAndDateGreaterThanEqualOrderByDateDesc(pCode, userId, START_DATE);
         if (list.isEmpty()) {
-            calculateDailyDistributionStatsForUser(userId);
-            list = dailyRechargeDistributionRepository.findByUserIdAndDateGreaterThanEqualOrderByDateDesc(userId, START_DATE);
+            calculateDailyDistributionStatsForUser(pCode, userId);
+            list = dailyRechargeDistributionRepository.findByPlatformCodeAndUserIdAndDateGreaterThanEqualOrderByDateDesc(pCode, userId, START_DATE);
         }
         return list;
     }
 
-    public List<DailyRechargeDistribution> getDailyDistributionStats() {
-        return getDailyDistributionStats(1L);
+    public List<DailyRechargeDistribution> getDailyDistributionStats(Long userId) {
+        return getDailyDistributionStats("ALL", userId);
     }
 
-    public List<DailyRechargeDistribution> getGlobalDailyDistributionStats() {
+    public List<DailyRechargeDistribution> getDailyDistributionStats() {
+        return getDailyDistributionStats("ALL", 1L);
+    }
+
+    public List<DailyRechargeDistribution> getGlobalDailyDistributionStats(String platformCode) {
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
-        List<RawOrder> allOrders = rawOrderRepository.findAll();
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
+                ? platformCode.trim().toLowerCase() : "ALL";
+        List<RawOrder> allOrders = "ALL".equals(pCode)
+                ? rawOrderRepository.findAll()
+                : rawOrderRepository.findByPlatformCode(pCode);
 
         Map<LocalDate, List<RawOrder>> ordersByPayDate = allOrders.stream()
                 .filter(o -> {
@@ -81,7 +91,7 @@ public class DailyRechargeStatService {
 
         while (!currDate.isAfter(todayBj)) {
             List<RawOrder> dayOrders = ordersByPayDate.getOrDefault(currDate, Collections.emptyList());
-            DailyRechargeDistribution stat = calculateSingleDayDistribution(0L, currDate, dayOrders);
+            DailyRechargeDistribution stat = calculateSingleDayDistribution(pCode, 0L, currDate, dayOrders);
             statList.add(stat);
             currDate = currDate.plusDays(1);
         }
@@ -90,8 +100,31 @@ public class DailyRechargeStatService {
         return statList;
     }
 
+    public List<DailyRechargeDistribution> getGlobalDailyDistributionStats() {
+        return getGlobalDailyDistributionStats("ALL");
+    }
+
+    public DailyDistributionSummaryDto getGlobalDailyDistributionSummary(String platformCode) {
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
+                ? platformCode.trim().toLowerCase() : "ALL";
+        List<RawOrder> orders = ("ALL".equals(pCode) ? rawOrderRepository.findAll() : rawOrderRepository.findByPlatformCode(pCode)).stream()
+                .filter(o -> {
+                    LocalDate payDate = getBjPayDate(o);
+                    return payDate != null && !payDate.isBefore(START_DATE);
+                })
+                .collect(Collectors.toList());
+        return calculateDistributionSummaryFromOrders(orders);
+    }
+
     public DailyDistributionSummaryDto getGlobalDailyDistributionSummary() {
-        List<RawOrder> orders = rawOrderRepository.findAll().stream()
+        return getGlobalDailyDistributionSummary("ALL");
+    }
+
+    public DailyDistributionSummaryDto getDailyDistributionSummary(String platformCode, Long userId) {
+        if (userId == null) userId = 1L;
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
+                ? platformCode.trim().toLowerCase() : "ALL";
+        List<RawOrder> orders = ltvStatService.getOrdersFilteredForUser(pCode, userId).stream()
                 .filter(o -> {
                     LocalDate payDate = getBjPayDate(o);
                     return payDate != null && !payDate.isBefore(START_DATE);
@@ -101,18 +134,11 @@ public class DailyRechargeStatService {
     }
 
     public DailyDistributionSummaryDto getDailyDistributionSummary(Long userId) {
-        if (userId == null) userId = 1L;
-        List<RawOrder> orders = ltvStatService.getOrdersFilteredForUser(userId).stream()
-                .filter(o -> {
-                    LocalDate payDate = getBjPayDate(o);
-                    return payDate != null && !payDate.isBefore(START_DATE);
-                })
-                .collect(Collectors.toList());
-        return calculateDistributionSummaryFromOrders(orders);
+        return getDailyDistributionSummary("ALL", userId);
     }
 
     public DailyDistributionSummaryDto getDailyDistributionSummary() {
-        return getDailyDistributionSummary(1L);
+        return getDailyDistributionSummary("ALL", 1L);
     }
 
     public DailyDistributionSummaryDto calculateDistributionSummaryFromOrders(List<RawOrder> orders) {
@@ -217,14 +243,16 @@ public class DailyRechargeStatService {
     }
 
     /**
-     * 计算并持久化指定用户的每日充值分布表 (仅针对指定用户本身，不触发父级主账号)
+     * 计算并持久化指定用户和平台的每日充值分布表 (仅针对指定用户本身，不触发父级主账号)
      */
     @Transactional
-    public void calculateDailyDistributionStatsForUserDirect(Long userId) {
+    public void calculateDailyDistributionStatsForUserDirect(String platformCode, Long userId) {
         if (userId == null) userId = 1L;
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
+                ? platformCode.trim().toLowerCase() : "ALL";
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
 
-        List<RawOrder> orders = ltvStatService.getOrdersFilteredForUser(userId);
+        List<RawOrder> orders = ltvStatService.getOrdersFilteredForUser(pCode, userId);
 
         Map<LocalDate, List<RawOrder>> ordersByPayDate = orders.stream()
                 .filter(o -> {
@@ -238,23 +266,28 @@ public class DailyRechargeStatService {
 
         while (!currDate.isAfter(todayBj)) {
             List<RawOrder> dayOrders = ordersByPayDate.getOrDefault(currDate, Collections.emptyList());
-            DailyRechargeDistribution stat = calculateSingleDayDistribution(userId, currDate, dayOrders);
+            DailyRechargeDistribution stat = calculateSingleDayDistribution(pCode, userId, currDate, dayOrders);
             statList.add(stat);
             currDate = currDate.plusDays(1);
         }
 
-        dailyRechargeDistributionRepository.deleteByUserId(userId);
+        dailyRechargeDistributionRepository.deleteByPlatformCodeAndUserId(pCode, userId);
         dailyRechargeDistributionRepository.flush();
         dailyRechargeDistributionRepository.saveAll(statList);
         dailyRechargeDistributionRepository.flush();
     }
 
+    @Transactional
+    public void calculateDailyDistributionStatsForUserDirect(Long userId) {
+        calculateDailyDistributionStatsForUserDirect("ALL", userId);
+    }
+
     /**
-     * 计算并持久化指定用户的每日充值分布表，并异步触发关联主账号数据重算
+     * 计算并持久化指定用户和平台的每日充值分布表，并异步触发关联主账号数据重算
      */
     @Transactional
-    public void calculateDailyDistributionStatsForUser(Long userId) {
-        calculateDailyDistributionStatsForUserDirect(userId);
+    public void calculateDailyDistributionStatsForUser(String platformCode, Long userId) {
+        calculateDailyDistributionStatsForUserDirect(platformCode, userId);
 
         // 异步触发所属主账号的每日充值分布重算 (后台线程执行，不阻塞前端)
         if (asyncRecalculateService != null) {
@@ -263,20 +296,31 @@ public class DailyRechargeStatService {
     }
 
     @Transactional
-    public void calculateAllDailyDistributionStats() {
-        List<SysUser> users = userService.listAllUsers();
-        if (users.isEmpty()) {
-            calculateDailyDistributionStatsForUser(1L);
-        } else {
-            for (SysUser user : users) {
-                calculateDailyDistributionStatsForUser(user.getId());
-            }
-        }
-        log.info("Daily recharge distribution calculation completed for all active users.");
+    public void calculateDailyDistributionStatsForUser(Long userId) {
+        calculateDailyDistributionStatsForUser("ALL", userId);
     }
 
-    private DailyRechargeDistribution calculateSingleDayDistribution(Long userId, LocalDate payDate, List<RawOrder> dayOrders) {
+    @Transactional
+    public void calculateAllDailyDistributionStats() {
+        List<SysUser> users = userService.listAllUsers();
+        String[] platforms = new String[]{"ALL", "rocnovel", "flicknovel"};
+        if (users.isEmpty()) {
+            for (String p : platforms) {
+                calculateDailyDistributionStatsForUser(p, 1L);
+            }
+        } else {
+            for (SysUser user : users) {
+                for (String p : platforms) {
+                    calculateDailyDistributionStatsForUser(p, user.getId());
+                }
+            }
+        }
+        log.info("Daily recharge distribution calculation completed for all active users across platforms.");
+    }
+
+    private DailyRechargeDistribution calculateSingleDayDistribution(String platformCode, Long userId, LocalDate payDate, List<RawOrder> dayOrders) {
         DailyRechargeDistribution stat = new DailyRechargeDistribution();
+        stat.setPlatformCode(platformCode != null ? platformCode : "ALL");
         stat.setUserId(userId);
         stat.setDate(payDate);
 

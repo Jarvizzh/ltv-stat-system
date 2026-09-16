@@ -35,6 +35,7 @@ public class MonthlySettlementController {
 
     @GetMapping("/list")
     public ResponseEntity<?> getMonthlySettlementList(
+            @RequestParam(value = "platformCode", required = false) String platformCode,
             @RequestParam(value = "settlementType", defaultValue = "PLATFORM_ALL") String settlementType,
             @RequestParam(value = "targetUserId", required = false) Long targetUserId
     ) {
@@ -55,7 +56,7 @@ public class MonthlySettlementController {
             }
         }
 
-        List<MonthlySettlementItemDto> list = settlementService.getMonthlySettlementList(settlementType, targetUserId);
+        List<MonthlySettlementItemDto> list = settlementService.getMonthlySettlementList(platformCode, settlementType, targetUserId);
         return ResponseEntity.ok(ApiResponseDto.success(list));
     }
 

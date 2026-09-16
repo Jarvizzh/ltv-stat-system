@@ -15,9 +15,16 @@ import java.util.Optional;
 @Repository
 public interface LtvLaunchConfigRepository extends JpaRepository<LtvLaunchConfig, LtvLaunchConfigId> {
     Optional<LtvLaunchConfig> findByUserIdAndLaunchDate(Long userId, LocalDate launchDate);
+    Optional<LtvLaunchConfig> findByPlatformCodeAndUserIdAndLaunchDate(String platformCode, Long userId, LocalDate launchDate);
+
     List<LtvLaunchConfig> findByUserId(Long userId);
+    List<LtvLaunchConfig> findByPlatformCodeAndUserId(String platformCode, Long userId);
 
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM LtvLaunchConfig c WHERE c.userId = :userId")
     void deleteByUserId(@Param("userId") Long userId);
+
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM LtvLaunchConfig c WHERE c.platformCode = :platformCode AND c.userId = :userId")
+    void deleteByPlatformCodeAndUserId(@Param("platformCode") String platformCode, @Param("userId") Long userId);
 }

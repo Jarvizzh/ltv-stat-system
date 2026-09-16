@@ -158,6 +158,141 @@ public class DatabasePrimaryKeysInitializer {
                 log.warn("Failed to add month_settled_refund_amount column: {}", e.getMessage());
             }
         }
+
+        // 11. 执行多平台拓展架构自动平滑迁移
+        migrateMultiPlatformSchema();
+    }
+
+    private void migrateMultiPlatformSchema() {
+        // 1. 创建 platform_config 表并插入初始枚举平台
+        try {
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS platform_config (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "platform_code VARCHAR(32) NOT NULL UNIQUE, " +
+                    "platform_name VARCHAR(64) NOT NULL, " +
+                    "auth_type VARCHAR(32) NOT NULL DEFAULT 'TOKEN_COOKIE', " +
+                    "auth_credentials TEXT, " +
+                    "sync_cron VARCHAR(32) DEFAULT '0 5 * * * ?', " +
+                    "status INT NOT NULL DEFAULT 1, " +
+                    "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+                    "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
+                    ")");
+            jdbcTemplate.execute("INSERT INTO platform_config (platform_code, platform_name, auth_type, status) " +
+                    "VALUES ('rocnovel', '中文在线', 'TOKEN_COOKIE', 1) " +
+                    "ON DUPLICATE KEY UPDATE platform_name = VALUES(platform_name)");
+            jdbcTemplate.execute("INSERT INTO platform_config (platform_code, platform_name, auth_type, status) " +
+                    "VALUES ('flicknovel', '番茄海外', 'TOKEN_COOKIE', 1) " +
+                    "ON DUPLICATE KEY UPDATE platform_name = VALUES(platform_name)");
+            log.info("Checked/initialized platform_config table with default platforms");
+        } catch (Exception e) {
+            log.warn("Failed to create/init platform_config table: {}", e.getMessage());
+        }
+
+        // 2. 检查并补充 raw_order 表的 platform_code 和 raw_payload
+        if (!isColumnExist("raw_order", "platform_code")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE raw_order ADD COLUMN platform_code VARCHAR(32) NOT NULL DEFAULT 'rocnovel' AFTER id");
+                log.info("Successfully added platform_code to raw_order");
+            } catch (Exception e) {
+                log.warn("Failed to add platform_code to raw_order: {}", e.getMessage());
+            }
+        }
+        if (!isColumnExist("raw_order", "raw_payload")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE raw_order ADD COLUMN raw_payload TEXT DEFAULT NULL");
+                log.info("Successfully added raw_payload to raw_order");
+            } catch (Exception e) {
+                log.warn("Failed to add raw_payload to raw_order: {}", e.getMessage());
+            }
+        }
+        try {
+            if (isIndexExist("raw_order", "order_id")) {
+                jdbcTemplate.execute("ALTER TABLE raw_order DROP INDEX order_id");
+            }
+            if (!isIndexExist("raw_order", "uk_platform_order")) {
+                jdbcTemplate.execute("ALTER TABLE raw_order ADD UNIQUE KEY uk_platform_order (platform_code, order_id)");
+                log.info("Successfully updated raw_order unique key to (platform_code, order_id)");
+            }
+        } catch (Exception e) {
+            log.info("raw_order unique key update info: {}", e.getMessage());
+        }
+
+        // 3. 检查并补充 sys_user 表的 allowed_platforms 列
+        if (!isColumnExist("sys_user", "allowed_platforms")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE sys_user ADD COLUMN allowed_platforms VARCHAR(255) NOT NULL DEFAULT 'ALL'");
+                log.info("Successfully added allowed_platforms to sys_user");
+            } catch (Exception e) {
+                log.warn("Failed to add allowed_platforms to sys_user: {}", e.getMessage());
+            }
+        }
+
+        // 4. 检查并补充 ltv_launch_config 表的 platform_code 并修正复合主键
+        if (!isColumnExist("ltv_launch_config", "platform_code")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE ltv_launch_config ADD COLUMN platform_code VARCHAR(32) NOT NULL DEFAULT 'rocnovel'");
+                log.info("Successfully added platform_code to ltv_launch_config");
+            } catch (Exception e) {
+                log.warn("Failed to add platform_code to ltv_launch_config: {}", e.getMessage());
+            }
+        }
+        ensurePrimaryKey("ltv_launch_config", "platform_code,user_id,launch_date",
+                "ALTER TABLE ltv_launch_config DROP PRIMARY KEY, ADD PRIMARY KEY (platform_code, user_id, launch_date)");
+
+        // 5. 检查并补充 ltv_daily_stat 表的 platform_code 并修正复合主键
+        if (!isColumnExist("ltv_daily_stat", "platform_code")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE ltv_daily_stat ADD COLUMN platform_code VARCHAR(32) NOT NULL DEFAULT 'rocnovel'");
+                log.info("Successfully added platform_code to ltv_daily_stat");
+            } catch (Exception e) {
+                log.warn("Failed to add platform_code to ltv_daily_stat: {}", e.getMessage());
+            }
+        }
+        ensurePrimaryKey("ltv_daily_stat", "platform_code,user_id,launch_date",
+                "ALTER TABLE ltv_daily_stat DROP PRIMARY KEY, ADD PRIMARY KEY (platform_code, user_id, launch_date)");
+
+        // 6. 检查并补充 daily_recharge_distribution 表的 platform_code 并修正复合主键
+        if (!isColumnExist("daily_recharge_distribution", "platform_code")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE daily_recharge_distribution ADD COLUMN platform_code VARCHAR(32) NOT NULL DEFAULT 'rocnovel'");
+                log.info("Successfully added platform_code to daily_recharge_distribution");
+            } catch (Exception e) {
+                log.warn("Failed to add platform_code to daily_recharge_distribution: {}", e.getMessage());
+            }
+        }
+        ensurePrimaryKey("daily_recharge_distribution", "platform_code,user_id,date",
+                "ALTER TABLE daily_recharge_distribution DROP PRIMARY KEY, ADD PRIMARY KEY (platform_code, user_id, date)");
+
+        // 7. 检查并补充 user_landing_page 表的 platform_code
+        if (!isColumnExist("user_landing_page", "platform_code")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE user_landing_page ADD COLUMN platform_code VARCHAR(32) NOT NULL DEFAULT 'rocnovel'");
+                log.info("Successfully added platform_code to user_landing_page");
+            } catch (Exception e) {
+                log.warn("Failed to add platform_code to user_landing_page: {}", e.getMessage());
+            }
+        }
+
+        // 8. 检查并补充 subscription_config_version 表的 platform_code
+        if (!isColumnExist("subscription_config_version", "platform_code")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE subscription_config_version ADD COLUMN platform_code VARCHAR(32) NOT NULL DEFAULT 'rocnovel'");
+                log.info("Successfully added platform_code to subscription_config_version");
+            } catch (Exception e) {
+                log.warn("Failed to add platform_code to subscription_config_version: {}", e.getMessage());
+            }
+        }
+    }
+
+    private boolean isIndexExist(String tableName, String indexName) {
+        try {
+            String sql = "SELECT COUNT(*) FROM information_schema.statistics " +
+                         "WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?";
+            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, tableName, indexName);
+            return count != null && count > 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void ensurePrimaryKey(String tableName, String expectedCols, String alterSql) {

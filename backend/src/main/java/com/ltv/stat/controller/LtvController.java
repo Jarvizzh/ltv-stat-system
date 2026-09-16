@@ -10,6 +10,7 @@ import com.ltv.stat.service.LtvBenchmarkService;
 import com.ltv.stat.service.LtvPredictService;
 import com.ltv.stat.service.LtvStatService;
 import com.ltv.stat.service.OrderSyncService;
+import com.ltv.stat.service.PlatformSyncManager;
 import com.ltv.stat.service.SubscribeConfigSyncService;
 import com.ltv.stat.service.UserService;
 import com.ltv.stat.util.UserContext;
@@ -29,6 +30,7 @@ public class LtvController {
     private final LtvStatService ltvStatService;
     private final DailyRechargeStatService dailyRechargeStatService;
     private final OrderSyncService orderSyncService;
+    private final PlatformSyncManager platformSyncManager;
     private final LtvBenchmarkService ltvBenchmarkService;
     private final SubscribeConfigSyncService subscribeConfigSyncService;
     private final UserService userService;
@@ -36,12 +38,14 @@ public class LtvController {
     public LtvController(LtvStatService ltvStatService,
                          DailyRechargeStatService dailyRechargeStatService,
                          OrderSyncService orderSyncService,
+                         PlatformSyncManager platformSyncManager,
                          LtvBenchmarkService ltvBenchmarkService,
                          SubscribeConfigSyncService subscribeConfigSyncService,
                          UserService userService) {
         this.ltvStatService = ltvStatService;
         this.dailyRechargeStatService = dailyRechargeStatService;
         this.orderSyncService = orderSyncService;
+        this.platformSyncManager = platformSyncManager;
         this.ltvBenchmarkService = ltvBenchmarkService;
         this.subscribeConfigSyncService = subscribeConfigSyncService;
         this.userService = userService;
@@ -74,27 +78,31 @@ public class LtvController {
     }
 
     /**
-     * 进入系统首页全量获取按投放日期排序的 LTV 统计表 (支持 targetUserId)
+     * 进入系统首页全量获取按投放日期排序的 LTV 统计表 (支持 platformCode, targetUserId)
      */
     @GetMapping("/list")
-    public ResponseEntity<LtvListResponseDto> getLtvList(@RequestParam(value = "targetUserId", required = false) Long targetUserId) {
+    public ResponseEntity<LtvListResponseDto> getLtvList(
+            @RequestParam(value = "platformCode", required = false) String platformCode,
+            @RequestParam(value = "targetUserId", required = false) Long targetUserId) {
         Long userId = resolveTargetUserId(targetUserId);
-        LtvListResponseDto response = ltvStatService.getLtvListResponse(userId);
+        LtvListResponseDto response = ltvStatService.getLtvListResponse(platformCode, userId);
         return ResponseEntity.ok(response);
     }
 
     /**
-     * 进入【每日充值分布】页面获取按自然日（支付日期）排序的充值分布数据 (支持 targetUserId)
+     * 进入【每日充值分布】页面获取按自然日（支付日期）排序的充值分布数据 (支持 platformCode, targetUserId)
      */
     @GetMapping("/daily-distribution")
-    public ResponseEntity<DailyDistributionResponseDto> getDailyDistribution(@RequestParam(value = "targetUserId", required = false) Long targetUserId) {
+    public ResponseEntity<DailyDistributionResponseDto> getDailyDistribution(
+            @RequestParam(value = "platformCode", required = false) String platformCode,
+            @RequestParam(value = "targetUserId", required = false) Long targetUserId) {
         Long userId = resolveTargetUserId(targetUserId);
-        List<DailyRechargeDistribution> list = dailyRechargeStatService.getDailyDistributionStats(userId);
+        List<DailyRechargeDistribution> list = dailyRechargeStatService.getDailyDistributionStats(platformCode, userId);
         if (list.isEmpty()) {
-            dailyRechargeStatService.calculateDailyDistributionStatsForUser(userId);
-            list = dailyRechargeStatService.getDailyDistributionStats(userId);
+            dailyRechargeStatService.calculateDailyDistributionStatsForUser(platformCode, userId);
+            list = dailyRechargeStatService.getDailyDistributionStats(platformCode, userId);
         }
-        DailyDistributionSummaryDto summary = dailyRechargeStatService.getDailyDistributionSummary(userId);
+        DailyDistributionSummaryDto summary = dailyRechargeStatService.getDailyDistributionSummary(platformCode, userId);
         DailyDistributionResponseDto response = new DailyDistributionResponseDto();
         response.setCode(0);
         response.setMsg("success");
@@ -109,13 +117,14 @@ public class LtvController {
      * 进入【平台汇总】页面获取全量平台订单（不区分落地页）的充值分布数据 (仅管理员/超级管理员可访问)
      */
     @GetMapping("/global-daily-distribution")
-    public ResponseEntity<?> getGlobalDailyDistribution() {
+    public ResponseEntity<?> getGlobalDailyDistribution(
+            @RequestParam(value = "platformCode", required = false) String platformCode) {
         TokenInfo currentUser = UserContext.getCurrentUser();
         if (currentUser == null || !userService.hasPermGlobalDistribution(currentUser.getUserId())) {
             return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权访问，请联系超级管理员分配「平台汇总」功能权限"));
         }
-        List<DailyRechargeDistribution> list = dailyRechargeStatService.getGlobalDailyDistributionStats();
-        DailyDistributionSummaryDto summary = dailyRechargeStatService.getGlobalDailyDistributionSummary();
+        List<DailyRechargeDistribution> list = dailyRechargeStatService.getGlobalDailyDistributionStats(platformCode);
+        DailyDistributionSummaryDto summary = dailyRechargeStatService.getGlobalDailyDistributionSummary(platformCode);
         DailyDistributionResponseDto response = new DailyDistributionResponseDto();
         response.setCode(0);
         response.setMsg("success");
@@ -129,11 +138,13 @@ public class LtvController {
      * 重新计算 LTV 统计表与每日充值分布
      */
     @PostMapping("/recalculate")
-    public ResponseEntity<LtvListResponseDto> recalculate(@RequestParam(value = "targetUserId", required = false) Long targetUserId) {
+    public ResponseEntity<LtvListResponseDto> recalculate(
+            @RequestParam(value = "platformCode", required = false) String platformCode,
+            @RequestParam(value = "targetUserId", required = false) Long targetUserId) {
         Long userId = resolveTargetUserId(targetUserId);
-        ltvStatService.calculateLtvStatsForUser(userId);
-        dailyRechargeStatService.calculateDailyDistributionStatsForUser(userId);
-        LtvListResponseDto response = ltvStatService.getLtvListResponse(userId);
+        ltvStatService.calculateLtvStatsForUser(platformCode, userId);
+        dailyRechargeStatService.calculateDailyDistributionStatsForUser(platformCode, userId);
+        LtvListResponseDto response = ltvStatService.getLtvListResponse(platformCode, userId);
         response.setMsg("重算 LTV 完成");
         return ResponseEntity.ok(response);
     }
@@ -142,10 +153,12 @@ public class LtvController {
      * 仅重新计算 LTV 统计表
      */
     @PostMapping("/recalculate-ltv")
-    public ResponseEntity<LtvListResponseDto> recalculateLtvOnly(@RequestParam(value = "targetUserId", required = false) Long targetUserId) {
+    public ResponseEntity<LtvListResponseDto> recalculateLtvOnly(
+            @RequestParam(value = "platformCode", required = false) String platformCode,
+            @RequestParam(value = "targetUserId", required = false) Long targetUserId) {
         Long userId = resolveTargetUserId(targetUserId);
-        ltvStatService.calculateLtvStatsForUser(userId);
-        LtvListResponseDto response = ltvStatService.getLtvListResponse(userId);
+        ltvStatService.calculateLtvStatsForUser(platformCode, userId);
+        LtvListResponseDto response = ltvStatService.getLtvListResponse(platformCode, userId);
         response.setMsg("重算 LTV 报表完成！");
         return ResponseEntity.ok(response);
     }
@@ -154,11 +167,13 @@ public class LtvController {
      * 仅重新计算每日充值分布统计表
      */
     @PostMapping("/recalculate-daily-distribution")
-    public ResponseEntity<DailyDistributionResponseDto> recalculateDailyDistributionOnly(@RequestParam(value = "targetUserId", required = false) Long targetUserId) {
+    public ResponseEntity<DailyDistributionResponseDto> recalculateDailyDistributionOnly(
+            @RequestParam(value = "platformCode", required = false) String platformCode,
+            @RequestParam(value = "targetUserId", required = false) Long targetUserId) {
         Long userId = resolveTargetUserId(targetUserId);
-        dailyRechargeStatService.calculateDailyDistributionStatsForUser(userId);
-        List<DailyRechargeDistribution> list = dailyRechargeStatService.getDailyDistributionStats(userId);
-        DailyDistributionSummaryDto summary = dailyRechargeStatService.getDailyDistributionSummary(userId);
+        dailyRechargeStatService.calculateDailyDistributionStatsForUser(platformCode, userId);
+        List<DailyRechargeDistribution> list = dailyRechargeStatService.getDailyDistributionStats(platformCode, userId);
+        DailyDistributionSummaryDto summary = dailyRechargeStatService.getDailyDistributionSummary(platformCode, userId);
         DailyDistributionResponseDto response = new DailyDistributionResponseDto();
         response.setCode(0);
         response.setMsg("重算每日充值分析完成！");
@@ -179,6 +194,7 @@ public class LtvController {
 
         String startTimeStr = "2026-07-10";
         String endTimeStr = defaultEndTimeStr;
+        String platformCode = null;
 
         if (body != null) {
             if (body.get("startTime") != null && !body.get("startTime").trim().isEmpty()) {
@@ -187,11 +203,23 @@ public class LtvController {
             if (body.get("endTime") != null && !body.get("endTime").trim().isEmpty()) {
                 endTimeStr = body.get("endTime").trim();
             }
+            if (body.get("platformCode") != null && !body.get("platformCode").trim().isEmpty()) {
+                platformCode = body.get("platformCode").trim();
+            }
         }
 
         int totalSyncedOrders = 0;
         try {
-            totalSyncedOrders = orderSyncService.syncOrdersAll(startTimeStr, endTimeStr);
+            if (platformCode != null && !"ALL".equalsIgnoreCase(platformCode)) {
+                com.ltv.stat.enums.PlatformEnum pEnum = com.ltv.stat.enums.PlatformEnum.fromCode(platformCode).orElse(null);
+                if (pEnum != null) {
+                    totalSyncedOrders = platformSyncManager.syncOrdersForPlatform(pEnum, startTimeStr, endTimeStr);
+                } else {
+                    totalSyncedOrders = platformSyncManager.syncOrdersAllPlatforms(startTimeStr, endTimeStr);
+                }
+            } else {
+                totalSyncedOrders = platformSyncManager.syncOrdersAllPlatforms(startTimeStr, endTimeStr);
+            }
         } catch (RuntimeException re) {
             if (re.getMessage() != null && re.getMessage().contains("TOKEN_EXPIRED")) {
                 Map<String, Object> errResponse = new HashMap<>();
@@ -222,13 +250,17 @@ public class LtvController {
     }
 
     /**
-     * 用户录入/修改某一投放日期的账户消耗和备注 (按用户隔离)
+     * 用户录入/修改某一投放日期的账户消耗和备注 (按平台与用户隔离)
      */
     @PostMapping("/config")
     public ResponseEntity<Map<String, Object>> updateLaunchConfig(@RequestBody Map<String, Object> body) {
         String launchDateStr = (String) body.get("launchDate");
         Object spendObj = body.get("spend");
         String remark = (String) body.get("remark");
+        String platformCode = (String) body.get("platformCode");
+        if (platformCode == null || platformCode.trim().isEmpty() || "ALL".equalsIgnoreCase(platformCode.trim())) {
+            platformCode = "rocnovel";
+        }
 
         Long targetUserId = null;
         if (body.containsKey("targetUserId") && body.get("targetUserId") != null) {
@@ -267,10 +299,11 @@ public class LtvController {
             } catch (Exception ignored) {}
         }
 
-        LtvLaunchConfig config = ltvStatService.saveLaunchConfig(userId, launchDate, spend, remark);
+        LtvLaunchConfig config = ltvStatService.saveLaunchConfig(platformCode, userId, launchDate, spend, remark);
 
-        // 保存消耗配置后重新触发当前用户的 LTV 指标重算
-        ltvStatService.calculateLtvStatsForUser(userId);
+        // 保存消耗配置后重新触发当前用户和平台的 LTV 指标重算，并联动刷新 ALL 大盘
+        ltvStatService.calculateLtvStatsForUser(platformCode, userId);
+        ltvStatService.calculateLtvStatsForUser("ALL", userId);
 
         Map<String, Object> response = new HashMap<>();
         response.put("code", 0);
@@ -280,7 +313,7 @@ public class LtvController {
     }
 
     /**
-     * 批量导入账户消耗与备注 (按用户隔离)
+     * 批量导入账户消耗与备注 (按平台与用户隔离)
      */
     @PostMapping("/batch-spend")
     public ResponseEntity<Map<String, Object>> batchSpend(@RequestBody Map<String, Object> body) {
@@ -290,6 +323,11 @@ public class LtvController {
                 targetUserId = Long.valueOf(body.get("targetUserId").toString());
             } catch (Exception ignored) {}
         }
+        String platformCode = (String) body.get("platformCode");
+        if (platformCode == null || platformCode.trim().isEmpty() || "ALL".equalsIgnoreCase(platformCode.trim())) {
+            platformCode = "rocnovel";
+        }
+
         TokenInfo currentUser = UserContext.getCurrentUser();
         Long userId = (targetUserId != null) ? targetUserId : (currentUser != null ? currentUser.getUserId() : 1L);
         if (userService.isMasterAccount(userId)) {
@@ -313,7 +351,11 @@ public class LtvController {
             return ResponseEntity.badRequest().body(res);
         }
 
-        int count = ltvStatService.batchSaveLaunchConfig(userId, items);
+        int count = ltvStatService.batchSaveLaunchConfig(platformCode, userId, items);
+
+        // 刷新单平台和 ALL 报表
+        ltvStatService.calculateLtvStatsForUser(platformCode, userId);
+        ltvStatService.calculateLtvStatsForUser("ALL", userId);
 
         Map<String, Object> response = new HashMap<>();
         response.put("code", 0);
@@ -323,7 +365,7 @@ public class LtvController {
     }
 
     /**
-     * 手动触发同步订单与全量统计，支持自定义时间范围 [startTime, endTime]
+     * 手动触发同步订单与全量统计，支持自定义时间范围 [startTime, endTime] 与 platformCode
      */
     @PostMapping("/sync-and-calc")
     public ResponseEntity<Map<String, Object>> syncAndCalc(@RequestBody(required = false) Map<String, String> body) {
@@ -332,6 +374,7 @@ public class LtvController {
 
         String startTimeStr = "2026-07-10";
         String endTimeStr = defaultEndTimeStr;
+        String platformCode = null;
 
         if (body != null) {
             if (body.get("startTime") != null && !body.get("startTime").trim().isEmpty()) {
@@ -340,11 +383,23 @@ public class LtvController {
             if (body.get("endTime") != null && !body.get("endTime").trim().isEmpty()) {
                 endTimeStr = body.get("endTime").trim();
             }
+            if (body.get("platformCode") != null && !body.get("platformCode").trim().isEmpty()) {
+                platformCode = body.get("platformCode").trim();
+            }
         }
 
         int totalSyncedOrders = 0;
         try {
-            totalSyncedOrders = orderSyncService.syncOrdersAll(startTimeStr, endTimeStr);
+            if (platformCode != null && !"ALL".equalsIgnoreCase(platformCode)) {
+                com.ltv.stat.enums.PlatformEnum pEnum = com.ltv.stat.enums.PlatformEnum.fromCode(platformCode).orElse(null);
+                if (pEnum != null) {
+                    totalSyncedOrders = platformSyncManager.syncOrdersForPlatform(pEnum, startTimeStr, endTimeStr);
+                } else {
+                    totalSyncedOrders = platformSyncManager.syncOrdersAllPlatforms(startTimeStr, endTimeStr);
+                }
+            } else {
+                totalSyncedOrders = platformSyncManager.syncOrdersAllPlatforms(startTimeStr, endTimeStr);
+            }
             ltvStatService.calculateAllLtvStats();
         } catch (RuntimeException re) {
             if (re.getMessage() != null && re.getMessage().contains("TOKEN_EXPIRED")) {
@@ -364,14 +419,15 @@ public class LtvController {
     }
 
     /**
-     * 获取 LTV 预测基准数据曲线
+     * 获取 LTV 预测基准数据曲线 (支持 platformCode)
      */
     @GetMapping("/benchmark")
     public ResponseEntity<Map<String, Object>> getBenchmark(
+            @RequestParam(value = "platformCode", required = false) String platformCode,
             @RequestParam(value = "dimensionType", defaultValue = "ALL") String dimensionType,
             @RequestParam(value = "dimensionValue", defaultValue = "DEFAULT") String dimensionValue,
             @RequestParam(value = "subPeriodDays", defaultValue = "1") Integer subPeriodDays) {
-        List<LtvPredictBenchmark> benchmarkCurve = ltvBenchmarkService.getBenchmarkCurve(dimensionType, dimensionValue, subPeriodDays);
+        List<LtvPredictBenchmark> benchmarkCurve = ltvBenchmarkService.getBenchmarkCurve(platformCode, dimensionType, dimensionValue, subPeriodDays);
         Map<String, Object> response = new HashMap<>();
         response.put("code", 0);
         response.put("data", benchmarkCurve);

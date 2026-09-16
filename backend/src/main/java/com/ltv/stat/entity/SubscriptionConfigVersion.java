@@ -13,8 +13,14 @@ public class SubscriptionConfigVersion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "platform_code", nullable = false, length = 32)
+    private String platformCode = "rocnovel";
+
     @Column(name = "landing_page_id", nullable = false)
     private String landingPageId;
+
+    public String getPlatformCode() { return platformCode != null ? platformCode : "rocnovel"; }
+    public void setPlatformCode(String platformCode) { this.platformCode = platformCode; }
 
     @Column(name = "subscribe_config_id", nullable = false)
     private String subscribeConfigId;

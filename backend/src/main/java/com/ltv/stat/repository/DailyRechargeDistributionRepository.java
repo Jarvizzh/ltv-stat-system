@@ -16,15 +16,22 @@ import java.util.Optional;
 public interface DailyRechargeDistributionRepository extends JpaRepository<DailyRechargeDistribution, DailyRechargeDistributionId> {
 
     Optional<DailyRechargeDistribution> findByUserIdAndDate(Long userId, LocalDate date);
+    Optional<DailyRechargeDistribution> findByPlatformCodeAndUserIdAndDate(String platformCode, Long userId, LocalDate date);
 
     /**
      * 按用户和自然日（支付日期）倒序查询 2026-07-10 至今的每日充值分布统计表
      */
     List<DailyRechargeDistribution> findByUserIdAndDateGreaterThanEqualOrderByDateDesc(Long userId, LocalDate startDate);
+    List<DailyRechargeDistribution> findByPlatformCodeAndUserIdAndDateGreaterThanEqualOrderByDateDesc(String platformCode, Long userId, LocalDate startDate);
 
     List<DailyRechargeDistribution> findByUserIdOrderByDateDesc(Long userId);
+    List<DailyRechargeDistribution> findByPlatformCodeAndUserIdOrderByDateDesc(String platformCode, Long userId);
 
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM DailyRechargeDistribution d WHERE d.userId = :userId")
     void deleteByUserId(@Param("userId") Long userId);
+
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM DailyRechargeDistribution d WHERE d.platformCode = :platformCode AND d.userId = :userId")
+    void deleteByPlatformCodeAndUserId(@Param("platformCode") String platformCode, @Param("userId") Long userId);
 }

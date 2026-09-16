@@ -1,10 +1,20 @@
 import React, { useState } from 'react';
 import { X, Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 
-export default function BatchSpendModal({ isOpen, onClose, onSaved, authFetch, targetUserId }) {
+export default function BatchSpendModal({ isOpen, onClose, onSaved, authFetch, targetUserId, selectedPlatform, platformsList }) {
+  const [platformCode, setPlatformCode] = useState(() => {
+    return (!selectedPlatform || selectedPlatform === 'ALL') ? 'rocnovel' : selectedPlatform;
+  });
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Update platformCode when selectedPlatform changes
+  React.useEffect(() => {
+    if (selectedPlatform && selectedPlatform !== 'ALL') {
+      setPlatformCode(selectedPlatform);
+    }
+  }, [selectedPlatform]);
 
   if (!isOpen) return null;
 
@@ -84,6 +94,7 @@ export default function BatchSpendModal({ isOpen, onClose, onSaved, authFetch, t
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          platformCode: platformCode || 'rocnovel',
           items: parsed,
           targetUserId: targetUserId || null,
         }),
@@ -107,6 +118,11 @@ export default function BatchSpendModal({ isOpen, onClose, onSaved, authFetch, t
 
   const sampleText = `2026/7/10\t1,872.28\n2026-7-11\t12,121,872.28\n2026/07/12\t642.84`;
 
+  const actualPlatforms = (platformsList || [
+    { code: 'rocnovel', name: '中文在线' },
+    { code: 'flicknovel', name: '番茄海外' }
+  ]).filter(p => p.code !== 'ALL');
+
   return (
     <div className="modal-overlay">
       <div className="modal-card" style={{ maxWidth: '650px' }}>
@@ -121,6 +137,32 @@ export default function BatchSpendModal({ isOpen, onClose, onSaved, authFetch, t
         </div>
 
         <div className="modal-body">
+          {/* 目标平台选择 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', padding: '0.5rem 0.75rem', background: 'var(--bg-secondary)', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap' }}>目标平台：</span>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {actualPlatforms.map(p => (
+                <button
+                  key={p.code}
+                  type="button"
+                  onClick={() => setPlatformCode(p.code)}
+                  style={{
+                    padding: '0.25rem 0.65rem',
+                    fontSize: '0.8rem',
+                    borderRadius: '0.35rem',
+                    border: platformCode === p.code ? '1.5px solid #10b981' : '1px solid var(--border-color)',
+                    background: platformCode === p.code ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
+                    color: platformCode === p.code ? '#10b981' : 'var(--text-sub)',
+                    fontWeight: platformCode === p.code ? 600 : 400,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {p.name || p.code}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div style={{ fontSize: '0.85rem', color: 'var(--text-sub)', background: 'var(--bg-secondary)', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
             <strong>支持格式：</strong><code>日期(yyyy-MM-dd / yyyy/M/d)  消耗金额(支持逗号如12,121,872.28)  [备注]</code>，以空格或 Tab 分隔，多行换行。
           </div>

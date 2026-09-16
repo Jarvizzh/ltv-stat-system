@@ -6,6 +6,9 @@ import CustomSelect from './CustomSelect';
 export default function LtvHeader({
   activeTab,
   onTabChange,
+  selectedPlatform,
+  platformsList,
+  onSelectPlatform,
   onOpenConfig,
   onOpenTokenModal,
   onOpenSyncModal,
@@ -91,6 +94,39 @@ export default function LtvHeader({
 
       {/* 桌面端平铺操作区 */}
       <div className="header-actions desktop-actions">
+        {/* 平台切换下拉框 */}
+        {platformsList && platformsList.length > 0 && (
+          <div
+            title="选择数据源平台（默认全平台综合大盘）"
+            style={{
+              position: 'relative',
+              zIndex: 1002,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              background: 'rgba(16, 185, 129, 0.12)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              borderRadius: '0.48rem',
+              padding: '0.25rem 0.55rem'
+            }}
+          >
+            <Globe size={15} color="#10b981" />
+            <span style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              平台
+            </span>
+            <CustomSelect
+              value={selectedPlatform || 'ALL'}
+              onChange={(val) => onSelectPlatform && onSelectPlatform(val)}
+              options={platformsList.map((p) => ({
+                label: p.name || p.code,
+                value: p.code
+              }))}
+              className="custom-select-sm"
+              style={{ minWidth: '130px' }}
+            />
+          </div>
+        )}
+
         {/* 账户视图切换下拉框 (包含被分配只读视图或超级管理员可见) */}
         {canSwitchView && (
           <div
@@ -243,6 +279,29 @@ export default function LtvHeader({
             </div>
 
             <div className="mobile-drawer-content">
+              {/* 移动端平台切换 */}
+              {platformsList && platformsList.length > 0 && (
+                <div className="mobile-drawer-section">
+                  <div className="mobile-section-title">
+                    <Globe size={14} color="#10b981" />
+                    <span>选择平台</span>
+                  </div>
+                  <CustomSelect
+                    value={selectedPlatform || 'ALL'}
+                    onChange={(val) => {
+                      onSelectPlatform && onSelectPlatform(val);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    options={platformsList.map((p) => ({
+                      label: p.name || p.code,
+                      value: p.code
+                    }))}
+                    className="custom-select-sm"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              )}
+
               {/* 移动端视图切换 */}
               {canSwitchView && (
                 <div className="mobile-drawer-section">

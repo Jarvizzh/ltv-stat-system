@@ -11,12 +11,19 @@ import java.time.LocalDateTime;
 public class DailyRechargeDistribution {
 
     @Id
+    @Column(name = "platform_code", nullable = false, length = 32)
+    private String platformCode = "rocnovel";
+
+    @Id
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
     @Id
     @Column(name = "date", nullable = false)
     private LocalDate date;
+
+    public String getPlatformCode() { return platformCode != null ? platformCode : "rocnovel"; }
+    public void setPlatformCode(String platformCode) { this.platformCode = platformCode; }
 
     @Column(name = "total_recharge", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalRecharge = BigDecimal.ZERO;

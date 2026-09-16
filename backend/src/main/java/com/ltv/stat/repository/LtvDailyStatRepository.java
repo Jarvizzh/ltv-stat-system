@@ -15,11 +15,22 @@ import java.util.Optional;
 @Repository
 public interface LtvDailyStatRepository extends JpaRepository<LtvDailyStat, LtvDailyStatId> {
     Optional<LtvDailyStat> findByUserIdAndLaunchDate(Long userId, LocalDate launchDate);
+    Optional<LtvDailyStat> findByPlatformCodeAndUserIdAndLaunchDate(String platformCode, Long userId, LocalDate launchDate);
+
     List<LtvDailyStat> findByUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(Long userId, LocalDate startDate);
+    List<LtvDailyStat> findByPlatformCodeAndUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(String platformCode, Long userId, LocalDate startDate);
+
     List<LtvDailyStat> findByUserIdOrderByLaunchDateAsc(Long userId);
+    List<LtvDailyStat> findByPlatformCodeAndUserIdOrderByLaunchDateAsc(String platformCode, Long userId);
+
     List<LtvDailyStat> findAllByOrderByLaunchDateAsc();
+    List<LtvDailyStat> findByPlatformCodeOrderByLaunchDateAsc(String platformCode);
 
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM LtvDailyStat s WHERE s.userId = :userId")
     void deleteByUserId(@Param("userId") Long userId);
+
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM LtvDailyStat s WHERE s.platformCode = :platformCode AND s.userId = :userId")
+    void deleteByPlatformCodeAndUserId(@Param("platformCode") String platformCode, @Param("userId") Long userId);
 }

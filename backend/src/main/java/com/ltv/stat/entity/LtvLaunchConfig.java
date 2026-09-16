@@ -11,6 +11,10 @@ import java.time.LocalDateTime;
 public class LtvLaunchConfig {
 
     @Id
+    @Column(name = "platform_code", nullable = false, length = 32)
+    private String platformCode = "rocnovel";
+
+    @Id
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
@@ -32,6 +36,9 @@ public class LtvLaunchConfig {
     public void onSave() {
         this.updatedAt = LocalDateTime.now();
     }
+
+    public String getPlatformCode() { return platformCode != null ? platformCode : "rocnovel"; }
+    public void setPlatformCode(String platformCode) { this.platformCode = platformCode; }
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }

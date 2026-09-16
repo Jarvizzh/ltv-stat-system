@@ -282,15 +282,24 @@ public class AdminUserController {
         }
 
         try {
+            String platformCode = (body != null && body.getPlatformCode() != null && !body.getPlatformCode().trim().isEmpty())
+                    ? body.getPlatformCode().trim() : "rocnovel";
             if (body != null && body.getLandingPages() != null) {
+                for (LandingPageConfigItem item : body.getLandingPages()) {
+                    if (item.getPlatformCode() == null || item.getPlatformCode().trim().isEmpty()) {
+                        item.setPlatformCode(platformCode);
+                    }
+                }
                 userService.updateUserLandingPageConfigs(id, body.getLandingPages());
             } else if (body != null && body.getLandingPageIds() != null) {
-                userService.updateUserLandingPageIds(id, body.getLandingPageIds());
+                userService.updateUserLandingPageIds(platformCode, id, body.getLandingPageIds());
             }
 
             // 重算该用户的统计
-            ltvStatService.calculateLtvStatsForUser(id);
-            dailyRechargeStatService.calculateDailyDistributionStatsForUser(id);
+            ltvStatService.calculateLtvStatsForUser(platformCode, id);
+            ltvStatService.calculateLtvStatsForUser("ALL", id);
+            dailyRechargeStatService.calculateDailyDistributionStatsForUser(platformCode, id);
+            dailyRechargeStatService.calculateDailyDistributionStatsForUser("ALL", id);
 
             return ResponseEntity.ok(ApiResponseDto.success("落地页配置保存成功，报表已同步计算完成！", null));
         } catch (Exception e) {

@@ -6,13 +6,17 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "user_landing_page", indexes = {
     @Index(name = "idx_user_id", columnList = "user_id"),
-    @Index(name = "idx_user_landing_page", columnList = "user_id, landing_page_id", unique = true)
+    @Index(name = "idx_platform_user", columnList = "platform_code, user_id"),
+    @Index(name = "idx_user_landing_page", columnList = "platform_code, user_id, landing_page_id", unique = true)
 })
 public class UserLandingPage {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "platform_code", nullable = false, length = 32)
+    private String platformCode = "rocnovel";
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
@@ -33,6 +37,9 @@ public class UserLandingPage {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public String getPlatformCode() { return platformCode != null ? platformCode : "rocnovel"; }
+    public void setPlatformCode(String platformCode) { this.platformCode = platformCode; }
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }

@@ -82,34 +82,45 @@ public class LtvStatService {
         this.asyncRecalculateService = asyncRecalculateService;
     }
 
-    public LtvLaunchConfig saveLaunchConfig(Long userId, LocalDate launchDate, BigDecimal spend, String remark) {
+    public LtvLaunchConfig saveLaunchConfig(String platformCode, Long userId, LocalDate launchDate, BigDecimal spend, String remark) {
         if (userId == null) userId = 1L;
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
+                ? platformCode.trim().toLowerCase() : "rocnovel";
         if (userService.isMasterAccount(userId)) {
             throw new IllegalArgumentException("主账号为数据汇总账号，消耗由关联子账号自动计算，不可直接编辑！");
         }
         final Long uid = userId;
-        LtvLaunchConfig config = ltvLaunchConfigRepository.findByUserIdAndLaunchDate(uid, launchDate).orElseGet(() -> {
+        final String finalPCode = pCode;
+        LtvLaunchConfig config = ltvLaunchConfigRepository.findByPlatformCodeAndUserIdAndLaunchDate(finalPCode, uid, launchDate).orElseGet(() -> {
             LtvLaunchConfig c = new LtvLaunchConfig();
+            c.setPlatformCode(finalPCode);
             c.setUserId(uid);
             c.setLaunchDate(launchDate);
             return c;
         });
+        config.setPlatformCode(finalPCode);
         config.setUserId(uid);
         config.setLaunchDate(launchDate);
         if (spend != null) config.setSpend(spend);
         if (remark != null) config.setRemark(remark);
         LtvLaunchConfig saved = ltvLaunchConfigRepository.saveAndFlush(config);
-        invalidateUserCache(uid);
+        invalidateUserCache(finalPCode, uid);
         return saved;
     }
 
+    public LtvLaunchConfig saveLaunchConfig(Long userId, LocalDate launchDate, BigDecimal spend, String remark) {
+        return saveLaunchConfig("rocnovel", userId, launchDate, spend, remark);
+    }
+
     public LtvLaunchConfig saveLaunchConfig(LocalDate launchDate, BigDecimal spend, String remark) {
-        return saveLaunchConfig(1L, launchDate, spend, remark);
+        return saveLaunchConfig("rocnovel", 1L, launchDate, spend, remark);
     }
 
     @Transactional
-    public int batchSaveLaunchConfig(Long userId, List<Map<String, Object>> items) {
+    public int batchSaveLaunchConfig(String platformCode, Long userId, List<Map<String, Object>> items) {
         if (userId == null) userId = 1L;
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
+                ? platformCode.trim().toLowerCase() : "rocnovel";
         if (userService.isMasterAccount(userId)) {
             throw new IllegalArgumentException("主账号为数据汇总账号，消耗由关联子账号自动计算，不可直接导入！");
         }
@@ -133,12 +144,15 @@ public class LtvStatService {
             final LocalDate fDate = launchDate;
             final BigDecimal fSpend = spend;
             final String fRemark = remark;
-            LtvLaunchConfig config = ltvLaunchConfigRepository.findByUserIdAndLaunchDate(uid, fDate).orElseGet(() -> {
+            final String finalPCode = pCode;
+            LtvLaunchConfig config = ltvLaunchConfigRepository.findByPlatformCodeAndUserIdAndLaunchDate(finalPCode, uid, fDate).orElseGet(() -> {
                 LtvLaunchConfig c = new LtvLaunchConfig();
+                c.setPlatformCode(finalPCode);
                 c.setUserId(uid);
                 c.setLaunchDate(fDate);
                 return c;
             });
+            config.setPlatformCode(finalPCode);
             config.setUserId(uid);
             config.setLaunchDate(fDate);
             if (fSpend != null) config.setSpend(fSpend);
@@ -147,9 +161,14 @@ public class LtvStatService {
             count++;
         }
         ltvLaunchConfigRepository.flush();
-        invalidateUserCache(userId);
-        calculateLtvStatsForUser(userId);
+        invalidateUserCache(pCode, userId);
+        calculateLtvStatsForUser(pCode, userId);
         return count;
+    }
+
+    @Transactional
+    public int batchSaveLaunchConfig(Long userId, List<Map<String, Object>> items) {
+        return batchSaveLaunchConfig("rocnovel", userId, items);
     }
 
     /**
@@ -222,11 +241,11 @@ public class LtvStatService {
 
 
     /**
-     * 根据特定用户配置的落地页 ID 过滤原始订单 (走数据库 landing_page_id 索引高效查询)
+     * 根据特定用户和平台配置的落地页 ID 过滤原始订单
      */
-    public List<RawOrder> getOrdersFilteredForUser(Long userId) {
+    public List<RawOrder> getOrdersFilteredForUser(String platformCode, Long userId) {
         if (userId == null) userId = 1L;
-        List<String> userPIds = userService.getUserLandingPageIds(userId);
+        List<String> userPIds = userService.getUserLandingPageIds(platformCode, userId);
 
         if (userPIds == null || userPIds.isEmpty()) {
             return Collections.emptyList();
@@ -242,26 +261,38 @@ public class LtvStatService {
             return Collections.emptyList();
         }
 
-        return rawOrderRepository.findByLandingPageIdIn(trimmedPIds);
+        if (platformCode == null || platformCode.trim().isEmpty() || "ALL".equalsIgnoreCase(platformCode.trim())) {
+            return rawOrderRepository.findByLandingPageIdIn(trimmedPIds);
+        } else {
+            return rawOrderRepository.findByPlatformCodeAndLandingPageIdIn(platformCode.trim().toLowerCase(), trimmedPIds);
+        }
+    }
+
+    public List<RawOrder> getOrdersFilteredForUser(Long userId) {
+        return getOrdersFilteredForUser("ALL", userId);
     }
 
     /**
-     * 计算并持久化指定用户的 LTV 统计表 (仅针对指定用户本身，不触发父级主账号)
+     * 计算并持久化指定用户和平台的 LTV 统计表 (仅针对指定用户本身，不触发父级主账号)
      */
     @Transactional
-    public void calculateLtvStatsForUserDirect(Long userId) {
+    public void calculateLtvStatsForUserDirect(String platformCode, Long userId) {
         if (userId == null) userId = 1L;
-        invalidateUserCache(userId);
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim().toLowerCase() : "all";
+        boolean isAll = "all".equalsIgnoreCase(pCode);
+        String targetPlatform = isAll ? "ALL" : pCode;
+
+        invalidateUserCache(pCode, userId);
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
         LocalDate todayEt = ZonedDateTime.now(TimeUtils.EASTERN_ZONE).toLocalDate();
         LocalDate maxToday = todayBj.isAfter(todayEt) ? todayBj : todayEt;
 
-        List<LandingPageConfigItem> userPages = userService.getUserLandingPageConfigs(userId);
+        List<LandingPageConfigItem> userPages = userService.getUserLandingPageConfigs(pCode, userId);
         Map<String, String> tzMap = userPages.stream()
                 .filter(p -> p.getLandingPageId() != null)
                 .collect(Collectors.toMap(p -> p.getLandingPageId().trim(), LandingPageConfigItem::getTimezone, (a, b) -> a));
 
-        List<RawOrder> orders = getOrdersFilteredForUser(userId);
+        List<RawOrder> orders = getOrdersFilteredForUser(pCode, userId);
 
         if (ltvBenchmarkService != null) {
             ltvBenchmarkService.recalculateBenchmarksForUser(userId);
@@ -292,7 +323,8 @@ public class LtvStatService {
 
             Map<LocalDate, BigDecimal> sumSpendMap = new HashMap<>();
             for (Long subId : subUserIds) {
-                List<LtvLaunchConfig> subConfigs = ltvLaunchConfigRepository.findByUserId(subId);
+                List<LtvLaunchConfig> subConfigs = isAll ? ltvLaunchConfigRepository.findByUserId(subId)
+                        : ltvLaunchConfigRepository.findByPlatformCodeAndUserId(pCode, subId);
                 for (LtvLaunchConfig sc : subConfigs) {
                     if (sc.getLaunchDate() != null && sc.getSpend() != null) {
                         sumSpendMap.merge(sc.getLaunchDate(), sc.getSpend(), BigDecimal::add);
@@ -302,6 +334,7 @@ public class LtvStatService {
             configsByDate = new HashMap<>();
             for (Map.Entry<LocalDate, BigDecimal> entry : sumSpendMap.entrySet()) {
                 LtvLaunchConfig mc = new LtvLaunchConfig();
+                mc.setPlatformCode(targetPlatform);
                 mc.setUserId(userId);
                 mc.setLaunchDate(entry.getKey());
                 mc.setSpend(entry.getValue());
@@ -309,8 +342,35 @@ public class LtvStatService {
                 configsByDate.put(entry.getKey(), mc);
             }
         } else {
-            configsByDate = ltvLaunchConfigRepository.findByUserId(userId).stream()
-                    .collect(Collectors.toMap(LtvLaunchConfig::getLaunchDate, c -> c));
+            List<LtvLaunchConfig> list = isAll ? ltvLaunchConfigRepository.findByUserId(userId)
+                    : ltvLaunchConfigRepository.findByPlatformCodeAndUserId(pCode, userId);
+            if (isAll) {
+                Map<LocalDate, BigDecimal> sumSpendMap = new HashMap<>();
+                Map<LocalDate, String> remarkMap = new HashMap<>();
+                for (LtvLaunchConfig c : list) {
+                    if (c.getLaunchDate() != null) {
+                        if (c.getSpend() != null) {
+                            sumSpendMap.merge(c.getLaunchDate(), c.getSpend(), BigDecimal::add);
+                        }
+                        if (c.getRemark() != null && !c.getRemark().trim().isEmpty()) {
+                            remarkMap.merge(c.getLaunchDate(), c.getRemark(), (r1, r2) -> r1 + "; " + r2);
+                        }
+                    }
+                }
+                configsByDate = new HashMap<>();
+                for (Map.Entry<LocalDate, BigDecimal> entry : sumSpendMap.entrySet()) {
+                    LtvLaunchConfig ac = new LtvLaunchConfig();
+                    ac.setPlatformCode("ALL");
+                    ac.setUserId(userId);
+                    ac.setLaunchDate(entry.getKey());
+                    ac.setSpend(entry.getValue());
+                    ac.setRemark(remarkMap.getOrDefault(entry.getKey(), ""));
+                    configsByDate.put(entry.getKey(), ac);
+                }
+            } else {
+                configsByDate = list.stream()
+                        .collect(Collectors.toMap(LtvLaunchConfig::getLaunchDate, c -> c, (a, b) -> a));
+            }
         }
 
         LocalDate currDate = START_DATE;
@@ -324,29 +384,40 @@ public class LtvStatService {
             String remark = isMasterAcc ? masterRemark : (launchConfig != null ? launchConfig.getRemark() : "");
 
             LtvDailyStat stat = calculateSingleCohort(userId, currDate, cohortOrders, spend, remark, maxToday, tzMap);
+            stat.setPlatformCode(targetPlatform);
             statList.add(stat);
             currDate = currDate.plusDays(1);
         }
 
-        ltvDailyStatRepository.deleteByUserId(userId);
+        ltvDailyStatRepository.deleteByPlatformCodeAndUserId(targetPlatform, userId);
         ltvDailyStatRepository.flush();
         ltvDailyStatRepository.saveAll(statList);
         ltvDailyStatRepository.flush();
 
-        invalidateUserCache(userId);
+        invalidateUserCache(pCode, userId);
+    }
+
+    @Transactional
+    public void calculateLtvStatsForUserDirect(Long userId) {
+        calculateLtvStatsForUserDirect("ALL", userId);
     }
 
     /**
      * 计算并持久化指定用户的 LTV 统计表，并异步触发关联主账号数据重算
      */
     @Transactional
-    public void calculateLtvStatsForUser(Long userId) {
-        calculateLtvStatsForUserDirect(userId);
+    public void calculateLtvStatsForUser(String platformCode, Long userId) {
+        calculateLtvStatsForUserDirect(platformCode, userId);
 
-        // 异步触发所属主账号的报表重算 (在后台独立线程执行，不阻塞前端)
+        // 异步触发所属主账号的报表重算
         if (asyncRecalculateService != null) {
             asyncRecalculateService.asyncRecalculateMastersForSubUser(userId);
         }
+    }
+
+    @Transactional
+    public void calculateLtvStatsForUser(Long userId) {
+        calculateLtvStatsForUser("ALL", userId);
     }
 
     /**
@@ -355,14 +426,19 @@ public class LtvStatService {
     @Transactional
     public void calculateAllLtvStatsOnly() {
         List<SysUser> users = userService.listAllUsers();
+        String[] platforms = new String[]{"ALL", "rocnovel", "flicknovel"};
         if (users.isEmpty()) {
-            calculateLtvStatsForUser(1L);
+            for (String p : platforms) {
+                calculateLtvStatsForUser(p, 1L);
+            }
         } else {
             for (SysUser user : users) {
-                calculateLtvStatsForUser(user.getId());
+                for (String p : platforms) {
+                    calculateLtvStatsForUser(p, user.getId());
+                }
             }
         }
-        log.info("LTV calculation completed for all active users.");
+        log.info("LTV calculation completed for all active users across platforms.");
     }
 
     @Transactional
@@ -545,69 +621,101 @@ public class LtvStatService {
     }
 
     @Transactional
-    public List<LtvDailyStat> getLtvDailyStats(Long userId) {
+    public List<LtvDailyStat> getLtvDailyStats(String platformCode, Long userId) {
         if (userId == null) userId = 1L;
-        List<LtvDailyStat> list = ltvDailyStatRepository.findByUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(userId, START_DATE);
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim().toUpperCase() : "ALL";
+        String targetPlatform = "ALL".equalsIgnoreCase(pCode) ? "ALL" : pCode.toLowerCase();
+        List<LtvDailyStat> list = ltvDailyStatRepository.findByPlatformCodeAndUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(targetPlatform, userId, START_DATE);
         if (list.isEmpty()) {
-            calculateLtvStatsForUser(userId);
-            list = ltvDailyStatRepository.findByUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(userId, START_DATE);
+            calculateLtvStatsForUser(targetPlatform, userId);
+            list = ltvDailyStatRepository.findByPlatformCodeAndUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(targetPlatform, userId, START_DATE);
         }
         return list;
     }
 
+    @Transactional
+    public List<LtvDailyStat> getLtvDailyStats(Long userId) {
+        return getLtvDailyStats("ALL", userId);
+    }
+
     public List<LtvDailyStat> getLtvDailyStats() {
-        return getLtvDailyStats(1L);
+        return getLtvDailyStats("ALL", 1L);
     }
 
     /**
-     * 计算指定用户的整体全盘预测回本天数
+     * 计算指定用户和平台的整体全盘预测回本天数
      */
-    public Integer getOverallPredictedPaybackDays(Long userId) {
-        List<LtvDailyStat> list = getLtvDailyStats(userId);
+    public Integer getOverallPredictedPaybackDays(String platformCode, Long userId) {
+        List<LtvDailyStat> list = getLtvDailyStats(platformCode, userId);
         PredictionResult pred = ltvPredictService.predictOverallCohort(list);
         return pred != null ? pred.getPredictedPaybackDays() : null;
     }
 
-    public PredictionResult getOverallPredictionResult(Long userId) {
-        List<LtvDailyStat> list = getLtvDailyStats(userId);
+    public Integer getOverallPredictedPaybackDays(Long userId) {
+        return getOverallPredictedPaybackDays("ALL", userId);
+    }
+
+    public PredictionResult getOverallPredictionResult(String platformCode, Long userId) {
+        List<LtvDailyStat> list = getLtvDailyStats(platformCode, userId);
         return ltvPredictService.predictOverallCohort(list);
     }
 
-    private final Map<Long, CachedLtvResponse> ltvListResponseCache = new ConcurrentHashMap<>();
+    public PredictionResult getOverallPredictionResult(Long userId) {
+        return getOverallPredictionResult("ALL", userId);
+    }
+
+    private final Map<String, CachedLtvResponse> ltvListResponseCache = new ConcurrentHashMap<>();
+
+    public void invalidateUserCache(String platformCode, Long userId) {
+        if (userId != null) {
+            String p = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim().toLowerCase() : "all";
+            ltvListResponseCache.remove(p + "_" + userId);
+            ltvListResponseCache.remove("all_" + userId);
+        } else {
+            ltvListResponseCache.clear();
+        }
+    }
 
     public void invalidateUserCache(Long userId) {
         if (userId != null) {
-            ltvListResponseCache.remove(userId);
+            ltvListResponseCache.keySet().removeIf(k -> k.endsWith("_" + userId));
         } else {
             ltvListResponseCache.clear();
         }
     }
 
     /**
-     * 方案一 + 方案二入口：带内存缓存与 Context 共享的极速 LTV 响应获取方法
+     * 方案一 + 方案二入口：带内存缓存与 Context 共享的极速 LTV 响应获取方法 (支持平台切片)
      */
-    public LtvListResponseDto getLtvListResponse(Long userId) {
+    public LtvListResponseDto getLtvListResponse(String platformCode, Long userId) {
         if (userId == null) userId = 1L;
-        CachedLtvResponse cached = ltvListResponseCache.get(userId);
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim().toLowerCase() : "all";
+        String cacheKey = pCode + "_" + userId;
+        CachedLtvResponse cached = ltvListResponseCache.get(cacheKey);
         if (cached != null && !cached.isExpired(10 * 60 * 1000L)) {
             return cached.data;
         }
 
-        LtvListResponseDto freshResponse = computeLtvListResponse(userId);
-        ltvListResponseCache.put(userId, new CachedLtvResponse(freshResponse));
+        LtvListResponseDto freshResponse = computeLtvListResponse(pCode, userId);
+        ltvListResponseCache.put(cacheKey, new CachedLtvResponse(freshResponse));
         return freshResponse;
     }
 
-    public LtvListResponseDto computeLtvListResponse(Long userId) {
+    public LtvListResponseDto getLtvListResponse(Long userId) {
+        return getLtvListResponse("ALL", userId);
+    }
+
+    public LtvListResponseDto computeLtvListResponse(String platformCode, Long userId) {
         if (userId == null) userId = 1L;
-        List<LtvDailyStat> list = getLtvDailyStats(userId);
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim().toLowerCase() : "all";
+        List<LtvDailyStat> list = getLtvDailyStats(pCode, userId);
         if (list.isEmpty()) {
-            calculateLtvStatsForUser(userId);
-            list = getLtvDailyStats(userId);
+            calculateLtvStatsForUser(pCode, userId);
+            list = getLtvDailyStats(pCode, userId);
         }
 
-        List<RawOrder> userOrders = getOrdersFilteredForUser(userId);
-        List<LandingPageConfigItem> userPages = userService.getUserLandingPageConfigs(userId);
+        List<RawOrder> userOrders = getOrdersFilteredForUser(pCode, userId);
+        List<LandingPageConfigItem> userPages = userService.getUserLandingPageConfigs(pCode, userId);
         Map<String, String> tzMap = (userPages != null) ? userPages.stream()
                 .filter(p -> p.getLandingPageId() != null)
                 .collect(Collectors.toMap(p -> p.getLandingPageId().trim(), LandingPageConfigItem::getTimezone, (a, b) -> a)) : Collections.emptyMap();

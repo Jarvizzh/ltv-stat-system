@@ -82,6 +82,10 @@ export default function App() {
   });
 
   const [usersList, setUsersList] = useState([]);
+  const [platformsList, setPlatformsList] = useState([]);
+  const [selectedPlatform, setSelectedPlatform] = useState(() => {
+    return localStorage.getItem('admin_selected_platform') || 'ALL';
+  });
   const [activeTab, setActiveTab] = useState('ltv'); // 'ltv' | 'distribution' | 'global-distribution' | 'settlement'
 
   useEffect(() => {
@@ -179,6 +183,34 @@ export default function App() {
     }
   };
 
+  const fetchPlatformsList = async () => {
+    const token = localStorage.getItem('admin_token');
+    if (!token) return;
+    try {
+      const res = await authFetch('/api/platform/list');
+      const json = await res.json();
+      if (json.code === 0 && Array.isArray(json.data)) {
+        setPlatformsList(json.data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch platforms list:', e);
+    }
+  };
+
+  const handleSelectPlatform = (platformCode) => {
+    const nextPlat = platformCode || 'ALL';
+    setSelectedPlatform(nextPlat);
+    localStorage.setItem('admin_selected_platform', nextPlat);
+    setData([]);
+    setDistributionData([]);
+    setDistributionSummary(null);
+    setGlobalDistributionData([]);
+    setGlobalDistributionSummary(null);
+    const pObj = platformsList.find(p => p.code.toLowerCase() === nextPlat.toLowerCase());
+    const name = pObj ? pObj.name : nextPlat;
+    showToast(`已切换至平台视图: [${name}]，已自动刷新数据`, 'info');
+  };
+
   const [backendOverallPaybackDays, setBackendOverallPaybackDays] = useState(null);
   const [backendOverallPaybackCycleDays, setBackendOverallPaybackCycleDays] = useState(null);
   const [overallPredictedDay30Roi, setOverallPredictedDay30Roi] = useState(null);
@@ -189,12 +221,13 @@ export default function App() {
   const [overallRetainedSubUsers, setOverallRetainedSubUsers] = useState(0);
   const [overallRetainedRate, setOverallRetainedRate] = useState('0.00%');
 
-  const fetchLtvData = async (overrideUserId) => {
+  const fetchLtvData = async (overrideUserId, overridePlatform) => {
     if (!localStorage.getItem('admin_token')) return;
     setLoading(true);
     const uid = overrideUserId !== undefined ? overrideUserId : targetUserId;
+    const plat = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
     try {
-      const res = await authFetch(`/api/ltv/list?targetUserId=${uid || ''}`);
+      const res = await authFetch(`/api/ltv/list?targetUserId=${uid || ''}&platformCode=${encodeURIComponent(plat || 'ALL')}`);
       const json = await res.json();
       if (json.code === 0 && Array.isArray(json.data)) {
         setData(json.data);
@@ -233,12 +266,13 @@ export default function App() {
     }
   };
 
-  const fetchDistributionData = async (overrideUserId) => {
+  const fetchDistributionData = async (overrideUserId, overridePlatform) => {
     if (!localStorage.getItem('admin_token')) return;
     setLoading(true);
     const uid = overrideUserId !== undefined ? overrideUserId : targetUserId;
+    const plat = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
     try {
-      const res = await authFetch(`/api/ltv/daily-distribution?targetUserId=${uid || ''}`);
+      const res = await authFetch(`/api/ltv/daily-distribution?targetUserId=${uid || ''}&platformCode=${encodeURIComponent(plat || 'ALL')}`);
       const json = await res.json();
       if (json.code === 0 && Array.isArray(json.data)) {
         setDistributionData(json.data);
@@ -256,12 +290,13 @@ export default function App() {
     }
   };
 
-  const fetchGlobalDistributionData = async () => {
+  const fetchGlobalDistributionData = async (overridePlatform) => {
     if (!localStorage.getItem('admin_token')) return;
     if (!hasPermGlobalDistribution) return;
     setLoading(true);
+    const plat = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
     try {
-      const res = await authFetch('/api/ltv/global-daily-distribution');
+      const res = await authFetch(`/api/ltv/global-daily-distribution?platformCode=${encodeURIComponent(plat || 'ALL')}`);
       const json = await res.json();
       if (json.code === 0 && Array.isArray(json.data)) {
         setGlobalDistributionData(json.data);
@@ -281,17 +316,18 @@ export default function App() {
   useEffect(() => {
     if (isAuthenticated) {
       fetchUsersList();
+      fetchPlatformsList();
       if (activeTab === 'ltv') {
-        fetchLtvData(targetUserId);
+        fetchLtvData(targetUserId, selectedPlatform);
       } else if (activeTab === 'distribution') {
-        fetchDistributionData(targetUserId);
+        fetchDistributionData(targetUserId, selectedPlatform);
       } else if (activeTab === 'global-distribution') {
         if (hasPermGlobalDistribution) {
-          fetchGlobalDistributionData();
+          fetchGlobalDistributionData(selectedPlatform);
         }
       }
     }
-  }, [isAuthenticated, activeTab, targetUserId, hasPermGlobalDistribution]);
+  }, [isAuthenticated, activeTab, targetUserId, selectedPlatform, hasPermGlobalDistribution]);
 
   const handleSelectTargetUser = (newUserId) => {
     setTargetUserId(newUserId);
@@ -301,12 +337,12 @@ export default function App() {
     setDistributionSummary(null);
 
     if (activeTab === 'ltv') {
-      fetchLtvData(newUserId);
+      fetchLtvData(newUserId, selectedPlatform);
     } else if (activeTab === 'distribution') {
-      fetchDistributionData(newUserId);
+      fetchDistributionData(newUserId, selectedPlatform);
     } else if (activeTab === 'global-distribution') {
       if (hasPermGlobalDistribution) {
-        fetchGlobalDistributionData();
+        fetchGlobalDistributionData(selectedPlatform);
       }
     }
     const userObj = usersList.find(u => u.id === newUserId);
@@ -338,15 +374,16 @@ export default function App() {
     setGlobalDistributionSummary(null);
 
     fetchUsersList();
+    fetchPlatformsList();
 
     // 立即自动拉取刷新新登录账号的数据
     if (activeTab === 'ltv') {
-      fetchLtvData(newUid);
+      fetchLtvData(newUid, selectedPlatform);
     } else if (activeTab === 'distribution') {
-      fetchDistributionData(newUid);
+      fetchDistributionData(newUid, selectedPlatform);
     } else if (activeTab === 'global-distribution') {
       if (userObj.role === 'SUPER_ADMIN' || userObj.permGlobalDistribution === 1) {
-        fetchGlobalDistributionData();
+        fetchGlobalDistributionData(selectedPlatform);
       }
     }
 
@@ -362,6 +399,7 @@ export default function App() {
     setCurrentUser(null);
     setTargetUserId(1);
     setUsersList([]);
+    setPlatformsList([]);
     setData([]);
     setDistributionData([]);
     setDistributionSummary(null);
@@ -371,20 +409,21 @@ export default function App() {
   };
 
   // 1. 仅抓取/同步订单
-  const handleSyncOrdersOnly = async (startTime, endTime) => {
+  const handleSyncOrdersOnly = async (startTime, endTime, platCode) => {
     setLoading(true);
     setLoadingType('orders');
     setErrorMessage('');
+    const p = platCode || selectedPlatform || 'ALL';
     try {
-      const res = await authFetch('/api/ltv/sync-orders', {
+      const res = await authFetch(`/api/ltv/sync-orders?platformCode=${encodeURIComponent(p)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startTime, endTime }),
+        body: JSON.stringify({ startTime, endTime, platformCode: p }),
       });
       const json = await res.json();
       if (json.code === 0) {
         setIsSyncModalOpen(false);
-        showToast(`订单同步成功 (${startTime} ~ ${endTime})，共抓取 ${json.totalSyncedOrders} 笔订单！`, 'success');
+        showToast(`[${p}] 订单同步成功 (${startTime} ~ ${endTime})，共抓取 ${json.totalSyncedOrders} 笔订单！`, 'success');
       } else if (json.code === 4002) {
         setErrorMessage(json.msg || '订单接口 Token 已过期');
         setIsSyncModalOpen(false);
@@ -404,20 +443,21 @@ export default function App() {
   };
 
   // 2. 仅重算 LTV & 充值分析全量报表
-  const handleRecalculateAllReports = async () => {
+  const handleRecalculateAllReports = async (platCode) => {
     setLoading(true);
     setLoadingType('calc');
+    const p = platCode || selectedPlatform || 'ALL';
     try {
-      const res = await authFetch(`/api/ltv/recalculate?targetUserId=${targetUserId || ''}`, { method: 'POST' });
+      const res = await authFetch(`/api/ltv/recalculate?targetUserId=${targetUserId || ''}&platformCode=${encodeURIComponent(p)}`, { method: 'POST' });
       const json = await res.json();
       if (json.code === 0) {
         setIsSyncModalOpen(false);
-        fetchLtvData();
-        fetchDistributionData();
+        fetchLtvData(targetUserId, selectedPlatform);
+        fetchDistributionData(targetUserId, selectedPlatform);
         if (hasPermGlobalDistribution) {
-          fetchGlobalDistributionData();
+          fetchGlobalDistributionData(selectedPlatform);
         }
-        showToast('LTV 与 充值分析全量报表重算完成！', 'success');
+        showToast(`[${p}] LTV 与 充值分析全量报表重算完成！`, 'success');
       } else {
         showToast(`提示: ${json.msg}`, 'warning');
       }
@@ -432,25 +472,26 @@ export default function App() {
   };
 
   // 4. 一键抓取订单 + 重算全量报表
-  const handleSyncAndCalcAll = async (startTime, endTime) => {
+  const handleSyncAndCalcAll = async (startTime, endTime, platCode) => {
     setLoading(true);
     setLoadingType('all');
     setErrorMessage('');
+    const p = platCode || selectedPlatform || 'ALL';
     try {
-      const res = await authFetch('/api/ltv/sync-and-calc', {
+      const res = await authFetch(`/api/ltv/sync-and-calc?platformCode=${encodeURIComponent(p)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startTime, endTime }),
+        body: JSON.stringify({ startTime, endTime, platformCode: p }),
       });
       const json = await res.json();
       if (json.code === 0) {
         setIsSyncModalOpen(false);
-        fetchLtvData();
-        fetchDistributionData();
+        fetchLtvData(targetUserId, selectedPlatform);
+        fetchDistributionData(targetUserId, selectedPlatform);
         if (hasPermGlobalDistribution) {
-          fetchGlobalDistributionData();
+          fetchGlobalDistributionData(selectedPlatform);
         }
-        showToast(`全流程抓取与重算完成！`, 'success');
+        showToast(`[${p}] 全流程抓取与重算完成！`, 'success');
       } else if (json.code === 4002) {
         setErrorMessage(json.msg);
         setIsSyncModalOpen(false);
@@ -470,18 +511,18 @@ export default function App() {
   };
 
   const handleSpendSaved = () => {
-    fetchLtvData();
+    fetchLtvData(targetUserId, selectedPlatform);
     showToast('投放消耗与备注更新成功！', 'success');
   };
 
   const handleBatchSpendSaved = (count) => {
-    fetchLtvData();
+    fetchLtvData(targetUserId, selectedPlatform);
     showToast(`批量导入成功！共写入/更新 ${count} 条消耗数据`, 'success');
   };
 
   const handleLandingPagesSaved = () => {
-    if (activeTab === 'ltv') fetchLtvData();
-    if (activeTab === 'distribution') fetchDistributionData();
+    if (activeTab === 'ltv') fetchLtvData(targetUserId, selectedPlatform);
+    if (activeTab === 'distribution') fetchDistributionData(targetUserId, selectedPlatform);
     if (currentUser.role === 'ADMIN') fetchUsersList();
     showToast('落地页配置保存成功，已完成专属报表实时重算！', 'success');
   };
@@ -643,6 +684,9 @@ export default function App() {
       <LtvHeader
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        selectedPlatform={selectedPlatform}
+        platformsList={platformsList}
+        onSelectPlatform={handleSelectPlatform}
         onOpenConfig={() => {
           setEditingTargetUserLandingPage(null);
           setIsConfigOpen(true);
@@ -961,6 +1005,7 @@ export default function App() {
             token={localStorage.getItem('admin_token')}
             currentUser={currentUser}
             showToast={showToast}
+            selectedPlatform={selectedPlatform}
           />
         )}
       </main>
@@ -971,6 +1016,8 @@ export default function App() {
         targetUser={editingTargetUserLandingPage}
         targetUserId={targetUserId}
         isReadOnly={isReadOnlyView}
+        platformCode={selectedPlatform}
+        platforms={platformsList}
         onClose={() => {
           setIsConfigOpen(false);
           setEditingTargetUserLandingPage(null);
@@ -1010,11 +1057,15 @@ export default function App() {
         onSyncAndCalcAll={handleSyncAndCalcAll}
         loading={loading}
         loadingType={loadingType}
+        platforms={platformsList}
+        selectedPlatform={selectedPlatform}
       />
 
       <BatchSpendModal
         isOpen={isBatchSpendOpen}
         targetUserId={targetUserId}
+        platforms={platformsList}
+        selectedPlatform={selectedPlatform}
         onClose={() => setIsBatchSpendOpen(false)}
         onSaved={handleBatchSpendSaved}
         authFetch={authFetch}
@@ -1024,6 +1075,7 @@ export default function App() {
         isOpen={!!editingRow}
         item={editingRow}
         targetUserId={targetUserId}
+        platformCode={selectedPlatform}
         onClose={() => setEditingRow(null)}
         onSaved={handleSpendSaved}
         authFetch={authFetch}

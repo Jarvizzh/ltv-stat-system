@@ -51,6 +51,7 @@ public class LtvStatServiceTest {
         rawOrderRepository.deleteAll();
         ltvDailyStatRepository.deleteAll();
         userLandingPageRepository.deleteAll();
+        ltvLaunchConfigRepository.deleteAll();
 
         // 绑定落地页给用户 1L
         com.ltv.stat.entity.UserLandingPage ulp = new com.ltv.stat.entity.UserLandingPage();

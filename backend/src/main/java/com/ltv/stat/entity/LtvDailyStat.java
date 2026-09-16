@@ -11,12 +11,19 @@ import java.time.LocalDateTime;
 public class LtvDailyStat {
 
     @Id
+    @Column(name = "platform_code", nullable = false, length = 32)
+    private String platformCode = "rocnovel";
+
+    @Id
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
     @Id
     @Column(name = "launch_date", nullable = false)
     private LocalDate launchDate;
+
+    public String getPlatformCode() { return platformCode != null ? platformCode : "rocnovel"; }
+    public void setPlatformCode(String platformCode) { this.platformCode = platformCode; }
 
     @Column(name = "spend", nullable = false, precision = 10, scale = 2)
     private BigDecimal spend = BigDecimal.ZERO;

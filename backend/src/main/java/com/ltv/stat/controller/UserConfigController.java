@@ -45,7 +45,9 @@ public class UserConfigController {
     }
 
     @GetMapping("/landing-pages")
-    public ResponseEntity<?> getMyLandingPages(@RequestParam(value = "targetUserId", required = false) Long targetUserId) {
+    public ResponseEntity<?> getMyLandingPages(
+            @RequestParam(value = "platformCode", required = false) String platformCode,
+            @RequestParam(value = "targetUserId", required = false) Long targetUserId) {
         TokenInfo currentUser = UserContext.getCurrentUser();
         if (currentUser == null || currentUser.getUserId() == null) {
             return ResponseEntity.status(401).body(ApiResponseDto.error(401, "未登录"));
@@ -56,14 +58,16 @@ public class UserConfigController {
             return ResponseEntity.status(403).body(ApiResponseDto.error(403, "无权访问该账户的视图"));
         }
 
-        List<LandingPageConfigItem> configs = userService.getUserLandingPageConfigs(userId);
+        List<LandingPageConfigItem> configs = userService.getUserLandingPageConfigs(platformCode, userId);
         List<String> pageIds = configs.stream().map(LandingPageConfigItem::getLandingPageId).collect(Collectors.toList());
 
         return ResponseEntity.ok(new UserLandingPageConfigResponseDto(configs, pageIds));
     }
 
     @PostMapping("/landing-pages")
-    public ResponseEntity<?> updateMyLandingPages(@RequestBody UserLandingPageUpdateRequestDto body) {
+    public ResponseEntity<?> updateMyLandingPages(
+            @RequestParam(value = "platformCode", required = false) String queryPlatformCode,
+            @RequestBody UserLandingPageUpdateRequestDto body) {
         TokenInfo currentUser = UserContext.getCurrentUser();
         if (currentUser == null || currentUser.getUserId() == null) {
             return ResponseEntity.status(401).body(ApiResponseDto.error(401, "未登录"));
@@ -74,16 +78,28 @@ public class UserConfigController {
             return ResponseEntity.status(403).body(ApiResponseDto.error(403, "该账户视图为只读模式，无法修改落地页配置"));
         }
 
+        String platformCode = (body != null && body.getPlatformCode() != null && !body.getPlatformCode().trim().isEmpty())
+                ? body.getPlatformCode().trim()
+                : (queryPlatformCode != null && !queryPlatformCode.trim().isEmpty() ? queryPlatformCode.trim() : "rocnovel");
+
         try {
             if (body != null && body.getLandingPages() != null) {
+                // Ensure platformCode is populated on items if missing
+                for (LandingPageConfigItem item : body.getLandingPages()) {
+                    if (item.getPlatformCode() == null || item.getPlatformCode().trim().isEmpty()) {
+                        item.setPlatformCode(platformCode);
+                    }
+                }
                 userService.updateUserLandingPageConfigs(userId, body.getLandingPages());
             } else if (body != null && body.getLandingPageIds() != null) {
-                userService.updateUserLandingPageIds(userId, body.getLandingPageIds());
+                userService.updateUserLandingPageIds(platformCode, userId, body.getLandingPageIds());
             }
 
-            // 立即触发当前用户的报表重算
-            ltvStatService.calculateLtvStatsForUser(userId);
-            dailyRechargeStatService.calculateDailyDistributionStatsForUser(userId);
+            // 立即触发当前用户和平台的报表重算，并联动刷新 ALL 大盘
+            ltvStatService.calculateLtvStatsForUser(platformCode, userId);
+            ltvStatService.calculateLtvStatsForUser("ALL", userId);
+            dailyRechargeStatService.calculateDailyDistributionStatsForUser(platformCode, userId);
+            dailyRechargeStatService.calculateDailyDistributionStatsForUser("ALL", userId);
 
             return ResponseEntity.ok(ApiResponseDto.success("落地页配置已更新，并完成个人报表秒级重算！", null));
         } catch (Exception e) {

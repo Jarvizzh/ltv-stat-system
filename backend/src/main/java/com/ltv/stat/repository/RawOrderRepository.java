@@ -9,9 +9,12 @@ import java.util.Optional;
 
 public interface RawOrderRepository extends JpaRepository<RawOrder, Long> {
     Optional<RawOrder> findByOrderId(String orderId);
+    Optional<RawOrder> findByPlatformCodeAndOrderId(String platformCode, String orderId);
+    List<RawOrder> findByPlatformCode(String platformCode);
     List<RawOrder> findByRegisterDateEt(LocalDate registerDateEt);
     List<RawOrder> findByRegisterDateEtGreaterThanEqual(LocalDate startDate);
     Optional<RawOrder> findTopByMemberIdAndIsSubsAndRenewTypeOrderByIdAsc(String memberId, Integer isSubs, Integer renewType);
     List<RawOrder> findByLandingPageIdIn(List<String> landingPageIds);
+    List<RawOrder> findByPlatformCodeAndLandingPageIdIn(String platformCode, List<String> landingPageIds);
     List<RawOrder> findByMemberId(String memberId);
 }

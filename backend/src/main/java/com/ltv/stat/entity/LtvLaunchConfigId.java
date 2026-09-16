@@ -5,15 +5,24 @@ import java.time.LocalDate;
 import java.util.Objects;
 
 public class LtvLaunchConfigId implements Serializable {
+    private String platformCode = "rocnovel";
     private Long userId;
     private LocalDate launchDate;
 
     public LtvLaunchConfigId() {}
 
     public LtvLaunchConfigId(Long userId, LocalDate launchDate) {
+        this("rocnovel", userId, launchDate);
+    }
+
+    public LtvLaunchConfigId(String platformCode, Long userId, LocalDate launchDate) {
+        this.platformCode = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim() : "rocnovel";
         this.userId = userId;
         this.launchDate = launchDate;
     }
+
+    public String getPlatformCode() { return platformCode; }
+    public void setPlatformCode(String platformCode) { this.platformCode = platformCode; }
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
@@ -26,11 +35,13 @@ public class LtvLaunchConfigId implements Serializable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         LtvLaunchConfigId that = (LtvLaunchConfigId) o;
-        return Objects.equals(userId, that.userId) && Objects.equals(launchDate, that.launchDate);
+        return Objects.equals(platformCode, that.platformCode) &&
+                Objects.equals(userId, that.userId) &&
+                Objects.equals(launchDate, that.launchDate);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(userId, launchDate);
+        return Objects.hash(platformCode, userId, launchDate);
     }
 }

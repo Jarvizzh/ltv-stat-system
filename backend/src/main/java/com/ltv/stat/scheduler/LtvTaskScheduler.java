@@ -2,7 +2,7 @@ package com.ltv.stat.scheduler;
 
 import com.ltv.stat.service.DailyRechargeStatService;
 import com.ltv.stat.service.LtvStatService;
-import com.ltv.stat.service.OrderSyncService;
+import com.ltv.stat.service.PlatformSyncManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 
 @Component
 @EnableScheduling
@@ -21,14 +20,14 @@ public class LtvTaskScheduler {
     private static final Logger log = LoggerFactory.getLogger(LtvTaskScheduler.class);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    private final OrderSyncService orderSyncService;
+    private final PlatformSyncManager platformSyncManager;
     private final LtvStatService ltvStatService;
     private final DailyRechargeStatService dailyRechargeStatService;
 
-    public LtvTaskScheduler(OrderSyncService orderSyncService,
+    public LtvTaskScheduler(PlatformSyncManager platformSyncManager,
                             LtvStatService ltvStatService,
                             DailyRechargeStatService dailyRechargeStatService) {
-        this.orderSyncService = orderSyncService;
+        this.platformSyncManager = platformSyncManager;
         this.ltvStatService = ltvStatService;
         this.dailyRechargeStatService = dailyRechargeStatService;
     }
@@ -38,7 +37,7 @@ public class LtvTaskScheduler {
      */
     @Scheduled(cron = "0 5 * * * ?", zone = "Asia/Shanghai")
     public void scheduledOrderFetch() {
-        log.info("Starting scheduled order fetch at xx:05 BJ Time (past 2 days)");
+        log.info("Starting scheduled order fetch across all platforms at xx:05 BJ Time (past 2 days)");
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
         LocalDate startBj = todayBj.minusDays(2);
 
@@ -46,9 +45,9 @@ public class LtvTaskScheduler {
         String endTimeStr = todayBj.format(DATE_FORMATTER);
 
         try {
-            orderSyncService.syncOrdersAll(startTimeStr, endTimeStr);
+            platformSyncManager.syncOrdersAllPlatforms(startTimeStr, endTimeStr);
         } catch (Exception e) {
-            log.error("Scheduled ALL order fetch failed", e);
+            log.error("Scheduled multi-platform order fetch failed", e);
         }
         log.info("Scheduled order fetch finished.");
     }
@@ -58,15 +57,15 @@ public class LtvTaskScheduler {
      */
     @Scheduled(cron = "0 40 0 * * ?", zone = "Asia/Shanghai")
     public void scheduledFullOrderFetch() {
-        log.info("Starting scheduled full order fetch at 00:40 BJ Time (from 2026-07-10 to today)");
+        log.info("Starting scheduled full order fetch across all platforms at 00:40 BJ Time (from 2026-07-10 to today)");
         LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
         String startTimeStr = "2026-07-10";
         String endTimeStr = todayBj.format(DATE_FORMATTER);
 
         try {
-            orderSyncService.syncOrdersAll(startTimeStr, endTimeStr);
+            platformSyncManager.syncOrdersAllPlatforms(startTimeStr, endTimeStr);
         } catch (Exception e) {
-            log.error("Scheduled full order fetch failed", e);
+            log.error("Scheduled multi-platform full order fetch failed", e);
         }
         log.info("Scheduled full order fetch finished.");
     }

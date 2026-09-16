@@ -467,16 +467,27 @@ public class UserService {
     }
 
     public List<String> getUserLandingPageIds(Long userId) {
+        return getUserLandingPageIds("ALL", userId);
+    }
+
+    public List<String> getUserLandingPageIds(String platformCode, Long userId) {
         if (userId == null) return Collections.emptyList();
-        return getUserLandingPageConfigs(userId).stream()
+        return getUserLandingPageConfigs(platformCode, userId).stream()
                 .map(com.ltv.stat.dto.LandingPageConfigItem::getLandingPageId)
                 .collect(Collectors.toList());
     }
 
     public List<com.ltv.stat.dto.LandingPageConfigItem> getUserLandingPageConfigs(Long userId) {
+        return getUserLandingPageConfigs("ALL", userId);
+    }
+
+    public List<com.ltv.stat.dto.LandingPageConfigItem> getUserLandingPageConfigs(String platformCode, Long userId) {
         if (userId == null) return Collections.emptyList();
         SysUser user = sysUserRepository.findById(userId).orElse(null);
         if (user == null) return Collections.emptyList();
+
+        boolean filterPlatform = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()));
+        String targetPlatform = filterPlatform ? platformCode.trim().toLowerCase() : null;
 
         // 若为主账号，自动聚合所有子账号配置的落地页（去重）
         if (user.isMasterAccount()) {
@@ -484,7 +495,7 @@ public class UserService {
             Set<String> uniquePids = new HashSet<>();
             List<com.ltv.stat.dto.LandingPageConfigItem> aggregated = new ArrayList<>();
             for (Long subId : subUserIds) {
-                List<com.ltv.stat.dto.LandingPageConfigItem> subConfigs = getUserLandingPageConfigs(subId);
+                List<com.ltv.stat.dto.LandingPageConfigItem> subConfigs = getUserLandingPageConfigs(platformCode, subId);
                 for (com.ltv.stat.dto.LandingPageConfigItem item : subConfigs) {
                     if (item != null && item.getLandingPageId() != null && !item.getLandingPageId().trim().isEmpty()) {
                         String pid = item.getLandingPageId().trim();
@@ -498,7 +509,12 @@ public class UserService {
             return aggregated;
         }
 
-        List<UserLandingPage> list = userLandingPageRepository.findByUserId(userId);
+        List<UserLandingPage> list;
+        if (filterPlatform) {
+            list = userLandingPageRepository.findByPlatformCodeAndUserId(targetPlatform, userId);
+        } else {
+            list = userLandingPageRepository.findByUserId(userId);
+        }
 
         // 如果是普通用户 (USER)，剔除已被管理员配置的隔离落地页 ID
         if ("USER".equalsIgnoreCase(user.getRole())) {
@@ -509,7 +525,7 @@ public class UserService {
         }
 
         return list.stream()
-                .map(ulp -> new com.ltv.stat.dto.LandingPageConfigItem(ulp.getLandingPageId(), ulp.getTimezone()))
+                .map(ulp -> new com.ltv.stat.dto.LandingPageConfigItem(ulp.getPlatformCode(), ulp.getLandingPageId(), ulp.getTimezone()))
                 .collect(Collectors.toList());
     }
 
@@ -540,39 +556,49 @@ public class UserService {
         userLandingPageRepository.deleteByUserId(userId);
         userLandingPageRepository.flush();
         if (items != null) {
-            Map<String, String> pidTzMap = new java.util.LinkedHashMap<>();
+            List<UserLandingPage> list = new ArrayList<>();
+            Set<String> seenPlatformPid = new HashSet<>();
             for (com.ltv.stat.dto.LandingPageConfigItem item : items) {
                 if (item != null && item.getLandingPageId() != null && !item.getLandingPageId().trim().isEmpty()) {
+                    String pCode = (item.getPlatformCode() != null && !item.getPlatformCode().trim().isEmpty()) ? item.getPlatformCode().trim().toLowerCase() : "rocnovel";
                     String pid = item.getLandingPageId().trim();
-                    String tz = (item.getTimezone() != null && "ET".equalsIgnoreCase(item.getTimezone().trim())) ? "ET" : "BJ";
-                    pidTzMap.put(pid, tz);
+                    String key = pCode + "_" + pid;
+                    if (!seenPlatformPid.contains(key)) {
+                        seenPlatformPid.add(key);
+                        String tz = (item.getTimezone() != null && "ET".equalsIgnoreCase(item.getTimezone().trim())) ? "ET" : "BJ";
+                        UserLandingPage ulp = new UserLandingPage();
+                        ulp.setPlatformCode(pCode);
+                        ulp.setUserId(userId);
+                        ulp.setLandingPageId(pid);
+                        ulp.setTimezone(tz);
+                        list.add(ulp);
+                    }
                 }
             }
-
-            List<UserLandingPage> list = new ArrayList<>();
-            for (Map.Entry<String, String> entry : pidTzMap.entrySet()) {
-                UserLandingPage ulp = new UserLandingPage();
-                ulp.setUserId(userId);
-                ulp.setLandingPageId(entry.getKey());
-                ulp.setTimezone(entry.getValue());
-                list.add(ulp);
+            if (!list.isEmpty()) {
+                userLandingPageRepository.saveAll(list);
+                userLandingPageRepository.flush();
             }
-            userLandingPageRepository.saveAll(list);
-            userLandingPageRepository.flush();
         }
     }
 
     @Transactional
-    public void updateUserLandingPageIds(Long userId, List<String> pageIds) {
+    public void updateUserLandingPageIds(String platformCode, Long userId, List<String> pageIds) {
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim().toLowerCase() : "rocnovel";
         if (pageIds == null) {
             updateUserLandingPageConfigs(userId, Collections.emptyList());
             return;
         }
         List<com.ltv.stat.dto.LandingPageConfigItem> items = pageIds.stream()
                 .filter(id -> id != null && !id.trim().isEmpty())
-                .map(id -> new com.ltv.stat.dto.LandingPageConfigItem(id.trim(), "BJ"))
+                .map(id -> new com.ltv.stat.dto.LandingPageConfigItem(pCode, id.trim(), "BJ"))
                 .collect(Collectors.toList());
         updateUserLandingPageConfigs(userId, items);
+    }
+
+    @Transactional
+    public void updateUserLandingPageIds(Long userId, List<String> pageIds) {
+        updateUserLandingPageIds("rocnovel", userId, pageIds);
     }
 
     public static String hashPassword(String rawPassword) {

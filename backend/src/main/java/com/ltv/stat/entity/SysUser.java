@@ -48,6 +48,9 @@ public class SysUser {
     @Column(name = "perm_video_gen", nullable = false)
     private Integer permVideoGen = 0; // AI视频生成
 
+    @Column(name = "allowed_platforms", length = 255)
+    private String allowedPlatforms = "ALL"; // 允许访问的平台，逗号分隔，如 "rocnovel,flicknovel" 或 "ALL"
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -114,6 +117,20 @@ public class SysUser {
     public Integer getPermVideoGen() { return permVideoGen != null ? permVideoGen : 0; }
     public void setPermVideoGen(Integer permVideoGen) { this.permVideoGen = permVideoGen; }
     public boolean hasPermVideoGen() { return isSuperAdmin() || Integer.valueOf(1).equals(this.permVideoGen); }
+
+    public String getAllowedPlatforms() { return allowedPlatforms != null ? allowedPlatforms : "ALL"; }
+    public void setAllowedPlatforms(String allowedPlatforms) { this.allowedPlatforms = allowedPlatforms; }
+
+    public boolean hasPlatformAccess(String platformCode) {
+        if (isSuperAdmin()) return true;
+        if (platformCode == null || platformCode.trim().isEmpty() || "ALL".equalsIgnoreCase(platformCode.trim())) {
+            String platforms = getAllowedPlatforms();
+            return platforms.contains("ALL");
+        }
+        String p = platformCode.trim().toLowerCase();
+        String current = getAllowedPlatforms().toLowerCase();
+        return current.contains("all") || current.contains(p);
+    }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

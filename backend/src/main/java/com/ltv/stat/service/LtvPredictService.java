@@ -167,10 +167,7 @@ public class LtvPredictService {
                 }
             }
 
-            List<LtvPredictBenchmark> benchmarkList = benchmarkService.getBenchmarkCurve(dimType, dimValue, period);
-            if ((benchmarkList == null || benchmarkList.isEmpty()) && !"ALL".equals(dimType)) {
-                benchmarkList = benchmarkService.getBenchmarkCurve("ALL", "DEFAULT", period);
-            }
+            List<LtvPredictBenchmark> benchmarkList = benchmarkService.getBenchmarkCurve(stat.getPlatformCode(), dimType, dimValue, period);
 
             if (benchmarkList != null && !benchmarkList.isEmpty()) {
                 for (LtvPredictBenchmark b : benchmarkList) {

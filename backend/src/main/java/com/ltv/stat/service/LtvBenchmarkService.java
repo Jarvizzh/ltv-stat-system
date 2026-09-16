@@ -149,17 +149,49 @@ public class LtvBenchmarkService {
     }
 
     @Transactional
-    public List<LtvPredictBenchmark> getBenchmarkCurve(String dimensionType, String dimensionValue, Integer subPeriodDays) {
-        List<LtvPredictBenchmark> list = benchmarkRepository
-                .findByDimensionTypeAndDimensionValueAndSubPeriodDaysOrderByDayIndexAsc(dimensionType, dimensionValue, subPeriodDays);
-        if (list.isEmpty() && !"ALL".equalsIgnoreCase(dimensionType)) {
-            list = benchmarkRepository.findByDimensionTypeAndDimensionValueAndSubPeriodDaysOrderByDayIndexAsc("ALL", "DEFAULT", subPeriodDays);
+    public List<LtvPredictBenchmark> getBenchmarkCurve(String platformCode, String dimensionType, String dimensionValue, Integer subPeriodDays) {
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
+                ? platformCode.trim().toLowerCase() : null;
+
+        List<LtvPredictBenchmark> list = Collections.emptyList();
+
+        // Level 1: (PLATFORM_USER, platformCode + ":" + userId) if platformCode is specified and dimType is USER
+        if (pCode != null && "USER".equalsIgnoreCase(dimensionType)) {
+            list = benchmarkRepository.findByDimensionTypeAndDimensionValueAndSubPeriodDaysOrderByDayIndexAsc(
+                    "PLATFORM_USER", pCode + ":" + dimensionValue, subPeriodDays);
         }
+
+        // Level 2: (PLATFORM, platformCode) if platformCode is specified
+        if (list.isEmpty() && pCode != null) {
+            list = benchmarkRepository.findByDimensionTypeAndDimensionValueAndSubPeriodDaysOrderByDayIndexAsc(
+                    "PLATFORM", pCode, subPeriodDays);
+        }
+
+        // Level 3: (USER, userId)
+        if (list.isEmpty() && "USER".equalsIgnoreCase(dimensionType)) {
+            list = benchmarkRepository.findByDimensionTypeAndDimensionValueAndSubPeriodDaysOrderByDayIndexAsc(
+                    "USER", dimensionValue, subPeriodDays);
+        }
+
+        // Level 4: (ALL, DEFAULT)
+        if (list.isEmpty()) {
+            list = benchmarkRepository.findByDimensionTypeAndDimensionValueAndSubPeriodDaysOrderByDayIndexAsc(
+                    "ALL", "DEFAULT", subPeriodDays);
+        }
+
+        // Fallback: Populate seed benchmarks if still empty
         if (list.isEmpty()) {
             populateSeedBenchmarks("ALL", "DEFAULT", subPeriodDays);
-            list = benchmarkRepository.findByDimensionTypeAndDimensionValueAndSubPeriodDaysOrderByDayIndexAsc("ALL", "DEFAULT", subPeriodDays);
+            list = benchmarkRepository.findByDimensionTypeAndDimensionValueAndSubPeriodDaysOrderByDayIndexAsc(
+                    "ALL", "DEFAULT", subPeriodDays);
         }
+
         return list;
+    }
+
+    @Transactional
+    public List<LtvPredictBenchmark> getBenchmarkCurve(String dimensionType, String dimensionValue, Integer subPeriodDays) {
+        return getBenchmarkCurve(null, dimensionType, dimensionValue, subPeriodDays);
     }
 
     @Transactional

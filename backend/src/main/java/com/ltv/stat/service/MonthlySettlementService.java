@@ -49,17 +49,25 @@ public class MonthlySettlementService {
 
     /**
      * 获取月度结算列表
+     * @param platformCode 平台代码，如 "rocnovel", "flicknovel", "ALL"
      * @param settlementType "PLATFORM_ALL", "USER_ACCOUNT", "UNLINKED_PID"
      * @param targetUserId 针对 USER_ACCOUNT 类型传入
      */
-    public List<MonthlySettlementItemDto> getMonthlySettlementList(String settlementType, Long targetUserId) {
+    public List<MonthlySettlementItemDto> getMonthlySettlementList(String platformCode, String settlementType, Long targetUserId) {
         String type = (settlementType != null && !settlementType.trim().isEmpty()) ? settlementType.trim().toUpperCase() : "PLATFORM_ALL";
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
+                ? platformCode.trim().toLowerCase() : "ALL";
 
-        // 获取全部订单数据
-        List<RawOrder> allOrders = rawOrderRepository.findAll();
+        // 获取全部或平台特定订单数据
+        List<RawOrder> allOrders = "ALL".equals(pCode)
+                ? rawOrderRepository.findAll()
+                : rawOrderRepository.findByPlatformCode(pCode);
 
-        // 获取系统中所有已配置的落地页 ID 集合
-        Set<String> allConfiguredPids = userLandingPageRepository.findAll().stream()
+        // 获取系统中已配置的落地页 ID 集合
+        List<UserLandingPage> landingPages = "ALL".equals(pCode)
+                ? userLandingPageRepository.findAll()
+                : userLandingPageRepository.findByPlatformCode(pCode);
+        Set<String> allConfiguredPids = landingPages.stream()
                 .map(UserLandingPage::getLandingPageId)
                 .filter(pid -> pid != null && !pid.trim().isEmpty())
                 .map(String::trim)
@@ -69,7 +77,7 @@ public class MonthlySettlementService {
         Set<String> userPids = Collections.emptySet();
         String targetUsername = null;
         if ("USER_ACCOUNT".equals(type) && targetUserId != null) {
-            List<String> pids = userService.getUserLandingPageIds(targetUserId);
+            List<String> pids = userService.getUserLandingPageIds(pCode, targetUserId);
             userPids = pids.stream().filter(p -> p != null && !p.trim().isEmpty()).map(String::trim).collect(Collectors.toSet());
             targetUsername = userService.findById(targetUserId).map(SysUser::getUsername).orElse("用户#" + targetUserId);
         }
@@ -264,6 +272,10 @@ public class MonthlySettlementService {
         }
 
         return resultList;
+    }
+
+    public List<MonthlySettlementItemDto> getMonthlySettlementList(String settlementType, Long targetUserId) {
+        return getMonthlySettlementList("ALL", settlementType, targetUserId);
     }
 
     /**

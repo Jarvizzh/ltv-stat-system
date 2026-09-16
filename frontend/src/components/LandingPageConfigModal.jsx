@@ -7,7 +7,29 @@ const TIMEZONE_OPTIONS = [
   { label: '北京时区 (BJ)', value: 'BJ' },
 ];
 
-export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authFetch, targetUser, targetUserId, isReadOnly }) {
+export default function LandingPageConfigModal({
+  isOpen,
+  onClose,
+  onSaved,
+  authFetch,
+  targetUser,
+  targetUserId,
+  isReadOnly,
+  platformCode = 'rocnovel',
+  platforms = [],
+}) {
+  const concretePlatforms = (platforms && platforms.length > 0)
+    ? platforms.filter((p) => p.code !== 'ALL' && !p.isAll)
+    : [
+        { code: 'rocnovel', name: 'ROCNOVEL (中文在线)' },
+        { code: 'flicknovel', name: 'FLICKNOVEL (番茄海外)' },
+      ];
+
+  const initialPlat = (platformCode && platformCode !== 'ALL')
+    ? platformCode
+    : (concretePlatforms[0]?.code || 'rocnovel');
+
+  const [modalPlatform, setModalPlatform] = useState(initialPlat);
   const [items, setItems] = useState([]); // [{ landingPageId: '', timezone: 'BJ' }]
   const [mode, setMode] = useState('list'); // 'list' | 'batch'
   const [batchText, setBatchText] = useState('');
@@ -19,17 +41,31 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
 
   useEffect(() => {
     if (isOpen) {
+      const plat = (platformCode && platformCode !== 'ALL')
+        ? platformCode
+        : (concretePlatforms[0]?.code || 'rocnovel');
+      setModalPlatform(plat);
+    }
+  }, [isOpen, platformCode]);
+
+  useEffect(() => {
+    if (isOpen) {
       setMsg('');
       setLoading(true);
 
-      const query = targetUserId ? `?targetUserId=${targetUserId}` : '';
+      const queryParts = [];
+      if (modalPlatform) queryParts.push(`platformCode=${encodeURIComponent(modalPlatform)}`);
+      if (targetUserId) queryParts.push(`targetUserId=${encodeURIComponent(targetUserId)}`);
+      const query = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+
       fetchFunc(`/api/user/landing-pages${query}`)
         .then((res) => res.json())
         .then((data) => {
           if (data && data.code === 0) {
             let list = [];
-            if (Array.isArray(data.data)) {
-              list = data.data.map((item) => {
+            const resultList = data.data && data.data.configs ? data.data.configs : data.data;
+            if (Array.isArray(resultList)) {
+              list = resultList.map((item) => {
                 if (typeof item === 'string') {
                   return { landingPageId: item, timezone: 'BJ' };
                 }
@@ -54,7 +90,7 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
         .catch((err) => console.error(err))
         .finally(() => setLoading(false));
     }
-  }, [isOpen, targetUser, targetUserId]);
+  }, [isOpen, targetUser, targetUserId, modalPlatform]);
 
   if (!isOpen) return null;
 
@@ -117,6 +153,7 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
       .map((it) => ({
         landingPageId: (it.landingPageId || '').trim(),
         timezone: (it.timezone || 'BJ').toUpperCase() === 'ET' ? 'ET' : 'BJ',
+        platformCode: modalPlatform,
       }))
       .filter((it) => it.landingPageId.length > 0);
 
@@ -134,7 +171,7 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
             tz = 'ET';
           }
         }
-        return { landingPageId: pid, timezone: tz };
+        return { landingPageId: pid, timezone: tz, platformCode: modalPlatform };
       });
     }
 
@@ -145,8 +182,8 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
     const method = targetUser ? 'PUT' : 'POST';
 
     const payload = targetUser
-      ? { landingPages: validItems }
-      : { landingPages: validItems, targetUserId: targetUserId || null };
+      ? { platformCode: modalPlatform, landingPages: validItems }
+      : { platformCode: modalPlatform, landingPages: validItems, targetUserId: targetUserId || null };
 
     try {
       const res = await fetchFunc(endpoint, {
@@ -202,6 +239,34 @@ export default function LandingPageConfigModal({ isOpen, onClose, onSaved, authF
               marginBottom: '0.85rem'
             }}>
               ⚠️ 当前视图为只读模式/主账号视图，当前账户配置的落地页仅供查看。
+            </div>
+          )}
+
+          {concretePlatforms.length > 1 && (
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-sub)', marginBottom: '0.4rem' }}>
+                业务平台：
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {concretePlatforms.map((p) => {
+                  const isActive = modalPlatform.toLowerCase() === p.code.toLowerCase();
+                  return (
+                    <button
+                      key={p.code}
+                      type="button"
+                      className={`btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{
+                        padding: '0.35rem 0.8rem',
+                        fontSize: '0.85rem',
+                        fontWeight: isActive ? 600 : 400,
+                      }}
+                      onClick={() => setModalPlatform(p.code)}
+                    >
+                      {p.name || p.code}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 

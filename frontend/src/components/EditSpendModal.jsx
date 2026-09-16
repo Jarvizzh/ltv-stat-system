@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, AlertCircle } from 'lucide-react';
 
-export default function EditSpendModal({ isOpen, item, onClose, onSaved, authFetch, targetUserId }) {
+export default function EditSpendModal({ isOpen, item, onClose, onSaved, authFetch, targetUserId, selectedPlatform }) {
   const [spend, setSpend] = useState('');
   const [remark, setRemark] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,11 +34,16 @@ export default function EditSpendModal({ isOpen, item, onClose, onSaved, authFet
       return;
     }
 
+    const effectivePlatform = (item.platformCode && item.platformCode !== 'ALL')
+      ? item.platformCode
+      : (selectedPlatform && selectedPlatform !== 'ALL' ? selectedPlatform : 'rocnovel');
+
     try {
       const res = await fetchFunc('/api/ltv/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          platformCode: effectivePlatform,
           launchDate: item.launchDate,
           spend: parsedSpend,
           remark: remark,

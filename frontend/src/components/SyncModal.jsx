@@ -9,6 +9,8 @@ export default function SyncModal({
   onSyncAndCalcAll,
   loading,
   loadingType, // 'orders' | 'calc' | 'all' | null
+  platforms = [],
+  selectedPlatform = 'ALL',
 }) {
   const getTodayStr = () => {
     const today = new Date();
@@ -28,8 +30,16 @@ export default function SyncModal({
   };
 
   const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'calc'
+  const [syncPlatform, setSyncPlatform] = useState(selectedPlatform || 'ALL');
   const [startTime, setStartTime] = useState(getPastDateStr(3));
   const [endTime, setEndTime] = useState(getTodayStr());
+
+  // Update syncPlatform when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      setSyncPlatform(selectedPlatform || 'ALL');
+    }
+  }, [isOpen, selectedPlatform]);
 
   if (!isOpen) return null;
 
@@ -62,6 +72,35 @@ export default function SyncModal({
           <button className="btn btn-secondary" style={{ padding: '0.25rem' }} onClick={onClose}>
             <X size={18} />
           </button>
+        </div>
+
+        {/* Platform Selection */}
+        <div style={{ padding: '0.85rem 1.5rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-sub)' }}>目标平台：</span>
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className={`btn ${syncPlatform === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem', fontWeight: syncPlatform === 'ALL' ? 600 : 400 }}
+              onClick={() => setSyncPlatform('ALL')}
+            >
+              全平台综合 (ALL)
+            </button>
+            {platforms.filter(p => p.code !== 'ALL' && !p.isAll).map(p => {
+              const active = syncPlatform.toLowerCase() === p.code.toLowerCase();
+              return (
+                <button
+                  key={p.code}
+                  type="button"
+                  className={`btn ${active ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem', fontWeight: active ? 600 : 400 }}
+                  onClick={() => setSyncPlatform(p.code)}
+                >
+                  {p.name || p.code}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Tab Selection Navigation */}
@@ -144,7 +183,7 @@ export default function SyncModal({
                   type="button"
                   className="btn btn-primary"
                   disabled={loading}
-                  onClick={() => onSyncOrders(startTime, endTime)}
+                  onClick={() => onSyncOrders(startTime, endTime, syncPlatform)}
                 >
                   <DownloadCloud size={16} className={loading && loadingType === 'orders' ? 'spin' : ''} />
                   <span>{loading && loadingType === 'orders' ? '正在抓取订单...' : '开始抓取订单'}</span>
@@ -170,7 +209,7 @@ export default function SyncModal({
                   type="button"
                   className="btn btn-primary"
                   disabled={loading}
-                  onClick={onRecalculateAllReports}
+                  onClick={() => onRecalculateAllReports(syncPlatform)}
                   style={{ background: 'linear-gradient(135deg, var(--accent-cyan), var(--accent-blue))' }}
                 >
                   <BarChart2 size={16} className={loading && loadingType === 'calc' ? 'spin' : ''} />
@@ -187,7 +226,7 @@ export default function SyncModal({
             type="button"
             className="btn btn-secondary"
             disabled={loading}
-            onClick={() => onSyncAndCalcAll(startTime, endTime)}
+            onClick={() => onSyncAndCalcAll(startTime, endTime, syncPlatform)}
             title="一键按顺序执行：1.抓取订单 -> 2.重算LTV与充值分析"
             style={{ fontSize: '0.8rem' }}
           >

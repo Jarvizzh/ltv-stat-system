@@ -8,7 +8,10 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "raw_order", indexes = {
     @Index(name = "idx_reg_date", columnList = "register_date_et"),
-    @Index(name = "idx_landing_page", columnList = "landing_page_id")
+    @Index(name = "idx_landing_page", columnList = "landing_page_id"),
+    @Index(name = "idx_platform_landing", columnList = "platform_code, landing_page_id")
+}, uniqueConstraints = {
+    @UniqueConstraint(name = "uk_platform_order", columnNames = {"platform_code", "order_id"})
 })
 public class RawOrder {
 
@@ -16,7 +19,10 @@ public class RawOrder {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "order_id", nullable = false, unique = true)
+    @Column(name = "platform_code", nullable = false, length = 32)
+    private String platformCode = "rocnovel";
+
+    @Column(name = "order_id", nullable = false)
     private String orderId;
 
     @Column(name = "member_id", nullable = false)
@@ -61,6 +67,9 @@ public class RawOrder {
     @Column(name = "refund_status")
     private Integer refundStatus = 0;
 
+    @Column(name = "raw_payload", columnDefinition = "TEXT")
+    private String rawPayload;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -72,8 +81,14 @@ public class RawOrder {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
+    public String getPlatformCode() { return platformCode != null ? platformCode : "rocnovel"; }
+    public void setPlatformCode(String platformCode) { this.platformCode = platformCode; }
+
     public String getOrderId() { return orderId; }
     public void setOrderId(String orderId) { this.orderId = orderId; }
+
+    public String getRawPayload() { return rawPayload; }
+    public void setRawPayload(String rawPayload) { this.rawPayload = rawPayload; }
 
     public String getMemberId() { return memberId; }
     public void setMemberId(String memberId) { this.memberId = memberId; }

@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import CustomSelect from './CustomSelect';
 
-export default function MonthlySettlementTable({ token, currentUser, showToast }) {
+export default function MonthlySettlementTable({ token, currentUser, showToast, selectedPlatform = 'ALL' }) {
   const isAdmin = currentUser && (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'ADMIN');
 
   const [settlementType, setSettlementType] = useState(isAdmin ? 'PLATFORM_ALL' : 'USER_ACCOUNT'); // 'PLATFORM_ALL' | 'USER_ACCOUNT' | 'UNLINKED_PID'
@@ -85,7 +85,8 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
       const effectiveType = isAdmin ? type : 'USER_ACCOUNT';
       const selfId = currentUser?.userId || currentUser?.id;
       const effectiveUid = effectiveType === 'USER_ACCOUNT' ? (isAdmin ? (uid || selfId) : selfId) : '';
-      const res = await fetch(`/api/settlement/list?settlementType=${effectiveType}&targetUserId=${effectiveUid || ''}`, {
+      const platParam = selectedPlatform ? `&platformCode=${encodeURIComponent(selectedPlatform)}` : '';
+      const res = await fetch(`/api/settlement/list?settlementType=${effectiveType}&targetUserId=${effectiveUid || ''}${platParam}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -104,7 +105,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast }
 
   useEffect(() => {
     fetchSettlementList(settlementType, selectedUserId);
-  }, [settlementType, selectedUserId, isAdmin]);
+  }, [settlementType, selectedUserId, isAdmin, selectedPlatform]);
 
   // 3. 处理单元格编辑与实时计算
   const handleCellChange = (monthStr, field, rawValue, displayVal, displayField) => {
