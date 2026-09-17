@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Link2, Plus, Trash2, FileText, List } from 'lucide-react';
+import { X, Save, Link2, Plus, Trash2, FileText, List, RotateCcw } from 'lucide-react';
 import CustomSelect from './CustomSelect';
 
 const TIMEZONE_OPTIONS = [
@@ -17,7 +17,9 @@ export default function LandingPageConfigModal({
   isReadOnly,
   platformCode = 'rocnovel',
   platforms = [],
+  currentUser,
 }) {
+  const isAdmin = (currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN')) || false;
   const concretePlatforms = (platforms && platforms.length > 0)
     ? platforms.filter((p) => p.code !== 'ALL' && !p.isAll)
     : [
@@ -75,9 +77,6 @@ export default function LandingPageConfigModal({
                 };
               });
             }
-            if (list.length === 0) {
-              list = [{ landingPageId: '', timezone: 'BJ' }];
-            }
             setItems(list);
 
             // Sync batch text
@@ -93,6 +92,33 @@ export default function LandingPageConfigModal({
   }, [isOpen, targetUser, targetUserId, modalPlatform]);
 
   if (!isOpen) return null;
+
+  const handleLoadAllPids = async () => {
+    if (isReadOnly || !isAdmin) return;
+    try {
+      setLoading(true);
+      setMsg('正在从系统加载该平台的全部推广ID...');
+      const res = await fetchFunc(`/api/user/all-landing-pages?platformCode=${encodeURIComponent(modalPlatform)}`);
+      const data = await res.json();
+      if (data && data.code === 0 && Array.isArray(data.data) && data.data.length > 0) {
+        const fullList = data.data.map((pid) => ({
+          landingPageId: pid,
+          timezone: 'BJ',
+        }));
+        setItems(fullList);
+        const batchLines = fullList.map((it) => `${it.landingPageId} 北京`);
+        setBatchText(batchLines.join('\n'));
+        setMsg(`已成功载入 ${fullList.length} 个全部推广ID！您可以手动删除无需关注的项后保存。`);
+      } else {
+        setMsg('系统中暂未记录该平台的推广ID');
+      }
+    } catch (err) {
+      console.error(err);
+      setMsg('载入全量推广ID失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddItem = () => {
     if (isReadOnly) return;
@@ -289,63 +315,118 @@ export default function LandingPageConfigModal({
                 <span>批量文本查看</span>
               </button>
             </div>
+
+            {!isReadOnly && isAdmin && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: '0.8rem', padding: '0.32rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                onClick={handleLoadAllPids}
+                title="载入系统已知当前平台的全部推广ID"
+              >
+                <RotateCcw size={14} />
+                <span>载入全量推广ID</span>
+              </button>
+            )}
           </div>
 
           {mode === 'list' ? (
             <div>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-sub)', marginBottom: '0.75rem' }}>
-                查看已配置的落地页 ID 及其归属时区。
-              </p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {items.map((item, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      background: 'var(--bg-secondary)',
-                      padding: '0.4rem 0.6rem',
-                      borderRadius: '0.375rem',
-                      border: '1px solid var(--border-color)',
-                    }}
-                  >
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', width: '24px', textAlign: 'center' }}>
-                      {idx + 1}
-                    </span>
-                    <input
-                      type="text"
-                      className="form-input"
-                      style={{ flex: 1, padding: '0.35rem 0.6rem', fontSize: '0.85rem' }}
-                      placeholder="落地页 ID (pId)"
-                      value={item.landingPageId}
-                      disabled={isReadOnly}
-                      onChange={(e) => handleItemChange(idx, 'landingPageId', e.target.value)}
-                    />
-                    <CustomSelect
-                      value={item.timezone}
-                      onChange={(val) => handleItemChange(idx, 'timezone', val)}
-                      options={TIMEZONE_OPTIONS}
-                      disabled={isReadOnly}
-                      style={{ width: '135px' }}
-                    />
-                    {!isReadOnly && (
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ padding: '0.35rem', color: '#f43f5e' }}
-                        onClick={() => handleRemoveItem(idx)}
-                        title="删除此项"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
-                ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-sub)', margin: 0 }}>
+                  当前共 {items.length} 个推广ID配置项，支持单独修改时区或手动删除。
+                </p>
               </div>
 
-              {!isReadOnly && (
+              {items.length === 0 ? (
+                <div style={{
+                  padding: '2rem 1rem',
+                  textAlign: 'center',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: '0.5rem',
+                  border: '1px dashed var(--border-color)',
+                  color: 'var(--text-sub)',
+                  fontSize: '0.85rem',
+                }}>
+                  <p style={{ marginBottom: '0.75rem' }}>
+                    {isAdmin ? '当前暂无配置任何推广ID（保存将按空配置生效）' : '当前暂无配置任何推广ID，请点击下方添加或由管理员配置'}
+                  </p>
+                  {!isReadOnly && (
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{ fontSize: '0.82rem', padding: '0.35rem 0.8rem' }}
+                          onClick={handleLoadAllPids}
+                        >
+                          <RotateCcw size={14} style={{ marginRight: 4 }} />
+                          一键载入全量推广ID
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className={isAdmin ? "btn btn-secondary" : "btn btn-primary"}
+                        style={{ fontSize: '0.82rem', padding: '0.35rem 0.8rem' }}
+                        onClick={handleAddItem}
+                      >
+                        <Plus size={14} style={{ marginRight: 4 }} />
+                        手动添加
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {items.map((item, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        background: 'var(--bg-secondary)',
+                        padding: '0.4rem 0.6rem',
+                        borderRadius: '0.375rem',
+                        border: '1px solid var(--border-color)',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', width: '24px', textAlign: 'center' }}>
+                        {idx + 1}
+                      </span>
+                      <input
+                        type="text"
+                        className="form-input"
+                        style={{ flex: 1, padding: '0.35rem 0.6rem', fontSize: '0.85rem' }}
+                        placeholder="落地页/推广 ID (pId)"
+                        value={item.landingPageId}
+                        disabled={isReadOnly}
+                        onChange={(e) => handleItemChange(idx, 'landingPageId', e.target.value)}
+                      />
+                      <CustomSelect
+                        value={item.timezone}
+                        onChange={(val) => handleItemChange(idx, 'timezone', val)}
+                        options={TIMEZONE_OPTIONS}
+                        disabled={isReadOnly}
+                        style={{ width: '135px' }}
+                      />
+                      {!isReadOnly && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ padding: '0.35rem', color: '#f43f5e' }}
+                          onClick={() => handleRemoveItem(idx)}
+                          title="删除此项"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!isReadOnly && items.length > 0 && (
                 <button
                   type="button"
                   className="btn btn-secondary"

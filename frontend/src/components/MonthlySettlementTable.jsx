@@ -486,7 +486,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast, 
               <Wallet size={14} color="#3b82f6" />
             </div>
           </div>
-          <div className="stat-value" style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', letterSpacing: '-0.01em' }}>
+          <div className="stat-value" style={{ fontSize: '1.12rem', fontWeight: 700, color: 'var(--text-main)', letterSpacing: '-0.01em' }}>
             {formatUsd(totalRechargeSum)}
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', marginTop: '0.2rem', display: 'block' }}>
@@ -509,11 +509,11 @@ export default function MonthlySettlementTable({ token, currentUser, showToast, 
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.45rem' }}>
-            <span className="stat-value" style={{ fontSize: '1.2rem', fontWeight: 700, color: '#f43f5e', letterSpacing: '-0.01em' }}>
+            <span className="stat-value" style={{ fontSize: '1.12rem', fontWeight: 700, color: '#f43f5e', letterSpacing: '-0.01em' }}>
               {formatUsd(totalRefundSum)}
             </span>
             <span style={{
-              fontSize: '0.7rem',
+              fontSize: '0.72rem',
               fontWeight: 600,
               color: '#f43f5e',
               background: 'rgba(244, 63, 94, 0.1)',
@@ -545,7 +545,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast, 
               <Calculator size={14} color="#10b981" />
             </div>
           </div>
-          <div className="stat-value" style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981', letterSpacing: '-0.01em' }}>
+          <div className="stat-value" style={{ fontSize: '1.12rem', fontWeight: 700, color: '#10b981', letterSpacing: '-0.01em' }}>
             {formatUsd(totalFinalSettlementSum)}
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', marginTop: '0.2rem', display: 'block' }}>
@@ -570,7 +570,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast, 
               <CheckCheck size={14} color="#10b981" />
             </div>
           </div>
-          <div className="stat-value" style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981', letterSpacing: '-0.01em' }}>
+          <div className="stat-value" style={{ fontSize: '1.12rem', fontWeight: 700, color: '#10b981', letterSpacing: '-0.01em' }}>
             {formatUsd(historySettledSum)}
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', marginTop: '0.2rem', display: 'block' }}>
@@ -592,7 +592,7 @@ export default function MonthlySettlementTable({ token, currentUser, showToast, 
               {totalUnsettledRefundSum > 0 ? <AlertCircle size={14} color="#f59e0b" /> : <CheckCircle2 size={14} color="#10b981" />}
             </div>
           </div>
-          <div className="stat-value" style={{ fontSize: '1.2rem', fontWeight: 700, color: totalUnsettledRefundSum > 0 ? '#f59e0b' : '#10b981', letterSpacing: '-0.01em' }}>
+          <div className="stat-value" style={{ fontSize: '1.12rem', fontWeight: 700, color: totalUnsettledRefundSum > 0 ? '#f59e0b' : '#10b981', letterSpacing: '-0.01em' }}>
             {formatUsd(totalUnsettledRefundSum)}
           </div>
           <span style={{ fontSize: '0.72rem', color: totalUnsettledRefundSum > 0 ? '#f59e0b' : 'var(--text-sub)', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>

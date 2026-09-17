@@ -174,9 +174,9 @@ public class DatabasePrimaryKeysInitializer {
             jdbcTemplate.execute("INSERT INTO platform_config (platform_code, platform_name, auth_type, launch_start_date, status) " +
                     "VALUES ('rocnovel', '中文在线', 'TOKEN_COOKIE', '2026-07-10', 1) " +
                     "ON DUPLICATE KEY UPDATE platform_name = VALUES(platform_name), launch_start_date = VALUES(launch_start_date)");
-            jdbcTemplate.execute("INSERT INTO platform_config (platform_code, platform_name, auth_type, launch_start_date, status) " +
-                    "VALUES ('flicknovel', '番茄海外', 'TOKEN_COOKIE', '2026-09-16', 1) " +
-                    "ON DUPLICATE KEY UPDATE platform_name = VALUES(platform_name), launch_start_date = VALUES(launch_start_date)");
+            jdbcTemplate.execute("INSERT INTO platform_config (platform_code, platform_name, auth_type, launch_start_date, status, auth_credentials) " +
+                    "VALUES ('flicknovel', '番茄海外', 'ED25519_KEY', '2026-09-16', 1, '{\"companyId\":\"355549587538358272\",\"privateKey\":\"ymcPnTqpiQOAtROHJoeegoovJxS7wv6t0HLDUv5q3/G4qry6yKcvjYwhrBqwuEIMjfXMIIqDe0YUPu9JaPofMQ==\"}') " +
+                    "ON DUPLICATE KEY UPDATE platform_name = VALUES(platform_name), auth_type = 'ED25519_KEY', launch_start_date = VALUES(launch_start_date)");
             log.info("Checked/initialized platform_config table with default platforms and launch_start_date");
         } catch (Exception e) {
             log.warn("Failed to create/init platform_config table: {}", e.getMessage());
@@ -300,6 +300,40 @@ public class DatabasePrimaryKeysInitializer {
             log.info("Successfully backfilled historical platform_code = 'rocnovel' and cleaned empty cache rows");
         } catch (Exception e) {
             log.warn("Failed to backfill historical platform_code: {}", e.getMessage());
+        }
+
+        // 13. 检查并创建 flicknovel_relation 表
+        try {
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS flicknovel_relation (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "relation_id VARCHAR(64) NOT NULL, " +
+                    "device_id VARCHAR(128) NOT NULL, " +
+                    "promotion_id VARCHAR(64), " +
+                    "promotion_code VARCHAR(64), " +
+                    "ad_id VARCHAR(64), " +
+                    "adset_id VARCHAR(64), " +
+                    "campaign_id VARCHAR(64), " +
+                    "ad_account_id VARCHAR(64), " +
+                    "relation_begin_time_bj DATETIME, " +
+                    "relation_begin_time_et DATETIME, " +
+                    "relation_begin_date_et DATE, " +
+                    "relation_begin_timestamp BIGINT, " +
+                    "media_channel VARCHAR(64), " +
+                    "platform VARCHAR(32), " +
+                    "app_id VARCHAR(32), " +
+                    "raw_payload TEXT, " +
+                    "created_at DATETIME, " +
+                    "updated_at DATETIME, " +
+                    "UNIQUE KEY uk_fn_relation_id (relation_id), " +
+                    "KEY idx_fn_device_id (device_id), " +
+                    "KEY idx_fn_promotion_id (promotion_id), " +
+                    "KEY idx_fn_begin_time_bj (relation_begin_time_bj), " +
+                    "KEY idx_fn_begin_date_et (relation_begin_date_et), " +
+                    "KEY idx_fn_media_channel (media_channel)" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            log.info("Successfully checked/created flicknovel_relation table");
+        } catch (Exception e) {
+            log.warn("Failed to check/create flicknovel_relation table: {}", e.getMessage());
         }
     }
 

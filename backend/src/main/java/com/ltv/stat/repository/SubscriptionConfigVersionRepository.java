@@ -46,4 +46,7 @@ public interface SubscriptionConfigVersionRepository extends JpaRepository<Subsc
            "ORDER BY v.versionNum DESC")
     List<SubscriptionConfigVersion> findMatchingPeriodVersions(@Param("period") Integer period,
                                                                 @Param("targetTime") LocalDateTime targetTime);
+
+    @Query("SELECT DISTINCT v.landingPageId FROM SubscriptionConfigVersion v WHERE (v.platformCode = :platformCode OR (:platformCode = 'rocnovel' AND (v.platformCode IS NULL OR v.platformCode = '' OR v.platformCode = 'ALL'))) AND v.landingPageId IS NOT NULL AND v.landingPageId != ''")
+    List<String> findDistinctLandingPageIdsByPlatformCode(@Param("platformCode") String platformCode);
 }

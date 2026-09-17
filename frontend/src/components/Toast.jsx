@@ -9,14 +9,14 @@ export default function Toast({ toast, onClose }) {
   const getIcon = () => {
     switch (type) {
       case 'success':
-        return <CheckCircle2 size={18} color="#34d399" />;
+        return <CheckCircle2 size={15} color="#34d399" />;
       case 'error':
-        return <AlertCircle size={18} color="#fb7185" />;
+        return <AlertCircle size={15} color="#fb7185" />;
       case 'warning':
-        return <AlertTriangle size={18} color="#fbbf24" />;
+        return <AlertTriangle size={15} color="#fbbf24" />;
       case 'info':
       default:
-        return <Info size={18} color="#60a5fa" />;
+        return <Info size={15} color="#60a5fa" />;
     }
   };
 
@@ -44,25 +44,26 @@ export default function Toast({ toast, onClose }) {
     <div
       style={{
         position: 'fixed',
-        top: '24px',
-        right: '24px',
+        top: '18px',
+        right: '18px',
         zIndex: 999999,
         display: 'flex',
         alignItems: 'center',
-        gap: '10px',
-        padding: '12px 20px',
+        gap: '8px',
+        padding: '7px 12px',
         background: getBgColor(),
         border: getBorderColor(),
-        borderRadius: '10px',
+        borderRadius: '7px',
         color: '#ffffff',
-        boxShadow: '0 12px 30px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.15)',
+        boxShadow: '0 8px 22px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.12)',
         backdropFilter: 'none',
         WebkitBackdropFilter: 'none',
-        fontSize: '0.92rem',
-        fontWeight: 600,
-        minWidth: '280px',
-        maxWidth: '480px',
-        animation: 'toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+        fontSize: '0.8rem',
+        fontWeight: 500,
+        minWidth: '200px',
+        maxWidth: '380px',
+        lineHeight: 1.4,
+        animation: 'toastSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
@@ -82,10 +83,11 @@ export default function Toast({ toast, onClose }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          borderRadius: '4px'
+          borderRadius: '4px',
+          marginLeft: '4px'
         }}
       >
-        <X size={16} />
+        <X size={14} />
       </button>
 
       <style>{`

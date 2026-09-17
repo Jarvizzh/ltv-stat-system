@@ -22,6 +22,14 @@ order:
     cookie: JSESSIONID=b959ba11-507c-4f63-8a01-b16ab37f96f4
     client-group-id: "405323222546395136"
 
+flicknovel:
+  api:
+    base-url: https://openapi.sinan-partner.com
+    company-id: "355549587538358272"
+    private-key: "ymcPnTqpiQOAtROHJoeegoovJxS7wv6t0HLDUv5q3/G4qry6yKcvjYwhrBqwuEIMjfXMIIqDe0YUPu9JaPofMQ=="
+    default-email: "charles_z0@163.com"
+    default-dist-app-id: 2000019
+
 app:
   auth:
     username: superadmin

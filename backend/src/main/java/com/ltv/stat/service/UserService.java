@@ -7,6 +7,8 @@ import com.ltv.stat.entity.SysUser;
 import com.ltv.stat.entity.UserLandingPage;
 import com.ltv.stat.entity.UserSubAccount;
 import com.ltv.stat.entity.UserViewPermission;
+import com.ltv.stat.repository.RawOrderRepository;
+import com.ltv.stat.repository.SubscriptionConfigVersionRepository;
 import com.ltv.stat.repository.SysUserRepository;
 import com.ltv.stat.repository.UserLandingPageRepository;
 import com.ltv.stat.repository.UserSubAccountRepository;
@@ -33,6 +35,8 @@ public class UserService {
     private final UserLandingPageRepository userLandingPageRepository;
     private final UserViewPermissionRepository userViewPermissionRepository;
     private final UserSubAccountRepository userSubAccountRepository;
+    private final RawOrderRepository rawOrderRepository;
+    private final SubscriptionConfigVersionRepository subscriptionConfigVersionRepository;
 
     @Value("${app.auth.username:superadmin}")
     private String defaultSuperAdminUsername;
@@ -43,11 +47,15 @@ public class UserService {
     public UserService(SysUserRepository sysUserRepository,
                        UserLandingPageRepository userLandingPageRepository,
                        UserViewPermissionRepository userViewPermissionRepository,
-                       UserSubAccountRepository userSubAccountRepository) {
+                       UserSubAccountRepository userSubAccountRepository,
+                       RawOrderRepository rawOrderRepository,
+                       SubscriptionConfigVersionRepository subscriptionConfigVersionRepository) {
         this.sysUserRepository = sysUserRepository;
         this.userLandingPageRepository = userLandingPageRepository;
         this.userViewPermissionRepository = userViewPermissionRepository;
         this.userSubAccountRepository = userSubAccountRepository;
+        this.rawOrderRepository = rawOrderRepository;
+        this.subscriptionConfigVersionRepository = subscriptionConfigVersionRepository;
     }
 
     @PostConstruct
@@ -524,6 +532,28 @@ public class UserService {
         return getUserLandingPageConfigs("ALL", userId);
     }
 
+    public List<String> getAllPlatformLandingPageIds(String platformCode) {
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim().toLowerCase() : "rocnovel";
+        Set<String> pids = new LinkedHashSet<>();
+        List<String> fromOrders = rawOrderRepository.findDistinctLandingPageIdsByPlatformCode(pCode);
+        if (fromOrders != null) {
+            for (String pid : fromOrders) {
+                if (pid != null && !pid.trim().isEmpty() && !"__EMPTY__".equalsIgnoreCase(pid.trim())) {
+                    pids.add(pid.trim());
+                }
+            }
+        }
+        List<String> fromConfigs = subscriptionConfigVersionRepository.findDistinctLandingPageIdsByPlatformCode(pCode);
+        if (fromConfigs != null) {
+            for (String pid : fromConfigs) {
+                if (pid != null && !pid.trim().isEmpty() && !"__EMPTY__".equalsIgnoreCase(pid.trim())) {
+                    pids.add(pid.trim());
+                }
+            }
+        }
+        return new ArrayList<>(pids);
+    }
+
     public List<LandingPageConfigItem> getUserLandingPageConfigs(String platformCode, Long userId) {
         if (userId == null) return Collections.emptyList();
         SysUser user = sysUserRepository.findById(userId).orElse(null);
@@ -540,7 +570,7 @@ public class UserService {
             for (Long subId : subUserIds) {
                 List<LandingPageConfigItem> subConfigs = getUserLandingPageConfigs(platformCode, subId);
                 for (LandingPageConfigItem item : subConfigs) {
-                    if (item != null && item.getLandingPageId() != null && !item.getLandingPageId().trim().isEmpty()) {
+                    if (item != null && item.getLandingPageId() != null && !item.getLandingPageId().trim().isEmpty() && !"__EMPTY__".equalsIgnoreCase(item.getLandingPageId().trim())) {
                         String pid = item.getLandingPageId().trim();
                         if (!uniquePids.contains(pid)) {
                             uniquePids.add(pid);
@@ -559,6 +589,27 @@ public class UserService {
             list = userLandingPageRepository.findByUserId(userId);
         }
 
+        // 番茄海外 (flicknovel) 初始配置特殊处理：
+        // 仅管理员 (ADMIN / SUPER_ADMIN) 初始落地页默认填充系统已知的所有推广ID（时区默认 BJ）；普通用户 (USER) 初始默认为空
+        boolean isAdmin = ("ADMIN".equalsIgnoreCase(user.getRole()) || "SUPER_ADMIN".equalsIgnoreCase(user.getRole()));
+        if (filterPlatform && "flicknovel".equalsIgnoreCase(targetPlatform) && (list == null || list.isEmpty())) {
+            if (isAdmin) {
+                List<String> allPids = getAllPlatformLandingPageIds("flicknovel");
+                if (!allPids.isEmpty()) {
+                    return allPids.stream()
+                            .map(pid -> new LandingPageConfigItem("flicknovel", pid, "BJ"))
+                            .collect(Collectors.toList());
+                }
+            } else {
+                return Collections.emptyList();
+            }
+        }
+
+        // 过滤掉用于标记已主动清空的占位记录 __EMPTY__
+        list = list.stream()
+                .filter(ulp -> ulp.getLandingPageId() != null && !"__EMPTY__".equalsIgnoreCase(ulp.getLandingPageId().trim()))
+                .collect(Collectors.toList());
+
         // 如果是普通用户 (USER)，剔除已被管理员配置的隔离落地页 ID
         if ("USER".equalsIgnoreCase(user.getRole())) {
             Set<String> adminPids = getAdminLandingPageIds(userId);
@@ -573,13 +624,27 @@ public class UserService {
     }
 
     @Transactional
-    public void updateUserLandingPageConfigs(Long userId, List<LandingPageConfigItem> items) {
+    public void updateUserLandingPageConfigs(String targetPlatform, Long userId, List<LandingPageConfigItem> items) {
         SysUser user = sysUserRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
 
         if (user.isMasterAccount()) {
             throw new IllegalArgumentException("主账号为数据汇总账号，落地页由关联子账号自动聚合，不可直接编辑！");
         }
+
+        String pCode = (targetPlatform != null && !targetPlatform.trim().isEmpty()) ? targetPlatform.trim().toLowerCase() : null;
+        if (pCode == null && items != null && !items.isEmpty()) {
+            for (LandingPageConfigItem item : items) {
+                if (item != null && item.getPlatformCode() != null && !item.getPlatformCode().trim().isEmpty()) {
+                    pCode = item.getPlatformCode().trim().toLowerCase();
+                    break;
+                }
+            }
+        }
+        if (pCode == null || pCode.trim().isEmpty()) {
+            pCode = "rocnovel";
+        }
+        pCode = pCode.trim().toLowerCase();
 
         // 如果是普通用户 (USER)，拦截校验：不允许配置已被管理员 (ADMIN / SUPER_ADMIN) 配置的独占隔离落地页
         if ("USER".equalsIgnoreCase(user.getRole())) {
@@ -596,21 +661,25 @@ public class UserService {
             }
         }
 
-        userLandingPageRepository.deleteByUserId(userId);
+        // 仅删除该平台的旧配置，保证平台间数据隔离
+        userLandingPageRepository.deleteByPlatformCodeAndUserId(pCode, userId);
         userLandingPageRepository.flush();
+
+        List<UserLandingPage> list = new ArrayList<>();
+        Set<String> seenPlatformPid = new HashSet<>();
         if (items != null) {
-            List<UserLandingPage> list = new ArrayList<>();
-            Set<String> seenPlatformPid = new HashSet<>();
             for (LandingPageConfigItem item : items) {
                 if (item != null && item.getLandingPageId() != null && !item.getLandingPageId().trim().isEmpty()) {
-                    String pCode = (item.getPlatformCode() != null && !item.getPlatformCode().trim().isEmpty()) ? item.getPlatformCode().trim().toLowerCase() : "rocnovel";
+                    String itemPCode = (item.getPlatformCode() != null && !item.getPlatformCode().trim().isEmpty())
+                            ? item.getPlatformCode().trim().toLowerCase() : pCode;
                     String pid = item.getLandingPageId().trim();
-                    String key = pCode + "_" + pid;
+                    if ("__EMPTY__".equalsIgnoreCase(pid)) continue;
+                    String key = itemPCode + "_" + pid;
                     if (!seenPlatformPid.contains(key)) {
                         seenPlatformPid.add(key);
                         String tz = (item.getTimezone() != null && "ET".equalsIgnoreCase(item.getTimezone().trim())) ? "ET" : "BJ";
                         UserLandingPage ulp = new UserLandingPage();
-                        ulp.setPlatformCode(pCode);
+                        ulp.setPlatformCode(itemPCode);
                         ulp.setUserId(userId);
                         ulp.setLandingPageId(pid);
                         ulp.setTimezone(tz);
@@ -618,25 +687,48 @@ public class UserService {
                     }
                 }
             }
-            if (!list.isEmpty()) {
-                userLandingPageRepository.saveAll(list);
-                userLandingPageRepository.flush();
+        }
+
+        // 若用户主动清空了该平台的所有落地页，写入一条 __EMPTY__ 占位记录，以标记“已主动清空”，避免被判定为初始未配置而再次自动塞入全量
+        if (list.isEmpty()) {
+            UserLandingPage emptyMarker = new UserLandingPage();
+            emptyMarker.setPlatformCode(pCode);
+            emptyMarker.setUserId(userId);
+            emptyMarker.setLandingPageId("__EMPTY__");
+            emptyMarker.setTimezone("BJ");
+            list.add(emptyMarker);
+        }
+
+        userLandingPageRepository.saveAll(list);
+        userLandingPageRepository.flush();
+    }
+
+    @Transactional
+    public void updateUserLandingPageConfigs(Long userId, List<LandingPageConfigItem> items) {
+        String pCode = null;
+        if (items != null && !items.isEmpty()) {
+            for (LandingPageConfigItem item : items) {
+                if (item != null && item.getPlatformCode() != null && !item.getPlatformCode().trim().isEmpty()) {
+                    pCode = item.getPlatformCode().trim().toLowerCase();
+                    break;
+                }
             }
         }
+        updateUserLandingPageConfigs(pCode, userId, items);
     }
 
     @Transactional
     public void updateUserLandingPageIds(String platformCode, Long userId, List<String> pageIds) {
         String pCode = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim().toLowerCase() : "rocnovel";
-        if (pageIds == null) {
-            updateUserLandingPageConfigs(userId, Collections.emptyList());
+        if (pageIds == null || pageIds.isEmpty()) {
+            updateUserLandingPageConfigs(pCode, userId, Collections.emptyList());
             return;
         }
         List<LandingPageConfigItem> items = pageIds.stream()
                 .filter(id -> id != null && !id.trim().isEmpty())
                 .map(id -> new LandingPageConfigItem(pCode, id.trim(), "BJ"))
                 .collect(Collectors.toList());
-        updateUserLandingPageConfigs(userId, items);
+        updateUserLandingPageConfigs(pCode, userId, items);
     }
 
     @Transactional

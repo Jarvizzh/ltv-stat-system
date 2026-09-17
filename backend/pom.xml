@@ -55,6 +55,13 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
+        <!-- Bouncy Castle for Ed25519 Signature -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.80</version>
+        </dependency>
+
         <!-- Spring Boot Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

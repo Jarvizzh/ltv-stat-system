@@ -104,8 +104,8 @@ export default function LtvHeader({
               display: 'flex',
               alignItems: 'center',
               gap: '0.4rem',
-              background: 'rgba(16, 185, 129, 0.12)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
+              background: 'rgba(21, 30, 50, 0.94)',
+              border: '1px solid rgba(16, 185, 129, 0.45)',
               borderRadius: '0.48rem',
               padding: '0.25rem 0.55rem'
             }}
@@ -115,7 +115,7 @@ export default function LtvHeader({
               平台
             </span>
             <CustomSelect
-              value={selectedPlatform || 'ALL'}
+              value={selectedPlatform || 'rocnovel'}
               onChange={(val) => onSelectPlatform && onSelectPlatform(val)}
               options={platformsList.map((p) => ({
                 label: p.name || p.code,
@@ -137,8 +137,8 @@ export default function LtvHeader({
               display: 'flex',
               alignItems: 'center',
               gap: '0.4rem',
-              background: isReadOnly ? 'rgba(244, 63, 94, 0.12)' : 'rgba(99, 102, 241, 0.12)',
-              border: isReadOnly ? '1px solid rgba(244, 63, 94, 0.3)' : '1px solid rgba(99, 102, 241, 0.3)',
+              background: isReadOnly ? 'rgba(38, 20, 30, 0.94)' : 'rgba(21, 30, 50, 0.94)',
+              border: isReadOnly ? '1px solid rgba(244, 63, 94, 0.45)' : '1px solid rgba(99, 102, 241, 0.45)',
               borderRadius: '0.48rem',
               padding: '0.25rem 0.55rem'
             }}
@@ -287,7 +287,7 @@ export default function LtvHeader({
                     <span>选择平台</span>
                   </div>
                   <CustomSelect
-                    value={selectedPlatform || 'ALL'}
+                    value={selectedPlatform || 'rocnovel'}
                     onChange={(val) => {
                       onSelectPlatform && onSelectPlatform(val);
                       setIsMobileMenuOpen(false);

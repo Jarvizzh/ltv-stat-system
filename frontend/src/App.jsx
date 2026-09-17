@@ -86,7 +86,15 @@ export default function App() {
   const [usersList, setUsersList] = useState([]);
   const [platformsList, setPlatformsList] = useState([]);
   const [selectedPlatform, setSelectedPlatform] = useState(() => {
-    return localStorage.getItem('admin_selected_platform') || 'ALL';
+    const sessionSaved = sessionStorage.getItem('admin_selected_platform');
+    if (sessionSaved && (sessionSaved.toLowerCase() === 'rocnovel' || sessionSaved.toLowerCase() === 'flicknovel')) {
+      return sessionSaved;
+    }
+    const localSaved = localStorage.getItem('admin_selected_platform');
+    if (localSaved && (localSaved.toLowerCase() === 'rocnovel' || localSaved.toLowerCase() === 'flicknovel')) {
+      return localSaved;
+    }
+    return 'rocnovel'; // 默认进入页面选择 <中文在线> (rocnovel)
   });
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(() => {
     const saved = localStorage.getItem('sidebar_expanded');
@@ -205,11 +213,12 @@ export default function App() {
       const json = await res.json();
       if (json.code === 0 && Array.isArray(json.data) && json.data.length > 0) {
         setPlatformsList(json.data);
-        const currentSaved = localStorage.getItem('admin_selected_platform') || 'ALL';
+        const currentSaved = sessionStorage.getItem('admin_selected_platform') || localStorage.getItem('admin_selected_platform') || 'rocnovel';
         const isCurrentAllowed = json.data.some(p => p.code.toLowerCase() === currentSaved.toLowerCase());
         if (!isCurrentAllowed) {
-          const fallbackCode = json.data[0].code;
+          const fallbackCode = json.data.find(p => p.code.toLowerCase() === 'rocnovel')?.code || json.data[0].code;
           setSelectedPlatform(fallbackCode);
+          sessionStorage.setItem('admin_selected_platform', fallbackCode);
           localStorage.setItem('admin_selected_platform', fallbackCode);
         }
       }
@@ -219,8 +228,9 @@ export default function App() {
   };
 
   const handleSelectPlatform = (platformCode) => {
-    const nextPlat = platformCode || 'ALL';
+    const nextPlat = platformCode || 'rocnovel';
     setSelectedPlatform(nextPlat);
+    sessionStorage.setItem('admin_selected_platform', nextPlat);
     localStorage.setItem('admin_selected_platform', nextPlat);
     setData([]);
     setDistributionData([]);
@@ -394,17 +404,22 @@ export default function App() {
     setGlobalDistributionData([]);
     setGlobalDistributionSummary(null);
 
+    // 登录后默认选择 <中文在线> (rocnovel) 平台
+    setSelectedPlatform('rocnovel');
+    sessionStorage.setItem('admin_selected_platform', 'rocnovel');
+    localStorage.setItem('admin_selected_platform', 'rocnovel');
+
     fetchUsersList();
     fetchPlatformsList();
 
-    // 立即自动拉取刷新新登录账号的数据
+    // 立即自动拉取刷新新登录账号的数据 (默认中文在线平台)
     if (activeTab === 'ltv') {
-      fetchLtvData(newUid, selectedPlatform);
+      fetchLtvData(newUid, 'rocnovel');
     } else if (activeTab === 'distribution') {
-      fetchDistributionData(newUid, selectedPlatform);
+      fetchDistributionData(newUid, 'rocnovel');
     } else if (activeTab === 'global-distribution') {
       if (userObj.role === 'SUPER_ADMIN' || userObj.permGlobalDistribution === 1) {
-        fetchGlobalDistributionData(selectedPlatform);
+        fetchGlobalDistributionData('rocnovel');
       }
     }
 
@@ -416,8 +431,11 @@ export default function App() {
     localStorage.removeItem('admin_username');
     localStorage.removeItem('admin_role');
     localStorage.removeItem('admin_user_id');
+    localStorage.removeItem('admin_selected_platform');
+    sessionStorage.removeItem('admin_selected_platform');
     setIsAuthenticated(false);
     setCurrentUser(null);
+    setSelectedPlatform('rocnovel');
     setTargetUserId(1);
     setUsersList([]);
     setPlatformsList([]);
@@ -434,7 +452,7 @@ export default function App() {
     setLoading(true);
     setLoadingType('orders');
     setErrorMessage('');
-    const p = platCode || selectedPlatform || 'ALL';
+    const p = platCode || selectedPlatform || 'rocnovel';
     try {
       const res = await authFetch(`/api/ltv/sync-orders?platformCode=${encodeURIComponent(p)}`, {
         method: 'POST',
@@ -467,7 +485,7 @@ export default function App() {
   const handleRecalculateAllReports = async (platCode) => {
     setLoading(true);
     setLoadingType('calc');
-    const p = platCode || selectedPlatform || 'ALL';
+    const p = platCode || selectedPlatform || 'rocnovel';
     try {
       const res = await authFetch(`/api/ltv/recalculate?targetUserId=${targetUserId || ''}&platformCode=${encodeURIComponent(p)}`, { method: 'POST' });
       const json = await res.json();
@@ -497,7 +515,7 @@ export default function App() {
     setLoading(true);
     setLoadingType('all');
     setErrorMessage('');
-    const p = platCode || selectedPlatform || 'ALL';
+    const p = platCode || selectedPlatform || 'rocnovel';
     try {
       const res = await authFetch(`/api/ltv/sync-and-calc?platformCode=${encodeURIComponent(p)}`, {
         method: 'POST',
@@ -564,7 +582,7 @@ export default function App() {
   const totalSubUsers = data.reduce((acc, cur) => acc + (parseInt(cur.subUserCount) || 0), 0);
   const overallRoi = totalSpend > 0 ? (((totalRecharge - totalRefund) / totalSpend) * 100).toFixed(2) : '0.00';
 
-  const currentPlatformObj = platformsList?.find(p => p.code?.toLowerCase() === (selectedPlatform || 'ALL').toLowerCase());
+  const currentPlatformObj = platformsList?.find(p => p.code?.toLowerCase() === (selectedPlatform || 'rocnovel').toLowerCase());
   const currentPlatformLaunchDate = currentPlatformObj?.launchStartDate || (selectedPlatform?.toLowerCase() === 'flicknovel' ? '2026-09-16' : '2026-07-10');
 
   // 月度卡片指标完全由后端接口计算并返回 (monthlySummary)，支持近4个月动态列表
@@ -657,6 +675,19 @@ export default function App() {
   const isTargetMaster = currentTargetUserObj ? Boolean(currentTargetUserObj.isMaster === 1) : false;
   const isReadOnlyView = Boolean(targetUserId && currentUser && targetUserId !== currentUser.userId) || isTargetMaster;
 
+  const formatMonthDisplay = (monthStr) => {
+    if (!monthStr) return '';
+    const clean = String(monthStr).trim();
+    const parts = clean.split(/[-/]/);
+    if (parts.length === 2) {
+      const year = parts[0];
+      const month = parts[1].padStart(2, '0');
+      const yy = year.length === 4 ? year.slice(2) : year;
+      return `${yy}/${month}`;
+    }
+    return clean;
+  };
+
   const renderActualPaybackTag = (days, monthStr, d30Roi, d60Roi, d90Roi) => {
     if (days === null || days === undefined) return null;
     const hasPred = hasPermRoiPredict && d30Roi !== null && d30Roi !== undefined;
@@ -668,7 +699,7 @@ export default function App() {
           setHoveredMonthlyPrediction({
             left: rect.left + rect.width / 2,
             top: rect.top - 8,
-            month: monthStr,
+            month: formatMonthDisplay(monthStr),
             d30Roi,
             d60Roi,
             d90Roi
@@ -679,9 +710,9 @@ export default function App() {
           background: 'rgba(16, 185, 129, 0.15)',
           color: '#10b981',
           border: '1px solid rgba(16, 185, 129, 0.3)',
-          padding: '0.1rem 0.35rem',
+          padding: '0.08rem 0.32rem',
           borderRadius: '0.25rem',
-          fontSize: '0.75rem',
+          fontSize: '0.72rem',
           fontWeight: 600,
           whiteSpace: 'nowrap',
           cursor: hasPred ? 'pointer' : 'default'
@@ -765,21 +796,21 @@ export default function App() {
               {/* 卡片 1: 总消耗 */}
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-label" style={{ fontSize: '0.76rem' }}>总消耗 ({currentPlatformLaunchDate}至今)</span>
+                  <span className="stat-label" style={{ fontSize: '0.78rem' }}>总消耗 ({currentPlatformLaunchDate}至今)</span>
                   <DollarSign size={16} color="var(--text-sub)" />
                 </div>
-                <div className="stat-value" style={{ fontSize: '1.15rem' }}>{formatUsd(totalSpend)}</div>
+                <div className="stat-value" style={{ fontSize: '1.12rem' }}>{formatUsd(totalSpend)}</div>
               </div>
 
               {/* 卡片 2: 累计充值 */}
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-label" style={{ fontSize: '0.76rem' }}>累计充值</span>
+                  <span className="stat-label" style={{ fontSize: '0.78rem' }}>累计充值</span>
                   <Wallet size={16} color="var(--text-sub)" />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', marginTop: '0.1rem' }}>
-                  <span className="stat-value" style={{ fontSize: '1.15rem' }}>{formatUsd(totalRecharge)}</span>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--text-sub)', fontWeight: 500 }}>
+                  <span className="stat-value" style={{ fontSize: '1.12rem' }}>{formatUsd(totalRecharge)}</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', fontWeight: 500 }}>
                     （退款：{formatUsd(totalRefund)}）
                   </span>
                 </div>
@@ -788,34 +819,34 @@ export default function App() {
               {/* 卡片 3: 总 ROI / 盈亏 */}
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-label" style={{ fontSize: '0.76rem' }}>总 ROI / 盈亏</span>
+                  <span className="stat-label" style={{ fontSize: '0.78rem' }}>总 ROI / 盈亏</span>
                   <TrendingUp size={16} color={overallRoi >= 100 ? '#10b981' : '#f43f5e'} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem' }}>
-                    <span className="stat-value" style={{ fontSize: '1.15rem', color: overallRoi >= 100 ? '#10b981' : '#f43f5e' }}>
+                    <span className="stat-value" style={{ fontSize: '1.12rem', color: overallRoi >= 100 ? '#10b981' : '#f43f5e' }}>
                       {overallRoi}%
                     </span>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-sub)', fontWeight: 400, opacity: 0.6 }}>/</span>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 600, color: totalProfit >= 0 ? '#10b981' : '#f43f5e', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-sub)', fontWeight: 400, opacity: 0.6 }}>/</span>
+                    <span style={{ fontSize: '0.86rem', fontWeight: 600, color: totalProfit >= 0 ? '#10b981' : '#f43f5e', whiteSpace: 'nowrap' }}>
                       {formatUsd(totalProfit)}
                     </span>
                   </div>
                   {overallPaybackDays === 0 || overallRoi >= 100 ? (
-                    <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.12rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.74rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.08rem 0.32rem', borderRadius: '0.25rem', fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       已回本{overallPaybackCycleDays ? ` / 周期：${overallPaybackCycleDays}天` : ''}
                     </span>
                   ) : hasPermPredictPayback && (
                     overallPaybackDays === -1 ? (
-                      <span style={{ background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.3)', padding: '0.12rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.74rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      <span style={{ background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.3)', padding: '0.08rem 0.32rem', borderRadius: '0.25rem', fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
                         回本：停滞
                       </span>
                     ) : overallPaybackDays > 365 ? (
-                      <span style={{ background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.3)', padding: '0.12rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.74rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      <span style={{ background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.3)', padding: '0.08rem 0.32rem', borderRadius: '0.25rem', fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
                         回本：&gt;365天
                       </span>
                     ) : overallPaybackDays !== null ? (
-                      <span style={{ background: overallPaybackDays <= 45 ? 'rgba(16, 185, 129, 0.15)' : overallPaybackDays <= 90 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(99, 102, 241, 0.15)', color: overallPaybackDays <= 45 ? '#10b981' : overallPaybackDays <= 90 ? '#f59e0b' : '#6366f1', border: '1px solid currentColor', padding: '0.12rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.74rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      <span style={{ background: overallPaybackDays <= 45 ? 'rgba(16, 185, 129, 0.15)' : overallPaybackDays <= 90 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(99, 102, 241, 0.15)', color: overallPaybackDays <= 45 ? '#10b981' : overallPaybackDays <= 90 ? '#f59e0b' : '#6366f1', border: '1px solid currentColor', padding: '0.08rem 0.32rem', borderRadius: '0.25rem', fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
                         回本：{overallPaybackDays}天{overallPaybackCycleDays ? ` / 周期：${overallPaybackCycleDays}天` : ''}
                       </span>
                     ) : null
@@ -826,13 +857,13 @@ export default function App() {
               {/* 卡片 4: 总订阅用户 */}
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-label" style={{ fontSize: '0.76rem' }}>总订阅用户</span>
+                  <span className="stat-label" style={{ fontSize: '0.78rem' }}>总订阅用户</span>
                   <Users size={16} color="#10b981" />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'nowrap', whiteSpace: 'nowrap', marginTop: '0.2rem' }}>
-                  <span className="stat-value" style={{ fontSize: '1.15rem' }}>{totalSubUsers}人</span>
+                  <span className="stat-value" style={{ fontSize: '1.12rem' }}>{totalSubUsers}人</span>
                   {overallRetainedSubUsers !== undefined && (
-                    <span style={{ fontSize: '0.74rem', color: 'var(--text-sub)', fontWeight: 500 }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', fontWeight: 500 }}>
                       （留存：{overallRetainedSubUsers}人 / {overallRetainedRate}）
                     </span>
                   )}
@@ -842,18 +873,18 @@ export default function App() {
               {/* 卡片 5: 月度消耗 */}
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-label">月度消耗</span>
-                  <DollarSign size={18} color="var(--text-sub)" />
+                  <span className="stat-label" style={{ fontSize: '0.78rem' }}>月度消耗</span>
+                  <DollarSign size={16} color="var(--text-sub)" />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.2rem' }}>
                   {monthlyList.map((m, idx) => (
                     <div key={m.month || idx} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderTop: idx > 0 ? '1px dashed var(--border-color)' : 'none', paddingTop: idx > 0 ? '0.25rem' : '0' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{m.month}</span>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)' }}>{formatUsd(m.spend)}</span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', fontWeight: 500 }}>{formatMonthDisplay(m.month)}</span>
+                      <span style={{ fontSize: '0.98rem', fontWeight: 500, color: 'var(--text-main)' }}>{formatUsd(m.spend)}</span>
                     </div>
                   ))}
                   {monthlyList.length === 0 && (
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>暂无月度数据</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>暂无月度数据</div>
                   )}
                 </div>
               </div>
@@ -861,15 +892,15 @@ export default function App() {
               {/* 卡片 6: 月度充值 */}
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-label">月度充值</span>
-                  <Wallet size={18} color="var(--text-sub)" />
+                  <span className="stat-label" style={{ fontSize: '0.78rem' }}>月度充值</span>
+                  <Wallet size={16} color="var(--text-sub)" />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.2rem' }}>
                   {monthlyList.map((m, idx) => (
                     <div key={m.month || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: idx > 0 ? '1px dashed var(--border-color)' : 'none', paddingTop: idx > 0 ? '0.25rem' : '0', flexWrap: 'nowrap' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{m.month}</span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', fontWeight: 500 }}>{formatMonthDisplay(m.month)}</span>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
-                        <span style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)' }}>{formatUsd(m.recharge)}</span>
+                        <span style={{ fontSize: '0.98rem', fontWeight: 500, color: 'var(--text-main)' }}>{formatUsd(m.recharge)}</span>
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', fontWeight: 500 }}>
                           （退款：{formatUsd(m.refund)}）
                         </span>
@@ -877,7 +908,7 @@ export default function App() {
                     </div>
                   ))}
                   {monthlyList.length === 0 && (
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>暂无月度数据</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>暂无月度数据</div>
                   )}
                 </div>
               </div>
@@ -885,8 +916,8 @@ export default function App() {
               {/* 卡片 7: 月度 ROI / 盈亏 */}
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-label">月度 ROI / 盈亏</span>
-                  <TrendingUp size={18} color={monthlyList.length > 0 && parseFloat(monthlyList[0].roi || 0) >= 100 ? '#10b981' : '#f43f5e'} />
+                  <span className="stat-label" style={{ fontSize: '0.78rem' }}>月度 ROI / 盈亏</span>
+                  <TrendingUp size={16} color={monthlyList.length > 0 && parseFloat(monthlyList[0].roi || 0) >= 100 ? '#10b981' : '#f43f5e'} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.2rem' }}>
                   {monthlyList.map((m, idx) => {
@@ -896,13 +927,13 @@ export default function App() {
                     const hasPred = hasPermRoiPredict && m.predictedDay30Roi !== null && m.predictedDay30Roi !== undefined;
                     return (
                       <div key={m.month || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: idx > 0 ? '1px dashed var(--border-color)' : 'none', paddingTop: idx > 0 ? '0.25rem' : '0', flexWrap: 'nowrap' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{m.month}</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                          <span style={{ fontSize: '1.05rem', fontWeight: 500, color: roiVal >= 100 ? '#10b981' : '#f43f5e' }}>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', fontWeight: 500 }}>{formatMonthDisplay(m.month)}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <span style={{ fontSize: '0.98rem', fontWeight: 500, color: roiVal >= 100 ? '#10b981' : '#f43f5e' }}>
                             {roiVal}%
                           </span>
-                          <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', fontWeight: 400, opacity: 0.6 }}>/</span>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: profitVal >= 0 ? '#10b981' : '#f43f5e' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-sub)', fontWeight: 400, opacity: 0.6 }}>/</span>
+                          <span style={{ fontSize: '0.80rem', fontWeight: 600, color: profitVal >= 0 ? '#10b981' : '#f43f5e' }}>
                             {formatUsd(profitVal)}
                           </span>
                           {renderActualPaybackTag(m.actualPaybackDays, m.month, m.predictedDay30Roi, m.predictedDay60Roi, m.predictedDay90Roi)}
@@ -913,7 +944,7 @@ export default function App() {
                                 setHoveredMonthlyPrediction({
                                   left: rect.left + rect.width / 2,
                                   top: rect.top - 8,
-                                  month: m.month,
+                                  month: formatMonthDisplay(m.month),
                                   d30Roi: m.predictedDay30Roi,
                                   d60Roi: m.predictedDay60Roi,
                                   d90Roi: m.predictedDay90Roi
@@ -924,9 +955,9 @@ export default function App() {
                                 background: 'rgba(99, 102, 241, 0.15)',
                                 color: '#818cf8',
                                 border: '1px solid rgba(99, 102, 241, 0.3)',
-                                padding: '0.1rem 0.35rem',
+                                padding: '0.08rem 0.32rem',
                                 borderRadius: '0.25rem',
-                                fontSize: '0.75rem',
+                                fontSize: '0.72rem',
                                 fontWeight: 600,
                                 whiteSpace: 'nowrap',
                                 cursor: 'pointer'
@@ -940,7 +971,7 @@ export default function App() {
                     );
                   })}
                   {monthlyList.length === 0 && (
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>暂无月度数据</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>暂无月度数据</div>
                   )}
                 </div>
               </div>
@@ -948,17 +979,17 @@ export default function App() {
               {/* 卡片 8: 月度订阅用户 */}
               <div className="stat-card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-label">月度订阅用户</span>
-                  <Users size={18} color="#10b981" />
+                  <span className="stat-label" style={{ fontSize: '0.78rem' }}>月度订阅用户</span>
+                  <Users size={16} color="#10b981" />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.2rem' }}>
                   {monthlyList.map((m, idx) => (
                     <div key={m.month || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: idx > 0 ? '1px dashed var(--border-color)' : 'none', paddingTop: idx > 0 ? '0.25rem' : '0', flexWrap: 'nowrap' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)', fontWeight: 500 }}>{m.month}</span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', fontWeight: 500 }}>{formatMonthDisplay(m.month)}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                        <span style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-main)' }}>{m.subUsers || 0}人</span>
+                        <span style={{ fontSize: '0.98rem', fontWeight: 500, color: 'var(--text-main)' }}>{m.subUsers || 0}人</span>
                         {m.retainedSubUsers !== undefined && (
-                          <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', fontWeight: 500 }}>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', fontWeight: 500 }}>
                             （留存：{m.retainedSubUsers}人 / {m.retainedRate || '0.00%'}）
                           </span>
                         )}
@@ -966,7 +997,7 @@ export default function App() {
                     </div>
                   ))}
                   {monthlyList.length === 0 && (
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>暂无月度数据</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>暂无月度数据</div>
                   )}
                 </div>
               </div>
@@ -1036,6 +1067,7 @@ export default function App() {
         }}
         onSaved={handleLandingPagesSaved}
         authFetch={authFetch}
+        currentUser={currentUser}
       />
 
       {currentUser && currentUser.role === 'SUPER_ADMIN' && (

@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
  */
 public enum PlatformEnum {
 
-    ALL("ALL", "综合大盘", true, LocalDate.of(2026, 7, 10)),
+    ALL("ALL", "大盘汇总", true, LocalDate.of(2026, 7, 10)),
     ROCNOVEL("rocnovel", "中文在线", true, LocalDate.of(2026, 7, 10)),
     FLICKNOVEL("flicknovel", "番茄海外", true, LocalDate.of(2026, 9, 16));
 

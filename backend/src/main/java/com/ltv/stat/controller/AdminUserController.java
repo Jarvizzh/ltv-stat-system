@@ -294,7 +294,7 @@ public class AdminUserController {
                         item.setPlatformCode(platformCode);
                     }
                 }
-                userService.updateUserLandingPageConfigs(id, body.getLandingPages());
+                userService.updateUserLandingPageConfigs(platformCode, id, body.getLandingPages());
             } else if (body != null && body.getLandingPageIds() != null) {
                 userService.updateUserLandingPageIds(platformCode, id, body.getLandingPageIds());
             }

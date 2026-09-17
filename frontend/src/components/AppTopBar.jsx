@@ -85,12 +85,12 @@ export default function AppTopBar({
         {platformsList && platformsList.length > 0 && (
           <div
             className="topbar-filter-pill platform-pill"
-            title="数据源业务平台（默认：综合大盘）"
+            title="数据源业务平台（默认：中文在线）"
           >
-            <Globe size={14} color="#6366f1" />
+            <Globe size={15} color="#6366f1" />
             <span className="pill-label" style={{ color: '#6366f1' }}>平台</span>
             <CustomSelect
-              value={selectedPlatform || 'ALL'}
+              value={selectedPlatform || 'rocnovel'}
               onChange={(val) => onSelectPlatform && onSelectPlatform(val)}
               options={platformsList.map((p) => ({
                 label: p.name || p.code,
@@ -108,7 +108,7 @@ export default function AppTopBar({
             className={`topbar-filter-pill view-pill ${isReadOnly ? 'readonly' : ''}`}
             title={isReadOnly ? '只读模式：您正在查看其他被授权账户的数据视图' : '主视图：您正在查看当前登录账户的数据'}
           >
-            <Eye size={14} color={isReadOnly ? '#f43f5e' : '#6366f1'} />
+            <Eye size={15} color={isReadOnly ? '#f43f5e' : '#6366f1'} />
             <span className="pill-label" style={{ color: isReadOnly ? '#f43f5e' : '#6366f1' }}>
               视图
             </span>
@@ -142,16 +142,6 @@ export default function AppTopBar({
 
           {isUserMenuOpen && (
             <div className="topbar-user-dropdown">
-              <div className="topbar-user-dropdown-header">
-                <div className="dropdown-user-row">
-                  <span className="dropdown-username">{username}</span>
-                  <span className="dropdown-role-badge">
-                    {currentUser?.role === 'SUPER_ADMIN' ? '超级管理员' : currentUser?.role === 'ADMIN' ? '管理员' : '标准用户'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="topbar-dropdown-divider" />
               <button
                 className="topbar-dropdown-item logout-item"
                 onClick={() => {

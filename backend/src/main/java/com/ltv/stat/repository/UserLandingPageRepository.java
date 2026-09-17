@@ -24,7 +24,7 @@ public interface UserLandingPageRepository extends JpaRepository<UserLandingPage
     void deleteByUserId(@Param("userId") Long userId);
 
     @Modifying(clearAutomatically = true)
-    @Query("DELETE FROM UserLandingPage p WHERE p.platformCode = :platformCode AND p.userId = :userId")
+    @Query("DELETE FROM UserLandingPage p WHERE (p.platformCode = :platformCode OR (:platformCode = 'rocnovel' AND (p.platformCode IS NULL OR p.platformCode = '' OR p.platformCode = 'ALL'))) AND p.userId = :userId")
     void deleteByPlatformCodeAndUserId(@Param("platformCode") String platformCode, @Param("userId") Long userId);
 
     boolean existsByUserIdAndLandingPageId(Long userId, String landingPageId);

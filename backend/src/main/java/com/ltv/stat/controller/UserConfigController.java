@@ -90,7 +90,7 @@ public class UserConfigController {
                         item.setPlatformCode(platformCode);
                     }
                 }
-                userService.updateUserLandingPageConfigs(userId, body.getLandingPages());
+                userService.updateUserLandingPageConfigs(platformCode, userId, body.getLandingPages());
             } else if (body != null && body.getLandingPageIds() != null) {
                 userService.updateUserLandingPageIds(platformCode, userId, body.getLandingPageIds());
             }
@@ -106,5 +106,21 @@ public class UserConfigController {
             log.error("Failed to update landing pages for user " + userId, e);
             return ResponseEntity.status(500).body(ApiResponseDto.error(500, "保存失败: " + e.getMessage()));
         }
+    }
+
+    @GetMapping("/all-landing-pages")
+    public ResponseEntity<?> getAllPlatformLandingPages(
+            @RequestParam(value = "platformCode", required = false) String platformCode) {
+        TokenInfo currentUser = UserContext.getCurrentUser();
+        if (currentUser == null || currentUser.getUserId() == null) {
+            return ResponseEntity.status(401).body(ApiResponseDto.error(401, "未登录"));
+        }
+        boolean isAdmin = ("ADMIN".equalsIgnoreCase(currentUser.getRole()) || "SUPER_ADMIN".equalsIgnoreCase(currentUser.getRole()));
+        if (!isAdmin) {
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "普通用户无权载入全量推广ID"));
+        }
+        String pCode = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim() : "rocnovel";
+        List<String> allPids = userService.getAllPlatformLandingPageIds(pCode);
+        return ResponseEntity.ok(ApiResponseDto.success(allPids));
     }
 }

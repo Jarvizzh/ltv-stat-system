@@ -25,4 +25,11 @@ public interface RawOrderRepository extends JpaRepository<RawOrder, Long> {
     List<RawOrder> findByPlatformCodeAndLandingPageIdIn(@Param("platformCode") String platformCode, @Param("landingPageIds") List<String> landingPageIds);
 
     List<RawOrder> findByMemberId(String memberId);
+
+    Optional<RawOrder> findFirstByPlatformCodeAndMemberIdOrderByPayTimeBjAsc(String platformCode, String memberId);
+
+    List<RawOrder> findByPlatformCodeAndMemberIdIn(String platformCode, List<String> memberIds);
+
+    @Query("SELECT DISTINCT r.landingPageId FROM RawOrder r WHERE (r.platformCode = :platformCode OR (:platformCode = 'rocnovel' AND (r.platformCode IS NULL OR r.platformCode = '' OR r.platformCode = 'ALL'))) AND r.landingPageId IS NOT NULL AND r.landingPageId != ''")
+    List<String> findDistinctLandingPageIdsByPlatformCode(@Param("platformCode") String platformCode);
 }

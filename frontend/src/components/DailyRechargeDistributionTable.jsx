@@ -106,66 +106,66 @@ export default function DailyRechargeDistributionTable({ distributionData, distr
       <div className="stats-summary" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
         <div className="stat-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span className="stat-label">累计总充值</span>
-            <DollarSign size={18} color="var(--accent-cyan)" />
+            <span className="stat-label" style={{ fontSize: '0.78rem' }}>累计总充值</span>
+            <DollarSign size={16} color="var(--accent-cyan)" />
           </div>
-          <div className="stat-value">{formatUsd(grandTotalRecharge)}</div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-sub)', marginTop: '0.2rem' }}>
+          <div className="stat-value" style={{ fontSize: '1.12rem' }}>{formatUsd(grandTotalRecharge)}</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-sub)', marginTop: '0.2rem' }}>
             全量自然日充值汇总
           </div>
         </div>
 
         <div className="stat-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span className="stat-label">上月总充值</span>
-            <Calendar size={18} color="#8b5cf6" />
+            <span className="stat-label" style={{ fontSize: '0.78rem' }}>上月总充值</span>
+            <Calendar size={16} color="#8b5cf6" />
           </div>
-          <div className="stat-value">{formatUsd(lastMonthRecharge)}</div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-sub)', marginTop: '0.2rem' }}>
+          <div className="stat-value" style={{ fontSize: '1.12rem' }}>{formatUsd(lastMonthRecharge)}</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-sub)', marginTop: '0.2rem' }}>
             退款: <strong style={{ color: '#f43f5e' }}>{formatUsd(lastMonthRefund)}</strong> | 实充: <strong style={{ color: '#10b981' }}>{formatUsd(lastMonthRecharge - lastMonthRefund)}</strong>
           </div>
         </div>
 
         <div className="stat-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span className="stat-label">本月总充值</span>
-            <TrendingUp size={18} color="#3b82f6" />
+            <span className="stat-label" style={{ fontSize: '0.78rem' }}>本月总充值</span>
+            <TrendingUp size={16} color="#3b82f6" />
           </div>
-          <div className="stat-value">{formatUsd(thisMonthRecharge)}</div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-sub)', marginTop: '0.2rem' }}>
+          <div className="stat-value" style={{ fontSize: '1.12rem' }}>{formatUsd(thisMonthRecharge)}</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-sub)', marginTop: '0.2rem' }}>
             退款: <strong style={{ color: '#f43f5e' }}>{formatUsd(thisMonthRefund)}</strong> | 实充: <strong style={{ color: '#10b981' }}>{formatUsd(thisMonthRecharge - thisMonthRefund)}</strong>
           </div>
         </div>
 
         <div className="stat-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span className="stat-label">今日充值</span>
-            <UserCheck size={18} color="#10b981" />
+            <span className="stat-label" style={{ fontSize: '0.78rem' }}>今日充值</span>
+            <UserCheck size={16} color="#10b981" />
           </div>
-          <div className="stat-value">{formatUsd(todayTotalRecharge)}</div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-sub)', marginTop: '0.2rem' }}>
+          <div className="stat-value" style={{ fontSize: '1.12rem' }}>{formatUsd(todayTotalRecharge)}</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-sub)', marginTop: '0.2rem' }}>
             今日付费人数: <strong style={{ color: '#10b981' }}>{todayPaidUsers} 人</strong>
           </div>
         </div>
 
         <div className="stat-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span className="stat-label">今日老用户充值</span>
-            <Users size={18} color="#f59e0b" />
+            <span className="stat-label" style={{ fontSize: '0.78rem' }}>今日老用户充值</span>
+            <Users size={16} color="#f59e0b" />
           </div>
-          <div className="stat-value">{formatUsd(todayOldRecharge)}</div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-sub)', marginTop: '0.2rem' }}>
+          <div className="stat-value" style={{ fontSize: '1.12rem' }}>{formatUsd(todayOldRecharge)}</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-sub)', marginTop: '0.2rem' }}>
             占比: <strong style={{ color: '#f59e0b' }}>{todayOldRechargePct}%</strong> | 老用户 ARPU: <strong style={{ color: '#f59e0b' }}>${todayOldArpu}</strong>
           </div>
         </div>
 
         <div className="stat-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span className="stat-label">累计充值人数</span>
-            <RefreshCw size={18} color="var(--accent-cyan)" />
+            <span className="stat-label" style={{ fontSize: '0.78rem' }}>累计充值人数</span>
+            <RefreshCw size={16} color="var(--accent-cyan)" />
           </div>
-          <div className="stat-value">{grandTotalPaidUsers} 人</div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-sub)', marginTop: '0.2rem' }}>
+          <div className="stat-value" style={{ fontSize: '1.12rem' }}>{grandTotalPaidUsers} 人</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-sub)', marginTop: '0.2rem' }}>
             复充率: <strong style={{ color: 'var(--accent-cyan)' }}>{overallRepeatRate}%</strong> (复充人数: {grandRepeatUsers}人)
           </div>
         </div>
