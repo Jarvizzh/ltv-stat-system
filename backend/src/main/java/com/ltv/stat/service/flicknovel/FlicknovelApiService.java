@@ -888,6 +888,17 @@ public class FlicknovelApiService {
 
         if (tplId != null) {
             TemplatePriceDetail detail = templateDetailCache.get(tplId);
+            if (detail == null) {
+                FlicknovelRechargeTemplate dbTpl = flicknovelRechargeTemplateRepository.findByTemplateId(tplId).orElse(null);
+                if (dbTpl != null && dbTpl.getRawPayload() != null && !dbTpl.getRawPayload().trim().isEmpty()) {
+                    try {
+                        JsonNode tplNode = objectMapper.readTree(dbTpl.getRawPayload());
+                        detail = parsePriceTypeDetail(tplNode);
+                        templateDetailCache.put(tplId, detail);
+                        templatePriceTypeCache.put(tplId, detail.getPriceMap());
+                    } catch (Exception ignored) {}
+                }
+            }
             if (detail != null) {
                 ctx.setTemplatePriceMap(detail.getPriceMap());
                 ctx.setAmbiguousPrices(detail.getAmbiguousPrices());
@@ -922,10 +933,11 @@ public class FlicknovelApiService {
                 distAppIds.add(apiClient.getDefaultDistAppId());
             }
 
-            // 2. 根据所有出现过的 dist_app_id 分别拉取充值模板列表 (/open/recharge_template/query/v2)
+            // 2. 根据所有出现过的 dist_app_id 分别拉取充值模板列表 (优先 v2，并同步 v1 兼容历史模板)
             for (Long appId : distAppIds) {
                 if (appId != null) {
                     syncRechargeTemplatesV2(appId);
+                    syncRechargeTemplatesV1(appId);
                 }
             }
 
@@ -990,6 +1002,65 @@ public class FlicknovelApiService {
 
                 templatePriceTypeCache.put(tplId, priceMap);
                 templateDetailCache.put(tplId, detailObj);
+            }
+
+            if (templatesArr.size() < pageSize) {
+                break;
+            }
+            page++;
+        }
+    }
+
+    /**
+     * 同步充值模板列表 (v1 接口，兼容未迁移到 v2 的历史模板如 '模版test')
+     * 接口: /open/recharge_template/query/v1
+     */
+    private void syncRechargeTemplatesV1(Long distAppId) {
+        String email = apiClient.getDefaultEmail();
+        long page = 1L;
+        long pageSize = 50L;
+
+        while (true) {
+            FlicknovelRechargeTemplateQueryRequest req = new FlicknovelRechargeTemplateQueryRequest(distAppId, email, page, pageSize);
+            JsonNode resp;
+            try {
+                resp = apiClient.getRechargeTemplateV1Json(req);
+            } catch (Exception e) {
+                log.error("[FlicknovelSync] Error requesting recharge template v1 for appId {} page {}: {}", distAppId, page, e.getMessage());
+                break;
+            }
+
+            if (resp == null || resp.path("code").asInt(-1) != 0 || !resp.has("data")) {
+                break;
+            }
+
+            JsonNode templatesArr = resp.path("data").path("recharge_templates");
+            if (!templatesArr.isArray() || templatesArr.isEmpty()) {
+                break;
+            }
+
+            for (JsonNode tplNode : templatesArr) {
+                String tplId = tplNode.path("recharge_template_id").asText(null);
+                if (tplId == null || tplId.trim().isEmpty()) continue;
+
+                // 若 v2 已包含且不为空，则优先保留 v2，否则以 v1 填充
+                String name = tplNode.path("name").asText("");
+                TemplatePriceDetail detailObj = parsePriceTypeDetail(tplNode);
+                Map<Integer, Integer> priceMap = detailObj.getPriceMap();
+
+                FlicknovelRechargeTemplate entity = flicknovelRechargeTemplateRepository.findByTemplateId(tplId)
+                        .orElseGet(FlicknovelRechargeTemplate::new);
+                entity.setTemplateId(tplId);
+                entity.setName(name);
+                entity.setDistAppId(distAppId);
+                try {
+                    entity.setPriceConfigJson(objectMapper.writeValueAsString(priceMap));
+                    entity.setRawPayload(objectMapper.writeValueAsString(tplNode));
+                } catch (Exception ignored) {}
+                flicknovelRechargeTemplateRepository.save(entity);
+
+                templatePriceTypeCache.putIfAbsent(tplId, priceMap);
+                templateDetailCache.putIfAbsent(tplId, detailObj);
             }
 
             if (templatesArr.size() < pageSize) {

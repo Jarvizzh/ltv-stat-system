@@ -25,8 +25,8 @@ public class PrintOrderCurlTest {
     @Test
     public void generateTodayOrderCurlAndFetch() throws Exception {
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Shanghai"));
-        // 今天全天的秒级时间戳 (北京时间 00:00:00 到 23:59:59)
-        long beginTs = today.atStartOfDay(ZoneId.of("Asia/Shanghai")).toEpochSecond();
+        // 最近3天全天的秒级时间戳 (北京时间)
+        long beginTs = today.minusDays(3).atStartOfDay(ZoneId.of("Asia/Shanghai")).toEpochSecond();
         long endTs = today.plusDays(1).atStartOfDay(ZoneId.of("Asia/Shanghai")).toEpochSecond();
 
         String bodyJson = String.format("{\"begin_ts\":%d,\"end_ts\":%d,\"page\":1,\"page_size\":100}", beginTs, endTs);
@@ -98,54 +98,78 @@ public class PrintOrderCurlTest {
     @Test
     public void testRechargeTemplateV2() throws Exception {
         String email = "charles_z0@163.com";
-        String bodyJson = String.format("{\"email\":\"%s\",\"dis_app_id\":2000019,\"page\":1,\"page_size\":50}", email);
-        long nowSeconds = System.currentTimeMillis() / 1000;
-        String nonce = UUID.randomUUID().toString().replace("-", "").substring(0, 32);
-
-        Map<String, String> queryParams = new HashMap<>();
-        queryParams.put("company_id", COMPANY_ID);
-        queryParams.put("timestamp", String.valueOf(nowSeconds));
-        queryParams.put("nonce", nonce);
-
-        String sign = FlicknovelSignUtil.generateSign(queryParams, bodyJson, PRIVATE_KEY);
-        queryParams.put("sign", sign);
-
-        StringBuilder urlBuilder = new StringBuilder(BASE_URL).append("/open/recharge_template/query/v2?");
-        boolean first = true;
-        for (Map.Entry<String, String> entry : queryParams.entrySet()) {
-            if (!first) urlBuilder.append("&");
-            urlBuilder.append(URLEncoder.encode(entry.getKey(), "UTF-8"))
-                    .append("=")
-                    .append(URLEncoder.encode(entry.getValue(), "UTF-8"));
-            first = false;
+        // 测试 v2 接口
+        String v2BodyJson = String.format("{\"email\":\"%s\",\"dis_app_id\":2000019,\"page\":1,\"page_size\":50}", email);
+        Map<String, String> v2Params = new HashMap<>();
+        v2Params.put("company_id", COMPANY_ID);
+        v2Params.put("timestamp", String.valueOf(System.currentTimeMillis() / 1000));
+        v2Params.put("nonce", UUID.randomUUID().toString().replace("-", "").substring(0, 32));
+        String v2Sign = FlicknovelSignUtil.generateSign(v2Params, v2BodyJson, PRIVATE_KEY);
+        v2Params.put("sign", v2Sign);
+        StringBuilder v2UrlBuilder = new StringBuilder(BASE_URL).append("/open/recharge_template/query/v2?");
+        boolean v2F = true;
+        for (Map.Entry<String, String> e : v2Params.entrySet()) {
+            if (!v2F) v2UrlBuilder.append("&");
+            v2UrlBuilder.append(URLEncoder.encode(e.getKey(), "UTF-8")).append("=").append(URLEncoder.encode(e.getValue(), "UTF-8"));
+            v2F = false;
         }
+        try {
+            URL u = new URL(v2UrlBuilder.toString());
+            HttpURLConnection c = (HttpURLConnection) u.openConnection();
+            c.setRequestMethod("POST");
+            c.setRequestProperty("Content-Type", "application/json");
+            c.setDoOutput(true);
+            try (OutputStream os = c.getOutputStream()) { os.write(v2BodyJson.getBytes(StandardCharsets.UTF_8)); }
+            int code = c.getResponseCode();
+            BufferedReader r = new BufferedReader(new InputStreamReader(code >= 200 && code < 300 ? c.getInputStream() : c.getErrorStream(), StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            String l;
+            while ((l = r.readLine()) != null) sb.append(l);
+            r.close();
+            java.nio.file.Files.write(java.nio.file.Paths.get("target/v2_resp.json"), sb.toString().getBytes(StandardCharsets.UTF_8));
+        } catch (Exception ignored) {}
 
-        URL url = new URL(urlBuilder.toString());
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setDoOutput(true);
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(bodyJson.getBytes(StandardCharsets.UTF_8));
+        // 测试 v1 接口
+        String v1BodyJson = String.format("{\"email\":\"%s\",\"dis_app_id\":2000019,\"page\":1,\"page_size\":50}", email);
+        Map<String, String> v1Params = new HashMap<>();
+        v1Params.put("company_id", COMPANY_ID);
+        v1Params.put("timestamp", String.valueOf(System.currentTimeMillis() / 1000));
+        v1Params.put("nonce", UUID.randomUUID().toString().replace("-", "").substring(0, 32));
+        String v1Sign = FlicknovelSignUtil.generateSign(v1Params, v1BodyJson, PRIVATE_KEY);
+        v1Params.put("sign", v1Sign);
+        StringBuilder v1UrlBuilder = new StringBuilder(BASE_URL).append("/open/recharge_template/query/v1?");
+        boolean v1F = true;
+        for (Map.Entry<String, String> e : v1Params.entrySet()) {
+            if (!v1F) v1UrlBuilder.append("&");
+            v1UrlBuilder.append(URLEncoder.encode(e.getKey(), "UTF-8")).append("=").append(URLEncoder.encode(e.getValue(), "UTF-8"));
+            v1F = false;
         }
-
-        int respCode = conn.getResponseCode();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(
-                respCode >= 200 && respCode < 300 ? conn.getInputStream() : conn.getErrorStream(), StandardCharsets.UTF_8));
-        StringBuilder respBody = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) respBody.append(line).append("\n");
-        reader.close();
-
-        System.out.println("【Template V2 Query Response】HTTP " + respCode);
-        System.out.println(respBody.toString());
-        java.nio.file.Files.write(java.nio.file.Paths.get("target/v2_resp.json"), respBody.toString().getBytes(StandardCharsets.UTF_8));
+        try {
+            URL u = new URL(v1UrlBuilder.toString());
+            HttpURLConnection c = (HttpURLConnection) u.openConnection();
+            c.setRequestMethod("POST");
+            c.setRequestProperty("Content-Type", "application/json");
+            c.setDoOutput(true);
+            try (OutputStream os = c.getOutputStream()) { os.write(v1BodyJson.getBytes(StandardCharsets.UTF_8)); }
+            int code = c.getResponseCode();
+            BufferedReader r = new BufferedReader(new InputStreamReader(code >= 200 && code < 300 ? c.getInputStream() : c.getErrorStream(), StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            String l;
+            while ((l = r.readLine()) != null) sb.append(l);
+            r.close();
+            java.nio.file.Files.write(java.nio.file.Paths.get("target/v1_resp.json"), sb.toString().getBytes(StandardCharsets.UTF_8));
+        } catch (Exception ignored) {}
 
         // 同时测试推广链接
-        StringBuilder pUrlBuilder = new StringBuilder(BASE_URL).append("/open/promotion/query/v1?");
-        String pSign = FlicknovelSignUtil.generateSign(queryParams, bodyJson, PRIVATE_KEY);
-        Map<String, String> pParams = new HashMap<>(queryParams);
+        String promoBodyJson = String.format("{\"email\":\"%s\",\"page\":1,\"page_size\":50}", email);
+        Map<String, String> pParams = new HashMap<>();
+        pParams.put("company_id", COMPANY_ID);
+        pParams.put("timestamp", String.valueOf(System.currentTimeMillis() / 1000));
+        pParams.put("nonce", UUID.randomUUID().toString().replace("-", "").substring(0, 32));
+        String pSign = FlicknovelSignUtil.generateSign(pParams, promoBodyJson, PRIVATE_KEY);
         pParams.put("sign", pSign);
+
+        StringBuilder pUrlBuilder = new StringBuilder(BASE_URL).append("/open/promotion/query/v1?");
         boolean pFirst = true;
         for (Map.Entry<String, String> entry : pParams.entrySet()) {
             if (!pFirst) pUrlBuilder.append("&");
@@ -159,13 +183,14 @@ public class PrintOrderCurlTest {
         pConn.setRequestProperty("Content-Type", "application/json");
         pConn.setDoOutput(true);
         try (OutputStream os = pConn.getOutputStream()) {
-            os.write(bodyJson.getBytes(StandardCharsets.UTF_8));
+            os.write(promoBodyJson.getBytes(StandardCharsets.UTF_8));
         }
         int pRespCode = pConn.getResponseCode();
         BufferedReader pReader = new BufferedReader(new InputStreamReader(
                 pRespCode >= 200 && pRespCode < 300 ? pConn.getInputStream() : pConn.getErrorStream(), StandardCharsets.UTF_8));
         StringBuilder pRespBody = new StringBuilder();
-        while ((line = pReader.readLine()) != null) pRespBody.append(line).append("\n");
+        String pLine;
+        while ((pLine = pReader.readLine()) != null) pRespBody.append(pLine).append("\n");
         pReader.close();
 
         System.out.println("【Promotion Query Response】HTTP " + pRespCode);

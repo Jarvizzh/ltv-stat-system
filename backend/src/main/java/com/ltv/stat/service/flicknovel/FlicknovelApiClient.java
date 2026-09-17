@@ -170,6 +170,15 @@ public class FlicknovelApiClient {
     }
 
     /**
+     * 获取短篇充值模版列表 (v1 返回 JsonNode 结构，兼容历史模板)
+     * Path: /open/recharge_template/query/v1
+     */
+    public com.fasterxml.jackson.databind.JsonNode getRechargeTemplateV1Json(FlicknovelRechargeTemplateQueryRequest request) {
+        String path = "/open/recharge_template/query/v1";
+        return executePost(path, request, com.fasterxml.jackson.databind.JsonNode.class);
+    }
+
+    /**
      * 3.2 获取短篇充值模版列表 (v2)
      * Path: /open/recharge_template/query/v2
      */
