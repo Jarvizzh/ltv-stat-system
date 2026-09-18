@@ -51,16 +51,16 @@ public class LtvStatServiceTest {
         LocalDate testCohortDate = LocalDate.of(2026, 7, 12);
 
         // 清理原有数据
-        rawOrderRepository.deleteAll();
-        ltvDailyStatRepository.deleteAll();
-        userLandingPageRepository.deleteAll();
-        ltvLaunchConfigRepository.deleteAll();
+        rawOrderRepository.deleteAllInBatch();
+        ltvDailyStatRepository.deleteAllInBatch();
+        userLandingPageRepository.deleteAllInBatch();
+        ltvLaunchConfigRepository.deleteAllInBatch();
 
         // 绑定落地页给用户 1L
         UserLandingPage ulp = new UserLandingPage();
         ulp.setUserId(1L);
         ulp.setLandingPageId("lp_999");
-        ulp.setTimezone("BJ");
+        ulp.setTimezone("CST");
         userLandingPageRepository.save(ulp);
 
         // 创建模版模拟订单
@@ -132,7 +132,7 @@ public class LtvStatServiceTest {
 
     @Test
     public void testRefundStatusAndLastMonthRefundSummary() {
-        rawOrderRepository.deleteAll();
+        rawOrderRepository.deleteAllInBatch();
         LocalDate today = LocalDate.now();
         LocalDate lastMonthDate = today.minusMonths(1).withDayOfMonth(15);
 

@@ -47,4 +47,19 @@ public class FlicknovelControllerTest {
                         .header("Authorization", getAuthToken()))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    public void testLandingPagesTimezoneDefaultsAndRecalculate() throws Exception {
+        // 1. 验证 flicknovel 落地页查询，默认时区为 UTC
+        mockMvc.perform(get("/api/user/landing-pages?platformCode=flicknovel")
+                        .header("Authorization", getAuthToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0));
+
+        // 2. 验证触发 flicknovel 重算接口
+        mockMvc.perform(post("/api/ltv/recalculate?platformCode=flicknovel")
+                        .header("Authorization", getAuthToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0));
+    }
 }

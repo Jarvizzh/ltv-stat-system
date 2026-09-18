@@ -179,15 +179,23 @@ public class LtvStatService {
     }
 
     /**
-     * 提取订单的生效注册日期 (按落地页 ID 对应的时区配置区分美东与北京时间，未标注默认北京时间)
+     * 提取订单的生效注册日期 (按落地页 ID 对应的时区配置区分 UTC、美东与北京时间，未标注根据平台默认判定，兼容历史 BJ)
      */
     public static LocalDate getEffectiveRegisterDate(RawOrder order, Map<String, String> tzMap) {
         if (order == null) return null;
         String pid = order.getLandingPageId() != null ? order.getLandingPageId().trim() : "";
-        String tz = (tzMap != null && tzMap.containsKey(pid)) ? tzMap.get(pid) : "BJ";
+        String defaultTz = (order.getPlatformCode() != null && "flicknovel".equalsIgnoreCase(order.getPlatformCode().trim())) ? "UTC" : "CST";
+        String tz = (tzMap != null && tzMap.containsKey(pid)) ? tzMap.get(pid) : defaultTz;
+        if (tz == null || tz.trim().isEmpty() || "BJ".equalsIgnoreCase(tz.trim())) {
+            tz = "CST";
+        }
+        if ("UTC".equalsIgnoreCase(tz)) {
+            return getUtcRegisterDate(order);
+        }
         if ("ET".equalsIgnoreCase(tz)) {
             return order.getRegisterDateEt();
         }
+        // CST / BJ
         return order.getRegisterTimeBj() != null ? order.getRegisterTimeBj().toLocalDate() : order.getRegisterDateEt();
     }
 
@@ -213,20 +221,50 @@ public class LtvStatService {
     }
 
     /**
-     * 提取订单的生效支付日期 (按落地页 ID 对应的时区配置区分美东与北京时间，未标注默认北京时间)
+     * 提取订单的生效支付日期 (按落地页 ID 对应的时区配置区分 UTC、美东与北京时间，未标注根据平台默认判定，兼容历史 BJ)
      */
     public static LocalDate getEffectivePayDate(RawOrder order, Map<String, String> tzMap) {
         if (order == null) return null;
         String pid = order.getLandingPageId() != null ? order.getLandingPageId().trim() : "";
-        String tz = (tzMap != null && tzMap.containsKey(pid)) ? tzMap.get(pid) : "BJ";
+        String defaultTz = (order.getPlatformCode() != null && "flicknovel".equalsIgnoreCase(order.getPlatformCode().trim())) ? "UTC" : "CST";
+        String tz = (tzMap != null && tzMap.containsKey(pid)) ? tzMap.get(pid) : defaultTz;
+        if (tz == null || tz.trim().isEmpty() || "BJ".equalsIgnoreCase(tz.trim())) {
+            tz = "CST";
+        }
+        if ("UTC".equalsIgnoreCase(tz)) {
+            return getUtcPayDate(order);
+        }
         if ("ET".equalsIgnoreCase(tz)) {
             return order.getPayDateEt();
         }
+        // CST / BJ
         return order.getPayTimeBj() != null ? order.getPayTimeBj().toLocalDate() : order.getPayDateEt();
     }
 
     public static LocalDate getEffectivePayDate(RawOrder order) {
         return getEffectivePayDate(order, null);
+    }
+
+    /**
+     * 提取订单的 UTC 注册日期
+     */
+    public static LocalDate getUtcRegisterDate(RawOrder order) {
+        if (order == null) return null;
+        if (order.getRegisterDateUtc() != null) return order.getRegisterDateUtc();
+        if (order.getRegisterTimeUtc() != null) return order.getRegisterTimeUtc().toLocalDate();
+        if (order.getRegisterTimeBj() != null) return TimeUtils.convertBjToUtc(order.getRegisterTimeBj()).toLocalDate();
+        return order.getRegisterDateEt();
+    }
+
+    /**
+     * 提取订单的 UTC 支付日期
+     */
+    public static LocalDate getUtcPayDate(RawOrder order) {
+        if (order == null) return null;
+        if (order.getPayDateUtc() != null) return order.getPayDateUtc();
+        if (order.getPayTimeUtc() != null) return order.getPayTimeUtc().toLocalDate();
+        if (order.getPayTimeBj() != null) return TimeUtils.convertBjToUtc(order.getPayTimeBj()).toLocalDate();
+        return order.getPayDateEt();
     }
 
     /**
@@ -290,9 +328,12 @@ public class LtvStatService {
         String targetPlatform = isAll ? "ALL" : pCode;
 
         invalidateUserCache(pCode, userId);
-        LocalDate todayBj = LocalDate.now(ZoneId.of("Asia/Shanghai"));
-        LocalDate todayEt = ZonedDateTime.now(TimeUtils.EASTERN_ZONE).toLocalDate();
-        LocalDate maxToday = todayBj.isAfter(todayEt) ? todayBj : todayEt;
+        LocalDate todayBj = LocalDate.now(TimeUtils.BEIJING_ZONE);
+        LocalDate todayEt = LocalDate.now(TimeUtils.EASTERN_ZONE);
+        LocalDate todayUtc = LocalDate.now(TimeUtils.UTC_ZONE);
+        LocalDate maxToday = todayBj;
+        if (todayEt.isAfter(maxToday)) maxToday = todayEt;
+        if (todayUtc.isAfter(maxToday)) maxToday = todayUtc;
 
         List<LandingPageConfigItem> userPages = userService.getUserLandingPageConfigs(pCode, userId);
         Map<String, String> tzMap = userPages.stream()

@@ -26,4 +26,19 @@ public class TimeUtilsTest {
         LocalDate etDate = TimeUtils.parseBjToEtDate(bjTime);
         assertEquals(LocalDate.of(2026, 7, 28), etDate);
     }
+
+    @Test
+    public void testBeijingToUtcConversion() {
+        // 北京时间 2026-07-28 02:30:00 (UTC+8) -> UTC 2026-07-27 18:30:00 (跨天)
+        String bjTime = "2026-07-28 02:30:00";
+        java.time.LocalDateTime utcLdt = TimeUtils.parseBjToUtc(bjTime);
+        assertNotNull(utcLdt);
+        assertEquals(2026, utcLdt.getYear());
+        assertEquals(7, utcLdt.getMonthValue());
+        assertEquals(27, utcLdt.getDayOfMonth());
+        assertEquals(18, utcLdt.getHour());
+        assertEquals(30, utcLdt.getMinute());
+
+        assertEquals(TimeUtils.BEIJING_ZONE, TimeUtils.CST_ZONE);
+    }
 }

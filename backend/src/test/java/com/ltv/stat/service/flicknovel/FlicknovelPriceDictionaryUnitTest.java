@@ -54,4 +54,67 @@ public class FlicknovelPriceDictionaryUnitTest {
 
         System.out.println("=== testParsePriceTypeMapFromJsonString PASSED ===");
     }
+
+    @Test
+    public void testParseIndependentFirstAndNoFirstDictionaries() throws Exception {
+        FlicknovelOrderTypeResolver resolver = new FlicknovelOrderTypeResolver();
+        FlicknovelApiService service = new FlicknovelApiService(null, null, null, null, null, null, resolver, objectMapper);
+
+        // 构造一个在首充池和非首充池有不同产品设定的模板：
+        // 首充池:
+        //   - 代币 999
+        //   - 订阅特惠 1999，订阅原价 2999
+        // 非首充池:
+        //   - 代币 2999 (注意：2999 在首充池是订阅原价，在非首充池是纯代币！)
+        //   - 订阅续费 3999
+        String json = "{\n" +
+                "  \"recharge_template_id\": \"tpl_dual_pool\",\n" +
+                "  \"name\": \"双池独立测试模板\",\n" +
+                "  \"detail\": {\n" +
+                "    \"h5\": {\n" +
+                "      \"first_products\": [\n" +
+                "        {\"product\": {\"benefit_type\": 1, \"price_cents\": 999}},\n" +
+                "        {\"product\": {\"benefit_type\": 2, \"price_cents\": 2999, \"discount_price_cents\": 1999}}\n" +
+                "      ],\n" +
+                "      \"nofirst_products\": [\n" +
+                "        {\"product\": {\"benefit_type\": 1, \"price_cents\": 2999}},\n" +
+                "        {\"product\": {\"benefit_type\": 2, \"price_cents\": 3999}}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}";
+
+        JsonNode tplNode = objectMapper.readTree(json);
+        FlicknovelApiService.TemplatePriceDetail detail = service.parsePriceTypeDetail(tplNode);
+
+        assertNotNull(detail);
+        Map<Integer, Integer> firstMap = detail.getFirstPriceMap();
+        Map<Integer, Integer> noFirstMap = detail.getNoFirstPriceMap();
+
+        // 验证首充池
+        assertEquals(0, firstMap.get(999), "首充池 999 应为代币 (0)");
+        assertEquals(1, firstMap.get(1999), "首充池 1999 应为订阅 (1)");
+        assertEquals(1, firstMap.get(2999), "首充池 2999 应为订阅 (1)");
+        assertNull(firstMap.get(3999), "首充池未配置 3999");
+
+        // 验证非首充池
+        assertNull(noFirstMap.get(999), "非首充池未配置 999");
+        assertNull(noFirstMap.get(1999), "非首充池未配置 1999");
+        assertEquals(0, noFirstMap.get(2999), "非首充池 2999 应为代币 (0)");
+        assertEquals(1, noFirstMap.get(3999), "非首充池 3999 应为订阅 (1)");
+
+        // 验证全局合并池
+        Map<Integer, Integer> allMap = detail.getPriceMap();
+        assertEquals(0, allMap.get(999));
+        assertEquals(1, allMap.get(1999));
+        assertEquals(1, allMap.get(3999));
+
+        // 2999 在首充是订阅(1)，在非首充是代币(0)，在全局合并池中应被标记为冲突金额
+        assertTrue(detail.getAmbiguousPrices().contains(2999), "2999 在全量池中跨池冲突");
+        // 但在首充池内部和非首充池内部各自并无冲突
+        assertFalse(detail.getFirstAmbiguousPrices().contains(2999), "首充池内 2999 无冲突");
+        assertFalse(detail.getNoFirstAmbiguousPrices().contains(2999), "非首充池内 2999 无冲突");
+
+        System.out.println("=== testParseIndependentFirstAndNoFirstDictionaries PASSED ===");
+    }
 }

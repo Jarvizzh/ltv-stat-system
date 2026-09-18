@@ -54,4 +54,26 @@ public class FlicknovelInternalPullTest {
         assertNotNull(response);
         System.out.println("[Internal Pull Recharge Templates] response code=" + response.getCode() + ", msg=" + response.getMessage());
     }
+
+    @Test
+    public void testQueryTemplatesRealJson() throws Exception {
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper().enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+        String email = flicknovelApiClient.getDefaultEmail();
+        Long distAppId = flicknovelApiClient.getDefaultDistAppId(); // 2000019L
+
+        System.out.println("====== [TEST] Query Recharge Templates V2: email=" + email + ", distAppId=" + distAppId + " ======");
+        com.fasterxml.jackson.databind.JsonNode respV2 = flicknovelApiClient.getRechargeTemplateV2List(
+                new FlicknovelRechargeTemplateV2QueryRequest(email, distAppId, 1L, 50L));
+        System.out.println("--- RAW JSON V2 START ---");
+        System.out.println(mapper.writeValueAsString(respV2));
+        System.out.println("--- RAW JSON V2 END ---");
+
+        System.out.println("====== [TEST] Query Recharge Templates V1: email=" + email + ", distAppId=" + distAppId + " ======");
+        com.fasterxml.jackson.databind.JsonNode respV1 = flicknovelApiClient.getRechargeTemplateV1Json(
+                new FlicknovelRechargeTemplateQueryRequest(distAppId, email, 1L, 50L));
+        System.out.println("--- RAW JSON V1 START ---");
+        System.out.println(mapper.writeValueAsString(respV1));
+        System.out.println("--- RAW JSON V1 END ---");
+    }
 }
+

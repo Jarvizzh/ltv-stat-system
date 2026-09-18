@@ -405,6 +405,12 @@ public class RocnovelOrderSyncService {
         LocalDateTime payTimeEt = payEtZdt.toLocalDateTime();
         LocalDate payDateEt = payEtZdt.toLocalDate();
 
+        LocalDateTime regTimeUtc = TimeUtils.convertBjToUtc(regTimeBj);
+        LocalDate regDateUtc = regTimeUtc != null ? regTimeUtc.toLocalDate() : null;
+
+        LocalDateTime payTimeUtc = TimeUtils.convertBjToUtc(payTimeBj);
+        LocalDate payDateUtc = payTimeUtc != null ? payTimeUtc.toLocalDate() : null;
+
         BigDecimal orderAmountUsd = BigDecimal.valueOf(orderAmountCent)
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
@@ -418,9 +424,13 @@ public class RocnovelOrderSyncService {
         order.setRegisterTimeBj(regTimeBj);
         order.setRegisterTimeEt(regTimeEt);
         order.setRegisterDateEt(regDateEt);
+        order.setRegisterTimeUtc(regTimeUtc);
+        order.setRegisterDateUtc(regDateUtc);
         order.setPayTimeBj(payTimeBj);
         order.setPayTimeEt(payTimeEt);
         order.setPayDateEt(payDateEt);
+        order.setPayTimeUtc(payTimeUtc);
+        order.setPayDateUtc(payDateUtc);
         order.setOrderAmountCent(orderAmountCent);
         order.setOrderAmountUsd(orderAmountUsd);
         order.setIsSubs(isSubs);

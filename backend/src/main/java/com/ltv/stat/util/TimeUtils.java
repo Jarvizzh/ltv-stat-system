@@ -6,7 +6,9 @@ import java.time.format.DateTimeFormatter;
 public class TimeUtils {
 
     public static final ZoneId BEIJING_ZONE = ZoneId.of("Asia/Shanghai");
+    public static final ZoneId CST_ZONE = BEIJING_ZONE; // 国际标准缩写 CST (China Standard Time, UTC+8)
     public static final ZoneId EASTERN_ZONE = ZoneId.of("America/New_York");
+    public static final ZoneId UTC_ZONE = ZoneOffset.UTC; // 国际标准 UTC (世界协调时)
     public static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     public static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -38,7 +40,35 @@ public class TimeUtils {
         return bjLdt.atZone(BEIJING_ZONE).withZoneSameInstant(EASTERN_ZONE).toLocalDateTime();
     }
 
+    /**
+     * 将 LocalDateTime (假设是北京时间) 转换为 UTC LocalDateTime
+     */
+    public static LocalDateTime convertBjToUtc(LocalDateTime bjLdt) {
+        if (bjLdt == null) return null;
+        return bjLdt.atZone(BEIJING_ZONE).withZoneSameInstant(UTC_ZONE).toLocalDateTime();
+    }
+
+    /**
+     * 将北京时间字符串 ("yyyy-MM-dd HH:mm:ss") 转换为 UTC LocalDateTime
+     */
+    public static LocalDateTime parseBjToUtc(String bjTimeStr) {
+        if (bjTimeStr == null || bjTimeStr.trim().isEmpty()) {
+            return null;
+        }
+        LocalDateTime ldt = LocalDateTime.parse(bjTimeStr.trim(), DATETIME_FORMATTER);
+        return ldt.atZone(BEIJING_ZONE).withZoneSameInstant(UTC_ZONE).toLocalDateTime();
+    }
+
     public static LocalDate getTodayEt() {
         return LocalDate.now(EASTERN_ZONE);
     }
+
+    public static LocalDate getTodayUtc() {
+        return LocalDate.now(UTC_ZONE);
+    }
+
+    public static LocalDate getTodayCst() {
+        return LocalDate.now(CST_ZONE);
+    }
 }
+

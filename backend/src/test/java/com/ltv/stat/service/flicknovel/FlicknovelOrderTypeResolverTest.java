@@ -104,4 +104,63 @@ public class FlicknovelOrderTypeResolverTest {
         int resultRepeatCoins = resolver.resolve(ctx);
         assertEquals(0, resultRepeatCoins, "无订阅历史的复充 3999，必须判定为代币单充 (0)");
     }
+
+    /**
+     * 测试第二优先级: 首充专属字典与非首充专属字典独立路由
+     * 针对同一金额在首充池和非首充池代表不同业务类型（如 29.99 在首充池为订阅原价，在非首充池为代币）
+     */
+    @Test
+    public void testPriority2_DualPoolIndependentRouting() {
+        FlicknovelOrderTypeResolver.OrderResolveContext ctx = new FlicknovelOrderTypeResolver.OrderResolveContext();
+        ctx.setDto(new FlicknovelOrderDto());
+
+        // 配置首充池: 2999 -> 订阅 (1)
+        Map<Integer, Integer> firstMap = new HashMap<>();
+        firstMap.put(999, 0); // 首充代币特惠
+        firstMap.put(2999, 1); // 首充订阅
+        ctx.setFirstPriceMap(firstMap);
+
+        // 配置非首充池: 2999 -> 代币 (0), 3999 -> 订阅 (1)
+        Map<Integer, Integer> noFirstMap = new HashMap<>();
+        noFirstMap.put(2999, 0); // 复充代币
+        noFirstMap.put(3999, 1); // 复充订阅
+        ctx.setNoFirstPriceMap(noFirstMap);
+
+        // 全局合并池 (兜底)
+        Map<Integer, Integer> allMap = new HashMap<>();
+        allMap.put(999, 0);
+        allMap.put(3999, 1);
+        ctx.setTemplatePriceMap(allMap);
+
+        // 1. 首充订单金额 2999，必须命中 firstPriceMap -> 订阅 (1)
+        ctx.setOrderAmountCent(2999);
+        ctx.setRenewType(1);
+        assertEquals(1, resolver.resolve(ctx), "首充订单 2999 必须路由至首充池判定为订阅 (1)");
+
+        // 2. 复充订单金额 2999，必须命中 noFirstPriceMap -> 代币 (0)
+        ctx.setRenewType(2);
+        assertEquals(0, resolver.resolve(ctx), "复充订单 2999 必须路由至非首充池判定为代币 (0)");
+
+        // 3. 首充池独有商品 999
+        ctx.setOrderAmountCent(999);
+        ctx.setRenewType(1);
+        assertEquals(0, resolver.resolve(ctx), "首充 999 命中首充池代币 (0)");
+
+        // 4. 复充订单金额 999 (非首充池未配置，优雅降级至全局合并池)
+        ctx.setRenewType(2);
+        assertEquals(0, resolver.resolve(ctx), "非首充池未配置时，降级全局池命中 999 -> 代币 (0)");
+
+        // 5. 边缘情况: renewType 未定义 (0 或 -1)，直接走全局合并池，不武断假定为非首充
+        ctx.setRenewType(0);
+        ctx.setOrderAmountCent(3999);
+        assertEquals(1, resolver.resolve(ctx), "renewType 未知时直接走全局池命中 3999 -> 订阅 (1)");
+
+        // 6. 降级消歧场景: 模板无首购优惠 (hasIntroOffer=false)，首充订单遇到冲突金额，但非首充池中明确配置了代币 (0)
+        ctx.setRenewType(1);
+        ctx.setOrderAmountCent(2999);
+        ctx.setFirstPriceMap(Collections.emptyMap()); // 模拟首充池缺失 2999
+        ctx.setAmbiguousPrices(Collections.singleton(2999));
+        ctx.setTemplateHasIntroOffer(false);
+        assertEquals(0, resolver.resolve(ctx), "无首购优惠但非首充池明确为代币时，首单冲突金额应准确判为代币 (0)");
+    }
 }

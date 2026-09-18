@@ -34,8 +34,12 @@ public class FlicknovelOrderTypeResolver {
         private LocalDateTime payTimeBj;
         private boolean hasSubscribed; // 用户历史是否有过订阅记录
         private LocalDateTime latestSubsPayTime; // 用户最近一次订阅支付时间
-        private Map<Integer, Integer> templatePriceMap; // 该推广模板解析出的价格映射
-        private Set<Integer> ambiguousPrices; // 该模板中同时存在单充与订阅的冲突价格集合 (如 3999)
+        private Map<Integer, Integer> templatePriceMap; // 该推广模板解析出的全量合并价格映射 (兜底)
+        private Map<Integer, Integer> firstPriceMap; // 首充专属商品价格映射 (first_products)
+        private Map<Integer, Integer> noFirstPriceMap; // 非首充专属商品价格映射 (nofirst_products)
+        private Set<Integer> ambiguousPrices; // 全局冲突价格集合 (如 3999)
+        private Set<Integer> firstAmbiguousPrices; // 首充池内的冲突价格集合
+        private Set<Integer> noFirstAmbiguousPrices; // 非首充池内的冲突价格集合
         private boolean templateHasIntroOffer; // 该模板是否存在低于原价的订阅首充优惠 (如 1999, 2999)
 
         public FlicknovelOrderDto getDto() { return dto; }
@@ -62,8 +66,20 @@ public class FlicknovelOrderTypeResolver {
         public Map<Integer, Integer> getTemplatePriceMap() { return templatePriceMap; }
         public void setTemplatePriceMap(Map<Integer, Integer> templatePriceMap) { this.templatePriceMap = templatePriceMap; }
 
+        public Map<Integer, Integer> getFirstPriceMap() { return firstPriceMap; }
+        public void setFirstPriceMap(Map<Integer, Integer> firstPriceMap) { this.firstPriceMap = firstPriceMap; }
+
+        public Map<Integer, Integer> getNoFirstPriceMap() { return noFirstPriceMap; }
+        public void setNoFirstPriceMap(Map<Integer, Integer> noFirstPriceMap) { this.noFirstPriceMap = noFirstPriceMap; }
+
         public Set<Integer> getAmbiguousPrices() { return ambiguousPrices; }
         public void setAmbiguousPrices(Set<Integer> ambiguousPrices) { this.ambiguousPrices = ambiguousPrices; }
+
+        public Set<Integer> getFirstAmbiguousPrices() { return firstAmbiguousPrices; }
+        public void setFirstAmbiguousPrices(Set<Integer> firstAmbiguousPrices) { this.firstAmbiguousPrices = firstAmbiguousPrices; }
+
+        public Set<Integer> getNoFirstAmbiguousPrices() { return noFirstAmbiguousPrices; }
+        public void setNoFirstAmbiguousPrices(Set<Integer> noFirstAmbiguousPrices) { this.noFirstAmbiguousPrices = noFirstAmbiguousPrices; }
 
         public boolean isTemplateHasIntroOffer() { return templateHasIntroOffer; }
         public void setTemplateHasIntroOffer(boolean templateHasIntroOffer) { this.templateHasIntroOffer = templateHasIntroOffer; }
@@ -105,21 +121,43 @@ public class FlicknovelOrderTypeResolver {
         }
 
         int amountCent = ctx.getOrderAmountCent();
-        Map<Integer, Integer> priceMap = ctx.getTemplatePriceMap();
-        Set<Integer> ambiguousPrices = ctx.getAmbiguousPrices();
+        int renewType = ctx.getRenewType(); // 1=首单, 2=老用户复充
 
         // =========================================================================
-        // 【第二优先级: 冲突金额时序消歧 (Heuristic Temporal Resolution)】
-        // 当金额同时存在于单充和订阅 (例如 3999 既是周订又是代币)，进行生命周期消歧
+        // 【第二优先级: 首充专属字典 vs 非首充专属字典独立路由】
         // =========================================================================
-        boolean isAmbiguous = (ambiguousPrices != null && ambiguousPrices.contains(amountCent));
-        if (isAmbiguous) {
-            return resolveAmbiguousPrice(ctx);
+        if (renewType == 1) {
+            // --- 场景 A: 首充订单 (renew_type == 1) ---
+            Set<Integer> firstAmbiguous = ctx.getFirstAmbiguousPrices();
+            if (firstAmbiguous != null && firstAmbiguous.contains(amountCent)) {
+                return resolveAmbiguousPrice(ctx);
+            }
+            Map<Integer, Integer> firstMap = ctx.getFirstPriceMap();
+            if (firstMap != null && firstMap.containsKey(amountCent)) {
+                return firstMap.get(amountCent);
+            }
+        } else if (renewType == 2) {
+            // --- 场景 B: 非首充/复充订单 (renew_type == 2) ---
+            Set<Integer> noFirstAmbiguous = ctx.getNoFirstAmbiguousPrices();
+            if (noFirstAmbiguous != null && noFirstAmbiguous.contains(amountCent)) {
+                return resolveAmbiguousPrice(ctx);
+            }
+            Map<Integer, Integer> noFirstMap = ctx.getNoFirstPriceMap();
+            if (noFirstMap != null && noFirstMap.containsKey(amountCent)) {
+                return noFirstMap.get(amountCent);
+            }
         }
 
         // =========================================================================
-        // 【第三优先级: 模板无冲突价格直接映射】
+        // 【第三优先级: 跨池优雅降级与全局消歧】
+        // 若在指定池未配置，降级尝试全局合并池消歧或直接映射
         // =========================================================================
+        Set<Integer> globalAmbiguous = ctx.getAmbiguousPrices();
+        if (globalAmbiguous != null && globalAmbiguous.contains(amountCent)) {
+            return resolveAmbiguousPrice(ctx);
+        }
+
+        Map<Integer, Integer> priceMap = ctx.getTemplatePriceMap();
         if (priceMap != null && priceMap.containsKey(amountCent)) {
             return priceMap.get(amountCent);
         }
@@ -143,7 +181,14 @@ public class FlicknovelOrderTypeResolver {
                 log.info("[OrderTypeResolver] First purchase at full price {} when intro offer exists -> Treated as Coins Recharge (0)", amountCent);
                 return 0;
             } else {
-                // 若模板完全没有首充优惠（纯原价模板），根据置顶偏好优先判定为订阅
+                // 若模板完全没有首充优惠（纯原价模板），检查是否在非首充池中明确为代币 (0)
+                Map<Integer, Integer> noFirstMap = ctx.getNoFirstPriceMap();
+                if (noFirstMap != null && Integer.valueOf(0).equals(noFirstMap.get(amountCent))) {
+                    // 若非首充池中明确为代币，且无首充优惠，说明该档位大概率为主推代币
+                    log.info("[OrderTypeResolver] First purchase {} without intro offer matches token in noFirstMap -> Treated as Coins Recharge (0)", amountCent);
+                    return 0;
+                }
+                // 根据置顶订阅偏好优先判定为订阅
                 return 1;
             }
         }

@@ -102,14 +102,14 @@ public class UserServiceLandingPageTest {
         assertNotNull(userInitial);
         assertTrue(userInitial.isEmpty(), "普通用户初始落地页应默认为空");
 
-        // 2. 管理员 (ADMIN) 初始状态：未配置 flicknovel 时，默认填入所有推广ID
+        // 2. 管理员 (ADMIN) 初始状态：未配置 flicknovel 时，默认填入所有推广ID，番茄海外默认时区为 UTC
         List<LandingPageConfigItem> adminInitial = userService.getUserLandingPageConfigs("flicknovel", testAdminId);
         assertNotNull(adminInitial);
         assertFalse(adminInitial.isEmpty(), "管理员初始配置应默认返回所有推广ID");
         assertTrue(adminInitial.stream().anyMatch(c -> "TEST_PROMO_999".equals(c.getLandingPageId())), "应包含测试推广ID TEST_PROMO_999");
-        assertTrue(adminInitial.stream().allMatch(c -> "BJ".equals(c.getTimezone())), "初始配置时区应默认为 BJ");
+        assertTrue(adminInitial.stream().allMatch(c -> "UTC".equals(c.getTimezone())), "番茄海外初始配置时区应默认为 UTC");
 
-        // 3. 模拟管理员手动删除部分项后保存（只保留 TEST_PROMO_999）
+        // 3. 模拟管理员手动保存（指定 ET 时区与 UTC 时区）
         LandingPageConfigItem retained = new LandingPageConfigItem("flicknovel", "TEST_PROMO_999", "ET");
         userService.updateUserLandingPageConfigs("flicknovel", testAdminId, Collections.singletonList(retained));
 
@@ -119,7 +119,7 @@ public class UserServiceLandingPageTest {
         assertEquals("TEST_PROMO_999", updatedConfigs.get(0).getLandingPageId());
         assertEquals("ET", updatedConfigs.get(0).getTimezone());
 
-        // 4. 验证平台隔离：给用户配置 rocnovel 落地页，修改 flicknovel 不会影响 rocnovel
+        // 4. 验证平台隔离与 CST / 历史 BJ 兼容：给用户配置 rocnovel 落地页（传入 BJ 自动映射为 CST）
         LandingPageConfigItem rocItem = new LandingPageConfigItem("rocnovel", "ROC_PAGE_1", "BJ");
         userService.updateUserLandingPageConfigs("rocnovel", testAdminId, Collections.singletonList(rocItem));
 
@@ -134,5 +134,6 @@ public class UserServiceLandingPageTest {
         List<LandingPageConfigItem> rocConfigs = userService.getUserLandingPageConfigs("rocnovel", testAdminId);
         assertEquals(1, rocConfigs.size());
         assertEquals("ROC_PAGE_1", rocConfigs.get(0).getLandingPageId());
+        assertEquals("CST", rocConfigs.get(0).getTimezone(), "传入 BJ 应平滑升级为 CST");
     }
 }

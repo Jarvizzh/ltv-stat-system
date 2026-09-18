@@ -3,7 +3,7 @@ package com.ltv.stat.dto;
 public class LandingPageConfigItem {
     private String platformCode = "rocnovel";
     private String landingPageId;
-    private String timezone; // "ET" (美东) or "BJ" (北京)
+    private String timezone; // "CST" (北京时间), "UTC" (世界协调时), "ET" (美东时区)
 
     public LandingPageConfigItem() {}
 
@@ -34,7 +34,10 @@ public class LandingPageConfigItem {
     }
 
     public String getTimezone() {
-        return timezone != null ? timezone : "ET";
+        if (timezone == null || timezone.trim().isEmpty() || "BJ".equalsIgnoreCase(timezone.trim())) {
+            return "flicknovel".equalsIgnoreCase(platformCode) ? "UTC" : "CST";
+        }
+        return timezone.toUpperCase();
     }
 
     public void setTimezone(String timezone) {

@@ -302,6 +302,43 @@ public class DatabasePrimaryKeysInitializer {
             log.warn("Failed to backfill historical platform_code: {}", e.getMessage());
         }
 
+        // 11. 检查并补充 raw_order 表的 UTC 时间字段及索引
+        if (!isColumnExist("raw_order", "register_time_utc")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE raw_order ADD COLUMN register_time_utc DATETIME DEFAULT NULL AFTER register_date_et");
+                jdbcTemplate.execute("ALTER TABLE raw_order ADD COLUMN register_date_utc DATE DEFAULT NULL AFTER register_time_utc");
+                jdbcTemplate.execute("ALTER TABLE raw_order ADD COLUMN pay_time_utc DATETIME DEFAULT NULL AFTER pay_date_et");
+                jdbcTemplate.execute("ALTER TABLE raw_order ADD COLUMN pay_date_utc DATE DEFAULT NULL AFTER pay_time_utc");
+                log.info("Successfully added UTC datetime and date columns to raw_order");
+            } catch (Exception e) {
+                log.warn("Failed to add UTC columns to raw_order: {}", e.getMessage());
+            }
+        }
+        try {
+            if (!isIndexExist("raw_order", "idx_reg_date_utc")) {
+                jdbcTemplate.execute("ALTER TABLE raw_order ADD INDEX idx_reg_date_utc (register_date_utc)");
+                log.info("Successfully added index idx_reg_date_utc to raw_order");
+            }
+        } catch (Exception e) {
+            log.info("raw_order idx_reg_date_utc index info: {}", e.getMessage());
+        }
+
+        // 12. 历史数据平滑回填与时区升级 (BJ -> CST / flicknovel -> UTC)
+        try {
+            jdbcTemplate.execute("UPDATE raw_order " +
+                    "SET register_time_utc = CONVERT_TZ(register_time_bj, '+08:00', '+00:00'), " +
+                    "    register_date_utc = DATE(CONVERT_TZ(register_time_bj, '+08:00', '+00:00')), " +
+                    "    pay_time_utc = CONVERT_TZ(pay_time_bj, '+08:00', '+00:00'), " +
+                    "    pay_date_utc = DATE(CONVERT_TZ(pay_time_bj, '+08:00', '+00:00')) " +
+                    "WHERE pay_time_utc IS NULL AND pay_time_bj IS NOT NULL");
+
+            jdbcTemplate.execute("UPDATE user_landing_page SET timezone = 'CST' WHERE timezone = 'BJ' AND platform_code != 'flicknovel'");
+            jdbcTemplate.execute("UPDATE user_landing_page SET timezone = 'UTC' WHERE platform_code = 'flicknovel' AND (timezone = 'BJ' OR timezone IS NULL)");
+            log.info("Successfully backfilled raw_order UTC timestamps and upgraded user_landing_page timezones");
+        } catch (Exception e) {
+            log.warn("Failed to backfill UTC timestamps or upgrade user_landing_page timezones: {}", e.getMessage());
+        }
+
         // 13. 检查并创建 flicknovel_relation 表
         try {
             jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS flicknovel_relation (" +

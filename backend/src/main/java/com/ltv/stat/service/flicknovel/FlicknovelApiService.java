@@ -133,6 +133,9 @@ public class FlicknovelApiService {
                             priceMap.put(Integer.parseInt(entry.getKey()), entry.getValue());
                         }
                         templatePriceTypeCache.put(tpl.getTemplateId(), priceMap);
+                        TemplatePriceDetail fallbackDetail = new TemplatePriceDetail(priceMap, Collections.emptySet(), false,
+                                priceMap, priceMap, Collections.emptySet(), Collections.emptySet());
+                        templateDetailCache.put(tpl.getTemplateId(), fallbackDetail);
                     } catch (Exception ignored) {}
                 }
             }
@@ -413,12 +416,14 @@ public class FlicknovelApiService {
         }
         landingPageId = landingPageId != null ? landingPageId.trim() : "";
 
-        // 2. 支付时间清洗 (番茄返回 UTC 秒级时间戳，分别精准换算为北京时间与美东时间)
+        // 2. 支付时间清洗 (番茄返回 UTC 秒级时间戳，分别精准换算为北京时间、美东时间及原生 UTC 时间)
         long payTs = parseEpochSecondSafe(dto.getCompletedAt(), dto.getCreatedAt());
         Instant payInstant = Instant.ofEpochSecond(payTs);
         LocalDateTime payTimeBj = payInstant.atZone(TimeUtils.BEIJING_ZONE).toLocalDateTime();
         LocalDateTime payTimeEt = payInstant.atZone(TimeUtils.EASTERN_ZONE).toLocalDateTime();
         LocalDate payDateEt = payTimeEt.toLocalDate();
+        LocalDateTime payTimeUtc = payInstant.atZone(TimeUtils.UTC_ZONE).toLocalDateTime();
+        LocalDate payDateUtc = payTimeUtc.toLocalDate();
 
         // 3. 首充/续订判断 (renew_type) 与用户注册/归因时间 (register_time) 清洗
         int renewType;
@@ -469,6 +474,8 @@ public class FlicknovelApiService {
         }
 
         LocalDate regDateEt = regTimeEt != null ? regTimeEt.toLocalDate() : payDateEt;
+        LocalDateTime regTimeUtc = TimeUtils.convertBjToUtc(regTimeBj);
+        LocalDate regDateUtc = regTimeUtc != null ? regTimeUtc.toLocalDate() : payDateUtc;
 
         // 4. 金额清洗 (us_price 美元字符串 -> BigDecimal 与 美分整数)
         BigDecimal orderAmountUsd = BigDecimal.ZERO;
@@ -498,9 +505,13 @@ public class FlicknovelApiService {
         order.setRegisterTimeBj(regTimeBj);
         order.setRegisterTimeEt(regTimeEt);
         order.setRegisterDateEt(regDateEt);
+        order.setRegisterTimeUtc(regTimeUtc);
+        order.setRegisterDateUtc(regDateUtc);
         order.setPayTimeBj(payTimeBj);
         order.setPayTimeEt(payTimeEt);
         order.setPayDateEt(payDateEt);
+        order.setPayTimeUtc(payTimeUtc);
+        order.setPayDateUtc(payDateUtc);
         order.setOrderAmountCent(orderAmountCent);
         order.setOrderAmountUsd(orderAmountUsd);
         order.setIsSubs(isSubs);
@@ -727,16 +738,34 @@ public class FlicknovelApiService {
         private final Map<Integer, Integer> priceMap;
         private final Set<Integer> ambiguousPrices;
         private final boolean hasIntroOffer;
+        private final Map<Integer, Integer> firstPriceMap;
+        private final Map<Integer, Integer> noFirstPriceMap;
+        private final Set<Integer> firstAmbiguousPrices;
+        private final Set<Integer> noFirstAmbiguousPrices;
 
         public TemplatePriceDetail(Map<Integer, Integer> priceMap, Set<Integer> ambiguousPrices, boolean hasIntroOffer) {
-            this.priceMap = priceMap;
-            this.ambiguousPrices = ambiguousPrices;
+            this(priceMap, ambiguousPrices, hasIntroOffer, Collections.emptyMap(), Collections.emptyMap(), Collections.emptySet(), Collections.emptySet());
+        }
+
+        public TemplatePriceDetail(Map<Integer, Integer> priceMap, Set<Integer> ambiguousPrices, boolean hasIntroOffer,
+                                   Map<Integer, Integer> firstPriceMap, Map<Integer, Integer> noFirstPriceMap,
+                                   Set<Integer> firstAmbiguousPrices, Set<Integer> noFirstAmbiguousPrices) {
+            this.priceMap = priceMap != null ? priceMap : Collections.emptyMap();
+            this.ambiguousPrices = ambiguousPrices != null ? ambiguousPrices : Collections.emptySet();
             this.hasIntroOffer = hasIntroOffer;
+            this.firstPriceMap = firstPriceMap != null ? firstPriceMap : Collections.emptyMap();
+            this.noFirstPriceMap = noFirstPriceMap != null ? noFirstPriceMap : Collections.emptyMap();
+            this.firstAmbiguousPrices = firstAmbiguousPrices != null ? firstAmbiguousPrices : Collections.emptySet();
+            this.noFirstAmbiguousPrices = noFirstAmbiguousPrices != null ? noFirstAmbiguousPrices : Collections.emptySet();
         }
 
         public Map<Integer, Integer> getPriceMap() { return priceMap; }
         public Set<Integer> getAmbiguousPrices() { return ambiguousPrices; }
         public boolean isHasIntroOffer() { return hasIntroOffer; }
+        public Map<Integer, Integer> getFirstPriceMap() { return firstPriceMap; }
+        public Map<Integer, Integer> getNoFirstPriceMap() { return noFirstPriceMap; }
+        public Set<Integer> getFirstAmbiguousPrices() { return firstAmbiguousPrices; }
+        public Set<Integer> getNoFirstAmbiguousPrices() { return noFirstAmbiguousPrices; }
     }
 
     /**
@@ -903,6 +932,10 @@ public class FlicknovelApiService {
                 ctx.setTemplatePriceMap(detail.getPriceMap());
                 ctx.setAmbiguousPrices(detail.getAmbiguousPrices());
                 ctx.setTemplateHasIntroOffer(detail.isHasIntroOffer());
+                ctx.setFirstPriceMap(detail.getFirstPriceMap());
+                ctx.setNoFirstPriceMap(detail.getNoFirstPriceMap());
+                ctx.setFirstAmbiguousPrices(detail.getFirstAmbiguousPrices());
+                ctx.setNoFirstAmbiguousPrices(detail.getNoFirstAmbiguousPrices());
                 return;
             }
             Map<Integer, Integer> priceMap = templatePriceTypeCache.get(tplId);
@@ -1140,17 +1173,27 @@ public class FlicknovelApiService {
     }
 
     /**
-     * 解析单个充值模板 v2 报文，生成高级详情结构 (包含无歧义价格字典、冲突价格集合、是否存在首购特惠)
+     * 解析单个充值模板 v2 报文，生成高级详情结构 (包含无歧义价格字典、首充字典、非首充字典、冲突价格集合、是否存在首购特惠)
      */
     public TemplatePriceDetail parsePriceTypeDetail(JsonNode tplNode) {
-        Map<Integer, Integer> priceMap = new HashMap<>();
-        Set<Integer> coinPrices = new HashSet<>();
-        Set<Integer> subsPrices = new HashSet<>();
+        Map<Integer, Integer> allPriceMap = new HashMap<>();
+        Set<Integer> allCoinPrices = new HashSet<>();
+        Set<Integer> allSubsPrices = new HashSet<>();
+
+        Map<Integer, Integer> firstPriceMap = new HashMap<>();
+        Set<Integer> firstCoinPrices = new HashSet<>();
+        Set<Integer> firstSubsPrices = new HashSet<>();
+
+        Map<Integer, Integer> noFirstPriceMap = new HashMap<>();
+        Set<Integer> noFirstCoinPrices = new HashSet<>();
+        Set<Integer> noFirstSubsPrices = new HashSet<>();
+
         boolean hasIntroOffer = false;
 
         JsonNode detail = tplNode.path("detail");
         if (!detail.isObject()) {
-            return new TemplatePriceDetail(priceMap, Collections.emptySet(), false);
+            return new TemplatePriceDetail(allPriceMap, Collections.emptySet(), false,
+                    firstPriceMap, noFirstPriceMap, Collections.emptySet(), Collections.emptySet());
         }
 
         Iterator<Map.Entry<String, JsonNode>> platformFields = detail.fields();
@@ -1159,24 +1202,27 @@ public class FlicknovelApiService {
             JsonNode platformNode = pf.getValue();
             if (!platformNode.isObject()) continue;
 
-            List<JsonNode> productLists = new ArrayList<>();
-            addArrayIfPresent(productLists, platformNode.path("first_top_products"));
-            addArrayIfPresent(productLists, platformNode.path("nofirst_top_products"));
-            addArrayIfPresent(productLists, platformNode.path("first_products"));
-            addArrayIfPresent(productLists, platformNode.path("nofirst_products"));
+            List<JsonNode> firstProductLists = new ArrayList<>();
+            List<JsonNode> noFirstProductLists = new ArrayList<>();
+
+            addArrayIfPresent(firstProductLists, platformNode.path("first_top_products"));
+            addArrayIfPresent(firstProductLists, platformNode.path("first_products"));
+            addArrayIfPresent(noFirstProductLists, platformNode.path("nofirst_top_products"));
+            addArrayIfPresent(noFirstProductLists, platformNode.path("nofirst_products"));
 
             JsonNode rechargeNode = platformNode.path("recharge");
             if (rechargeNode.isObject()) {
-                addArrayIfPresent(productLists, rechargeNode.path("first_products"));
-                addArrayIfPresent(productLists, rechargeNode.path("nofirst_products"));
+                addArrayIfPresent(firstProductLists, rechargeNode.path("first_products"));
+                addArrayIfPresent(noFirstProductLists, rechargeNode.path("nofirst_products"));
             }
             JsonNode subscribeNode = platformNode.path("subscribe");
             if (subscribeNode.isObject()) {
-                addArrayIfPresent(productLists, subscribeNode.path("first_products"));
-                addArrayIfPresent(productLists, subscribeNode.path("nofirst_products"));
+                addArrayIfPresent(firstProductLists, subscribeNode.path("first_products"));
+                addArrayIfPresent(noFirstProductLists, subscribeNode.path("nofirst_products"));
             }
 
-            for (JsonNode listNode : productLists) {
+            // 1. 处理首充商品池 (first_products)
+            for (JsonNode listNode : firstProductLists) {
                 for (JsonNode item : listNode) {
                     JsonNode product = item.path("product");
                     int benefitType = product.path("benefit_type").asInt(item.path("benefit_type").asInt(0));
@@ -1187,40 +1233,129 @@ public class FlicknovelApiService {
                     if (benefitType == 2) {
                         // 订阅产品
                         if (discountPriceCents > 0) {
-                            subsPrices.add(discountPriceCents);
-                            priceMap.put(discountPriceCents, 1);
+                            firstSubsPrices.add(discountPriceCents);
+                            firstPriceMap.put(discountPriceCents, 1);
+                            allSubsPrices.add(discountPriceCents);
+                            allPriceMap.put(discountPriceCents, 1);
                             if (priceCents > discountPriceCents) {
                                 hasIntroOffer = true;
                             }
                         }
                         if (customPriceCents > 0) {
-                            subsPrices.add(customPriceCents);
-                            priceMap.put(customPriceCents, 1);
+                            firstSubsPrices.add(customPriceCents);
+                            firstPriceMap.put(customPriceCents, 1);
+                            allSubsPrices.add(customPriceCents);
+                            allPriceMap.put(customPriceCents, 1);
                         }
                         if (priceCents > 0) {
-                            subsPrices.add(priceCents);
-                            if (!priceMap.containsKey(priceCents)) {
-                                priceMap.put(priceCents, 1);
+                            firstSubsPrices.add(priceCents);
+                            if (!firstPriceMap.containsKey(priceCents)) {
+                                firstPriceMap.put(priceCents, 1);
+                            }
+                            allSubsPrices.add(priceCents);
+                            if (!allPriceMap.containsKey(priceCents)) {
+                                allPriceMap.put(priceCents, 1);
                             }
                         }
                     } else if (benefitType == 1) {
-                        // 代币产品
+                        // 代币单充
                         if (discountPriceCents > 0) {
-                            coinPrices.add(discountPriceCents);
-                            if (!priceMap.containsKey(discountPriceCents)) {
-                                priceMap.put(discountPriceCents, 0);
+                            firstCoinPrices.add(discountPriceCents);
+                            if (!firstPriceMap.containsKey(discountPriceCents)) {
+                                firstPriceMap.put(discountPriceCents, 0);
+                            }
+                            allCoinPrices.add(discountPriceCents);
+                            if (!allPriceMap.containsKey(discountPriceCents)) {
+                                allPriceMap.put(discountPriceCents, 0);
                             }
                         }
                         if (customPriceCents > 0) {
-                            coinPrices.add(customPriceCents);
-                            if (!priceMap.containsKey(customPriceCents)) {
-                                priceMap.put(customPriceCents, 0);
+                            firstCoinPrices.add(customPriceCents);
+                            if (!firstPriceMap.containsKey(customPriceCents)) {
+                                firstPriceMap.put(customPriceCents, 0);
+                            }
+                            allCoinPrices.add(customPriceCents);
+                            if (!allPriceMap.containsKey(customPriceCents)) {
+                                allPriceMap.put(customPriceCents, 0);
                             }
                         }
                         if (priceCents > 0) {
-                            coinPrices.add(priceCents);
-                            if (!priceMap.containsKey(priceCents)) {
-                                priceMap.put(priceCents, 0);
+                            firstCoinPrices.add(priceCents);
+                            if (!firstPriceMap.containsKey(priceCents)) {
+                                firstPriceMap.put(priceCents, 0);
+                            }
+                            allCoinPrices.add(priceCents);
+                            if (!allPriceMap.containsKey(priceCents)) {
+                                allPriceMap.put(priceCents, 0);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. 处理非首充商品池 (nofirst_products)
+            for (JsonNode listNode : noFirstProductLists) {
+                for (JsonNode item : listNode) {
+                    JsonNode product = item.path("product");
+                    int benefitType = product.path("benefit_type").asInt(item.path("benefit_type").asInt(0));
+                    int priceCents = product.path("price_cents").asInt(item.path("price_cents").asInt(0));
+                    int discountPriceCents = product.path("discount_price_cents").asInt(item.path("discount_price_cents").asInt(0));
+                    int customPriceCents = item.path("custom_price_cents").asInt(0);
+
+                    if (benefitType == 2) {
+                        // 订阅产品
+                        if (discountPriceCents > 0) {
+                            noFirstSubsPrices.add(discountPriceCents);
+                            noFirstPriceMap.put(discountPriceCents, 1);
+                            allSubsPrices.add(discountPriceCents);
+                            allPriceMap.put(discountPriceCents, 1);
+                        }
+                        if (customPriceCents > 0) {
+                            noFirstSubsPrices.add(customPriceCents);
+                            noFirstPriceMap.put(customPriceCents, 1);
+                            allSubsPrices.add(customPriceCents);
+                            allPriceMap.put(customPriceCents, 1);
+                        }
+                        if (priceCents > 0) {
+                            noFirstSubsPrices.add(priceCents);
+                            if (!noFirstPriceMap.containsKey(priceCents)) {
+                                noFirstPriceMap.put(priceCents, 1);
+                            }
+                            allSubsPrices.add(priceCents);
+                            if (!allPriceMap.containsKey(priceCents)) {
+                                allPriceMap.put(priceCents, 1);
+                            }
+                        }
+                    } else if (benefitType == 1) {
+                        // 代币单充
+                        if (discountPriceCents > 0) {
+                            noFirstCoinPrices.add(discountPriceCents);
+                            if (!noFirstPriceMap.containsKey(discountPriceCents)) {
+                                noFirstPriceMap.put(discountPriceCents, 0);
+                            }
+                            allCoinPrices.add(discountPriceCents);
+                            if (!allPriceMap.containsKey(discountPriceCents)) {
+                                allPriceMap.put(discountPriceCents, 0);
+                            }
+                        }
+                        if (customPriceCents > 0) {
+                            noFirstCoinPrices.add(customPriceCents);
+                            if (!noFirstPriceMap.containsKey(customPriceCents)) {
+                                noFirstPriceMap.put(customPriceCents, 0);
+                            }
+                            allCoinPrices.add(customPriceCents);
+                            if (!allPriceMap.containsKey(customPriceCents)) {
+                                allPriceMap.put(customPriceCents, 0);
+                            }
+                        }
+                        if (priceCents > 0) {
+                            noFirstCoinPrices.add(priceCents);
+                            if (!noFirstPriceMap.containsKey(priceCents)) {
+                                noFirstPriceMap.put(priceCents, 0);
+                            }
+                            allCoinPrices.add(priceCents);
+                            if (!allPriceMap.containsKey(priceCents)) {
+                                allPriceMap.put(priceCents, 0);
                             }
                         }
                     }
@@ -1228,10 +1363,17 @@ public class FlicknovelApiService {
             }
         }
 
-        Set<Integer> ambiguousPrices = new HashSet<>(coinPrices);
-        ambiguousPrices.retainAll(subsPrices);
+        Set<Integer> ambiguousPrices = new HashSet<>(allCoinPrices);
+        ambiguousPrices.retainAll(allSubsPrices);
 
-        return new TemplatePriceDetail(priceMap, ambiguousPrices, hasIntroOffer);
+        Set<Integer> firstAmbiguousPrices = new HashSet<>(firstCoinPrices);
+        firstAmbiguousPrices.retainAll(firstSubsPrices);
+
+        Set<Integer> noFirstAmbiguousPrices = new HashSet<>(noFirstCoinPrices);
+        noFirstAmbiguousPrices.retainAll(noFirstSubsPrices);
+
+        return new TemplatePriceDetail(allPriceMap, ambiguousPrices, hasIntroOffer,
+                firstPriceMap, noFirstPriceMap, firstAmbiguousPrices, noFirstAmbiguousPrices);
     }
 
     /**

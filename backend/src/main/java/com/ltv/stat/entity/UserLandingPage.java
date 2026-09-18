@@ -25,7 +25,7 @@ public class UserLandingPage {
     private String landingPageId;
 
     @Column(name = "timezone", length = 32, nullable = false)
-    private String timezone = "BJ"; // "BJ" (北京时区) or "ET" (美东时区)
+    private String timezone = "CST"; // "CST" (北京时间/中国标准时间), "UTC" (世界协调时), "ET" (美东时区)
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -47,7 +47,12 @@ public class UserLandingPage {
     public String getLandingPageId() { return landingPageId; }
     public void setLandingPageId(String landingPageId) { this.landingPageId = landingPageId; }
 
-    public String getTimezone() { return timezone != null ? timezone : "BJ"; }
+    public String getTimezone() { 
+        if (timezone == null || timezone.trim().isEmpty() || "BJ".equalsIgnoreCase(timezone.trim())) {
+            return "flicknovel".equalsIgnoreCase(platformCode) ? "UTC" : "CST";
+        }
+        return timezone.toUpperCase(); 
+    }
     public void setTimezone(String timezone) { this.timezone = timezone; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }

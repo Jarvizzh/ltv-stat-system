@@ -590,14 +590,14 @@ public class UserService {
         }
 
         // 番茄海外 (flicknovel) 初始配置特殊处理：
-        // 仅管理员 (ADMIN / SUPER_ADMIN) 初始落地页默认填充系统已知的所有推广ID（时区默认 BJ）；普通用户 (USER) 初始默认为空
+        // 仅管理员 (ADMIN / SUPER_ADMIN) 初始落地页默认填充系统已知的所有推广ID（时区默认 UTC）；普通用户 (USER) 初始默认为空
         boolean isAdmin = ("ADMIN".equalsIgnoreCase(user.getRole()) || "SUPER_ADMIN".equalsIgnoreCase(user.getRole()));
         if (filterPlatform && "flicknovel".equalsIgnoreCase(targetPlatform) && (list == null || list.isEmpty())) {
             if (isAdmin) {
                 List<String> allPids = getAllPlatformLandingPageIds("flicknovel");
                 if (!allPids.isEmpty()) {
                     return allPids.stream()
-                            .map(pid -> new LandingPageConfigItem("flicknovel", pid, "BJ"))
+                            .map(pid -> new LandingPageConfigItem("flicknovel", pid, "UTC"))
                             .collect(Collectors.toList());
                 }
             } else {
@@ -677,7 +677,28 @@ public class UserService {
                     String key = itemPCode + "_" + pid;
                     if (!seenPlatformPid.contains(key)) {
                         seenPlatformPid.add(key);
-                        String tz = (item.getTimezone() != null && "ET".equalsIgnoreCase(item.getTimezone().trim())) ? "ET" : "BJ";
+                        String rawTz = item.getTimezone();
+                        boolean isFlicknovel = "flicknovel".equalsIgnoreCase(itemPCode);
+                        if (!isFlicknovel && ("all".equalsIgnoreCase(itemPCode) || "all".equalsIgnoreCase(pCode))) {
+                            // 若处于 ALL 混合平台上下文，检查该 landingPageId 是否归属于番茄平台
+                            isFlicknovel = pid.matches("^[0-9]{15,}$") || pid.startsWith("prmt_");
+                        }
+                        String defaultTz = isFlicknovel ? "UTC" : "CST";
+                        String tz;
+                        if (rawTz == null || rawTz.trim().isEmpty()) {
+                            tz = defaultTz;
+                        } else {
+                            String cleanTz = rawTz.trim().toUpperCase();
+                            if ("BJ".equals(cleanTz) || "CST".equals(cleanTz)) {
+                                tz = "CST";
+                            } else if ("UTC".equals(cleanTz)) {
+                                tz = "UTC";
+                            } else if ("ET".equals(cleanTz)) {
+                                tz = "ET";
+                            } else {
+                                tz = defaultTz;
+                            }
+                        }
                         UserLandingPage ulp = new UserLandingPage();
                         ulp.setPlatformCode(itemPCode);
                         ulp.setUserId(userId);
@@ -695,7 +716,7 @@ public class UserService {
             emptyMarker.setPlatformCode(pCode);
             emptyMarker.setUserId(userId);
             emptyMarker.setLandingPageId("__EMPTY__");
-            emptyMarker.setTimezone("BJ");
+            emptyMarker.setTimezone("flicknovel".equalsIgnoreCase(pCode) ? "UTC" : "CST");
             list.add(emptyMarker);
         }
 
@@ -724,9 +745,10 @@ public class UserService {
             updateUserLandingPageConfigs(pCode, userId, Collections.emptyList());
             return;
         }
+        String defTz = "flicknovel".equalsIgnoreCase(pCode) ? "UTC" : "CST";
         List<LandingPageConfigItem> items = pageIds.stream()
                 .filter(id -> id != null && !id.trim().isEmpty())
-                .map(id -> new LandingPageConfigItem(pCode, id.trim(), "BJ"))
+                .map(id -> new LandingPageConfigItem(pCode, id.trim(), defTz))
                 .collect(Collectors.toList());
         updateUserLandingPageConfigs(pCode, userId, items);
     }

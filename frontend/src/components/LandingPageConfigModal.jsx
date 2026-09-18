@@ -3,9 +3,29 @@ import { X, Save, Link2, Plus, Trash2, FileText, List, RotateCcw } from 'lucide-
 import CustomSelect from './CustomSelect';
 
 const TIMEZONE_OPTIONS = [
+  { label: '北京时间 (CST / UTC+8)', value: 'CST' },
+  { label: '世界协调时 (UTC)', value: 'UTC' },
   { label: '美东时区 (ET)', value: 'ET' },
-  { label: '北京时区 (BJ)', value: 'BJ' },
 ];
+
+const getDefaultTzForPlatform = (plat) => {
+  return (plat && plat.toLowerCase() === 'flicknovel') ? 'UTC' : 'CST';
+};
+
+const normalizeTz = (tz, plat) => {
+  if (!tz) return getDefaultTzForPlatform(plat);
+  const clean = tz.trim().toUpperCase();
+  if (clean === 'BJ' || clean === 'CST') return 'CST';
+  if (clean === 'UTC') return 'UTC';
+  if (clean === 'ET') return 'ET';
+  return getDefaultTzForPlatform(plat);
+};
+
+const getTzLabel = (tz) => {
+  if (tz === 'UTC') return 'UTC';
+  if (tz === 'ET') return '美东';
+  return '北京';
+};
 
 export default function LandingPageConfigModal({
   isOpen,
@@ -32,10 +52,10 @@ export default function LandingPageConfigModal({
     : (concretePlatforms[0]?.code || 'rocnovel');
 
   const [modalPlatform, setModalPlatform] = useState(initialPlat);
-  const [items, setItems] = useState([]); // [{ landingPageId: '', timezone: 'BJ' }]
+  const [items, setItems] = useState([]); // [{ landingPageId: '', timezone: 'CST' }]
   const [mode, setMode] = useState('list'); // 'list' | 'batch'
   const [batchText, setBatchText] = useState('');
-  const [defaultBatchTz, setDefaultBatchTz] = useState('BJ');
+  const [defaultBatchTz, setDefaultBatchTz] = useState(getDefaultTzForPlatform(initialPlat));
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -47,6 +67,7 @@ export default function LandingPageConfigModal({
         ? platformCode
         : (concretePlatforms[0]?.code || 'rocnovel');
       setModalPlatform(plat);
+      setDefaultBatchTz(getDefaultTzForPlatform(plat));
     }
   }, [isOpen, platformCode]);
 
@@ -69,11 +90,11 @@ export default function LandingPageConfigModal({
             if (Array.isArray(resultList)) {
               list = resultList.map((item) => {
                 if (typeof item === 'string') {
-                  return { landingPageId: item, timezone: 'BJ' };
+                  return { landingPageId: item, timezone: getDefaultTzForPlatform(modalPlatform) };
                 }
                 return {
                   landingPageId: item.landingPageId || '',
-                  timezone: item.timezone === 'ET' ? 'ET' : 'BJ',
+                  timezone: normalizeTz(item.timezone, modalPlatform),
                 };
               });
             }
@@ -82,7 +103,7 @@ export default function LandingPageConfigModal({
             // Sync batch text
             const batchLines = list
               .filter((it) => it.landingPageId.trim())
-              .map((it) => `${it.landingPageId} ${it.timezone === 'ET' ? '美东' : '北京'}`);
+              .map((it) => `${it.landingPageId} ${getTzLabel(it.timezone)}`);
             setBatchText(batchLines.join('\n'));
           }
         })
@@ -101,12 +122,13 @@ export default function LandingPageConfigModal({
       const res = await fetchFunc(`/api/user/all-landing-pages?platformCode=${encodeURIComponent(modalPlatform)}`);
       const data = await res.json();
       if (data && data.code === 0 && Array.isArray(data.data) && data.data.length > 0) {
+        const platDefaultTz = getDefaultTzForPlatform(modalPlatform);
         const fullList = data.data.map((pid) => ({
           landingPageId: pid,
-          timezone: 'BJ',
+          timezone: platDefaultTz,
         }));
         setItems(fullList);
-        const batchLines = fullList.map((it) => `${it.landingPageId} 北京`);
+        const batchLines = fullList.map((it) => `${it.landingPageId} ${getTzLabel(it.timezone)}`);
         setBatchText(batchLines.join('\n'));
         setMsg(`已成功载入 ${fullList.length} 个全部推广ID！您可以手动删除无需关注的项后保存。`);
       } else {
@@ -122,7 +144,7 @@ export default function LandingPageConfigModal({
 
   const handleAddItem = () => {
     if (isReadOnly) return;
-    setItems((prev) => [...prev, { landingPageId: '', timezone: 'BJ' }]);
+    setItems((prev) => [...prev, { landingPageId: '', timezone: getDefaultTzForPlatform(modalPlatform) }]);
   };
 
   const handleRemoveItem = (index) => {
@@ -148,8 +170,10 @@ export default function LandingPageConfigModal({
       let tz = defaultBatchTz;
       if (parts.length > 1) {
         const tag = parts[1].trim().toLowerCase();
-        if (tag.includes('bj') || tag.includes('北京') || tag.includes('shanghai')) {
-          tz = 'BJ';
+        if (tag.includes('utc')) {
+          tz = 'UTC';
+        } else if (tag.includes('cst') || tag.includes('bj') || tag.includes('北京') || tag.includes('shanghai')) {
+          tz = 'CST';
         } else if (tag.includes('et') || tag.includes('美东') || tag.includes('york')) {
           tz = 'ET';
         }
@@ -178,7 +202,7 @@ export default function LandingPageConfigModal({
     let validItems = items
       .map((it) => ({
         landingPageId: (it.landingPageId || '').trim(),
-        timezone: (it.timezone || 'BJ').toUpperCase() === 'ET' ? 'ET' : 'BJ',
+        timezone: normalizeTz(it.timezone, modalPlatform),
         platformCode: modalPlatform,
       }))
       .filter((it) => it.landingPageId.length > 0);
@@ -191,8 +215,10 @@ export default function LandingPageConfigModal({
         let tz = defaultBatchTz;
         if (parts.length > 1) {
           const tag = parts[1].trim().toLowerCase();
-          if (tag.includes('bj') || tag.includes('北京') || tag.includes('shanghai')) {
-            tz = 'BJ';
+          if (tag.includes('utc')) {
+            tz = 'UTC';
+          } else if (tag.includes('cst') || tag.includes('bj') || tag.includes('北京') || tag.includes('shanghai')) {
+            tz = 'CST';
           } else if (tag.includes('et') || tag.includes('美东') || tag.includes('york')) {
             tz = 'ET';
           }
@@ -240,7 +266,7 @@ export default function LandingPageConfigModal({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 620, width: '90%' }}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 680, width: '92%' }}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Link2 size={20} className="modal-header-icon" />
@@ -408,7 +434,7 @@ export default function LandingPageConfigModal({
                         onChange={(val) => handleItemChange(idx, 'timezone', val)}
                         options={TIMEZONE_OPTIONS}
                         disabled={isReadOnly}
-                        style={{ width: '135px' }}
+                        style={{ width: '180px' }}
                       />
                       {!isReadOnly && (
                         <button
@@ -444,8 +470,30 @@ export default function LandingPageConfigModal({
                 已配置的落地页 ID 列表文本视图：
               </p>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', fontSize: '0.82rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', fontSize: '0.82rem', flexWrap: 'wrap' }}>
                 <span style={{ color: 'var(--text-sub)' }}>未标注行的默认时区：</span>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', cursor: isReadOnly ? 'not-allowed' : 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="defaultTz"
+                    value="CST"
+                    checked={defaultBatchTz === 'CST'}
+                    disabled={isReadOnly}
+                    onChange={() => setDefaultBatchTz('CST')}
+                  />
+                  北京时间 (CST)
+                </label>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', cursor: isReadOnly ? 'not-allowed' : 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="defaultTz"
+                    value="UTC"
+                    checked={defaultBatchTz === 'UTC'}
+                    disabled={isReadOnly}
+                    onChange={() => setDefaultBatchTz('UTC')}
+                  />
+                  世界协调时 (UTC)
+                </label>
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', cursor: isReadOnly ? 'not-allowed' : 'pointer' }}>
                   <input
                     type="radio"
@@ -456,17 +504,6 @@ export default function LandingPageConfigModal({
                     onChange={() => setDefaultBatchTz('ET')}
                   />
                   美东时区 (ET)
-                </label>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', cursor: isReadOnly ? 'not-allowed' : 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="defaultTz"
-                    value="BJ"
-                    checked={defaultBatchTz === 'BJ'}
-                    disabled={isReadOnly}
-                    onChange={() => setDefaultBatchTz('BJ')}
-                  />
-                  北京时区 (BJ)
                 </label>
               </div>
 

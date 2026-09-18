@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "raw_order", indexes = {
     @Index(name = "idx_reg_date", columnList = "register_date_et"),
+    @Index(name = "idx_reg_date_utc", columnList = "register_date_utc"),
     @Index(name = "idx_landing_page", columnList = "landing_page_id"),
     @Index(name = "idx_platform_landing", columnList = "platform_code, landing_page_id")
 }, uniqueConstraints = {
@@ -40,6 +41,12 @@ public class RawOrder {
     @Column(name = "register_date_et", nullable = false)
     private LocalDate registerDateEt;
 
+    @Column(name = "register_time_utc")
+    private LocalDateTime registerTimeUtc;
+
+    @Column(name = "register_date_utc")
+    private LocalDate registerDateUtc;
+
     @Column(name = "pay_time_bj", nullable = false)
     private LocalDateTime payTimeBj;
 
@@ -48,6 +55,12 @@ public class RawOrder {
 
     @Column(name = "pay_date_et", nullable = false)
     private LocalDate payDateEt;
+
+    @Column(name = "pay_time_utc")
+    private LocalDateTime payTimeUtc;
+
+    @Column(name = "pay_date_utc")
+    private LocalDate payDateUtc;
 
     @Column(name = "order_amount_cent", nullable = false)
     private Integer orderAmountCent;
@@ -105,6 +118,21 @@ public class RawOrder {
     public LocalDate getRegisterDateEt() { return registerDateEt; }
     public void setRegisterDateEt(LocalDate registerDateEt) { this.registerDateEt = registerDateEt; }
 
+    public LocalDateTime getRegisterTimeUtc() { return registerTimeUtc; }
+    public void setRegisterTimeUtc(LocalDateTime registerTimeUtc) { 
+        this.registerTimeUtc = registerTimeUtc;
+        if (registerTimeUtc != null && this.registerDateUtc == null) {
+            this.registerDateUtc = registerTimeUtc.toLocalDate();
+        }
+    }
+
+    public LocalDate getRegisterDateUtc() { 
+        if (registerDateUtc != null) return registerDateUtc;
+        if (registerTimeUtc != null) return registerTimeUtc.toLocalDate();
+        return null;
+    }
+    public void setRegisterDateUtc(LocalDate registerDateUtc) { this.registerDateUtc = registerDateUtc; }
+
     public LocalDateTime getPayTimeBj() { return payTimeBj; }
     public void setPayTimeBj(LocalDateTime payTimeBj) { this.payTimeBj = payTimeBj; }
 
@@ -113,6 +141,29 @@ public class RawOrder {
 
     public LocalDate getPayDateEt() { return payDateEt; }
     public void setPayDateEt(LocalDate payDateEt) { this.payDateEt = payDateEt; }
+
+    public LocalDateTime getPayTimeUtc() { return payTimeUtc; }
+    public void setPayTimeUtc(LocalDateTime payTimeUtc) { 
+        this.payTimeUtc = payTimeUtc; 
+        if (payTimeUtc != null && this.payDateUtc == null) {
+            this.payDateUtc = payTimeUtc.toLocalDate();
+        }
+    }
+
+    public LocalDate getPayDateUtc() { 
+        if (payDateUtc != null) return payDateUtc;
+        if (payTimeUtc != null) return payTimeUtc.toLocalDate();
+        return null;
+    }
+    public void setPayDateUtc(LocalDate payDateUtc) { this.payDateUtc = payDateUtc; }
+
+    public LocalDate getRegisterDateBj() {
+        return registerTimeBj != null ? registerTimeBj.toLocalDate() : null;
+    }
+
+    public LocalDate getPayDateBj() {
+        return payTimeBj != null ? payTimeBj.toLocalDate() : null;
+    }
 
     public Integer getOrderAmountCent() { return orderAmountCent; }
     public void setOrderAmountCent(Integer orderAmountCent) { this.orderAmountCent = orderAmountCent; }

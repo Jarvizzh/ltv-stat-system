@@ -12,20 +12,26 @@ import java.util.stream.Collectors;
  */
 public enum PlatformEnum {
 
-    ALL("ALL", "大盘汇总", true, LocalDate.of(2026, 7, 10)),
-    ROCNOVEL("rocnovel", "中文在线", true, LocalDate.of(2026, 7, 10)),
-    FLICKNOVEL("flicknovel", "番茄海外", true, LocalDate.of(2026, 9, 16));
+    ALL("ALL", "大盘汇总", true, LocalDate.of(2026, 7, 10), "CST"),
+    ROCNOVEL("rocnovel", "中文在线", true, LocalDate.of(2026, 7, 10), "CST"),
+    FLICKNOVEL("flicknovel", "番茄海外", true, LocalDate.of(2026, 9, 16), "UTC");
 
     private final String code;
     private final String displayName;
     private final boolean enabled;
     private final LocalDate launchStartDate;
+    private final String defaultTimezone;
 
-    PlatformEnum(String code, String displayName, boolean enabled, LocalDate launchStartDate) {
+    PlatformEnum(String code, String displayName, boolean enabled, LocalDate launchStartDate, String defaultTimezone) {
         this.code = code;
         this.displayName = displayName;
         this.enabled = enabled;
         this.launchStartDate = launchStartDate;
+        this.defaultTimezone = defaultTimezone;
+    }
+
+    public String getDefaultTimezone() {
+        return defaultTimezone;
     }
 
     public String getCode() {
@@ -82,4 +88,13 @@ public enum PlatformEnum {
     public static LocalDate getLaunchStartDateForPlatform(String code) {
         return fromCode(code).map(PlatformEnum::getLaunchStartDate).orElse(ROCNOVEL.getLaunchStartDate());
     }
+
+    /**
+     * 根据平台代码安全获取默认时区，番茄海外默认返回 UTC，中文在线或未指定默认返回 CST
+     */
+    public static String getDefaultTimezoneForPlatform(String code) {
+        return fromCode(code).map(PlatformEnum::getDefaultTimezone).orElse(CST_DEFAULT_TIMEZONE);
+    }
+
+    public static final String CST_DEFAULT_TIMEZONE = "CST";
 }
