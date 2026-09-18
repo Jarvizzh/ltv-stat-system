@@ -86,7 +86,11 @@ public class DailyRechargeStatService {
         boolean allZeros = !list.isEmpty() && list.stream().allMatch(s ->
                 (s.getTotalRecharge() == null || s.getTotalRecharge().compareTo(BigDecimal.ZERO) == 0)
         );
-        if (list.isEmpty() || allZeros) {
+        LocalDate today = getTodayForPlatform(pCode);
+        boolean isMissingToday = !list.isEmpty() && list.get(0).getDate().isBefore(today);
+        boolean isMissingStartDate = !list.isEmpty() && list.get(list.size() - 1).getDate().isAfter(platformStartDate);
+
+        if (list.isEmpty() || allZeros || isMissingToday || isMissingStartDate) {
             calculateDailyDistributionStatsForUser(pCode, userId);
             list = dailyRechargeDistributionRepository.findByPlatformCodeAndUserIdAndDateGreaterThanEqualOrderByDateDesc(pCode, userId, platformStartDate);
         }

@@ -700,7 +700,18 @@ public class LtvStatService {
                 (s.getSpend() == null || s.getSpend().compareTo(BigDecimal.ZERO) == 0) &&
                 (s.getTotalRecharge() == null || s.getTotalRecharge().compareTo(BigDecimal.ZERO) == 0)
         );
-        if (list.isEmpty() || allZeros) {
+
+        LocalDate todayBj = LocalDate.now(TimeUtils.BEIJING_ZONE);
+        LocalDate todayEt = LocalDate.now(TimeUtils.EASTERN_ZONE);
+        LocalDate todayUtc = LocalDate.now(TimeUtils.UTC_ZONE);
+        LocalDate maxToday = todayBj;
+        if (todayEt.isAfter(maxToday)) maxToday = todayEt;
+        if (todayUtc.isAfter(maxToday)) maxToday = todayUtc;
+
+        boolean isMissingToday = !list.isEmpty() && list.get(list.size() - 1).getLaunchDate().isBefore(maxToday);
+        boolean isMissingStartDate = !list.isEmpty() && list.get(0).getLaunchDate().isAfter(platformStartDate);
+
+        if (list.isEmpty() || allZeros || isMissingStartDate || isMissingToday) {
             calculateLtvStatsForUser(targetPlatform, userId);
             list = ltvDailyStatRepository.findByPlatformCodeAndUserIdAndLaunchDateGreaterThanEqualOrderByLaunchDateAsc(targetPlatform, userId, platformStartDate);
         }

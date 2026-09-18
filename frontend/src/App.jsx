@@ -140,7 +140,7 @@ export default function App() {
 
   const handleConfirmExport = (dateRange) => {
     if (activeTab === 'ltv') {
-      exportLtvTable(data, hasPermPredictPayback, currentUser?.username || '', dateRange);
+      exportLtvTable(displayedLtvData, hasPermPredictPayback, currentUser?.username || '', dateRange);
     } else if (activeTab === 'distribution') {
       exportDistributionTable(distributionData, false, dateRange);
     } else if (activeTab === 'global-distribution') {
@@ -575,15 +575,93 @@ export default function App() {
     );
   }
 
-  const totalSpend = data.reduce((acc, cur) => acc + (parseFloat(cur.spend) || 0), 0);
-  const totalRecharge = data.reduce((acc, cur) => acc + (parseFloat(cur.totalRecharge) || 0), 0);
-  const totalRefund = data.reduce((acc, cur) => acc + (parseFloat(cur.totalRefund) || 0), 0);
-  const totalProfit = totalRecharge - totalRefund - totalSpend;
-  const totalSubUsers = data.reduce((acc, cur) => acc + (parseInt(cur.subUserCount) || 0), 0);
-  const overallRoi = totalSpend > 0 ? (((totalRecharge - totalRefund) / totalSpend) * 100).toFixed(2) : '0.00';
-
   const currentPlatformObj = platformsList?.find(p => p.code?.toLowerCase() === (selectedPlatform || 'rocnovel').toLowerCase());
   const currentPlatformLaunchDate = currentPlatformObj?.launchStartDate || (selectedPlatform?.toLowerCase() === 'flicknovel' ? '2026-09-17' : '2026-07-10');
+
+  // 获取平台对应今日的标准日期格式 (YYYY-MM-DD)
+  const getPlatformTodayStr = (platformCode) => {
+    const isFlick = (platformCode || '').toLowerCase() === 'flicknovel';
+    const tz = isFlick ? 'UTC' : 'Asia/Shanghai';
+    try {
+      const formatter = new Intl.DateTimeFormat('zh-CN', {
+        timeZone: tz,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      const parts = formatter.formatToParts(new Date());
+      const y = parts.find(p => p.type === 'year')?.value;
+      const m = parts.find(p => p.type === 'month')?.value;
+      const d = parts.find(p => p.type === 'day')?.value;
+      if (y && m && d) return `${y}-${m}-${d}`;
+    } catch (e) {
+      // fallback
+    }
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
+
+  const currentPlatformToday = getPlatformTodayStr(selectedPlatform);
+
+  // 严格从开始投放日期显示到今天 (无论当天是否有订单数据均展示完整 Cohort 行)
+  const displayedLtvData = React.useMemo(() => {
+    if (!currentPlatformLaunchDate) return data;
+    const startStr = currentPlatformLaunchDate;
+    const endStr = currentPlatformToday;
+    if (startStr > endStr) return data;
+
+    const dataMap = new Map();
+    if (Array.isArray(data)) {
+      data.forEach(item => {
+        if (item && item.launchDate) {
+          dataMap.set(item.launchDate, item);
+        }
+      });
+    }
+
+    const result = [];
+    let curr = new Date(startStr + 'T00:00:00');
+    const end = new Date(endStr + 'T00:00:00');
+
+    while (curr <= end) {
+      const y = curr.getFullYear();
+      const m = String(curr.getMonth() + 1).padStart(2, '0');
+      const d = String(curr.getDate()).padStart(2, '0');
+      const dateKey = `${y}-${m}-${d}`;
+
+      if (dataMap.has(dateKey)) {
+        result.push(dataMap.get(dateKey));
+      } else {
+        result.push({
+          launchDate: dateKey,
+          platformCode: selectedPlatform || 'rocnovel',
+          userId: targetUserId || currentUser?.userId,
+          spend: 0,
+          remark: '',
+          totalRecharge: 0,
+          totalRefund: 0,
+          totalProfit: 0,
+          totalRoi: 0,
+          subUserCount: 0,
+          subUserCost: 0,
+          day7RetentionCount: null,
+          day7RetentionRate: null,
+          day15RetentionCount: null,
+          day15RetentionRate: null,
+          predictedPaybackDays: null,
+        });
+      }
+      curr.setDate(curr.getDate() + 1);
+    }
+    return result;
+  }, [data, currentPlatformLaunchDate, currentPlatformToday, selectedPlatform, targetUserId, currentUser]);
+
+  const totalSpend = displayedLtvData.reduce((acc, cur) => acc + (parseFloat(cur.spend) || 0), 0);
+  const totalRecharge = displayedLtvData.reduce((acc, cur) => acc + (parseFloat(cur.totalRecharge) || 0), 0);
+  const totalRefund = displayedLtvData.reduce((acc, cur) => acc + (parseFloat(cur.totalRefund) || 0), 0);
+  const totalProfit = totalRecharge - totalRefund - totalSpend;
+  const totalSubUsers = displayedLtvData.reduce((acc, cur) => acc + (parseInt(cur.subUserCount) || 0), 0);
+  const overallRoi = totalSpend > 0 ? (((totalRecharge - totalRefund) / totalSpend) * 100).toFixed(2) : '0.00';
 
   // 月度卡片指标完全由后端接口计算并返回 (monthlySummary)，支持近4个月动态列表
   const monthlyList = Array.isArray(monthlySummary?.months) && monthlySummary.months.length > 0
@@ -653,16 +731,16 @@ export default function App() {
     return 366; // >365天
   };
 
-  const overallPaybackDays = backendOverallPaybackDays !== null ? backendOverallPaybackDays : calculateOverallPaybackDays(data);
+  const overallPaybackDays = backendOverallPaybackDays !== null ? backendOverallPaybackDays : calculateOverallPaybackDays(displayedLtvData);
 
   const calculateOverallPaybackCycleDays = () => {
     if (backendOverallPaybackCycleDays !== null && backendOverallPaybackCycleDays !== undefined) {
       return backendOverallPaybackCycleDays;
     }
-    if (!data || data.length === 0 || overallPaybackDays === null || overallPaybackDays < 0 || overallPaybackDays > 365) {
+    if (!displayedLtvData || displayedLtvData.length === 0 || overallPaybackDays === null || overallPaybackDays < 0 || overallPaybackDays > 365) {
       return null;
     }
-    const validDates = data.filter(d => d.launchDate && d.spend > 0).map(d => new Date(d.launchDate));
+    const validDates = displayedLtvData.filter(d => d.launchDate && d.spend > 0).map(d => new Date(d.launchDate));
     if (validDates.length === 0) return null;
     const minDate = new Date(Math.min(...validDates));
     const today = new Date();
@@ -1004,7 +1082,7 @@ export default function App() {
             </div>
 
             <LtvTable
-              data={data}
+              data={displayedLtvData}
               onEditRow={(row) => {
                 if (isReadOnlyView) {
                   const msgText = isTargetMaster
@@ -1144,7 +1222,7 @@ export default function App() {
               : '导出每日充值分布报表'
         }
         maxDays={90}
-        data={activeTab === 'ltv' ? data : distributionData}
+        data={activeTab === 'ltv' ? displayedLtvData : distributionData}
         dateField={activeTab === 'ltv' ? 'launchDate' : 'date'}
       />
 
