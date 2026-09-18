@@ -36,7 +36,7 @@ public class LtvStatService {
     public static final LocalDate START_DATE = LocalDate.of(2026, 7, 10);
 
     /**
-     * 根据平台代码安全获取投放起始日期，中文在线为 2026-07-10，番茄海外为 2026-09-16，ALL 为 2026-07-10
+     * 根据平台代码安全获取投放起始日期，中文在线为 2026-07-10，番茄海外为 2026-09-17，ALL 为 2026-07-10
      */
     public static LocalDate getLaunchStartDateForPlatform(String platformCode) {
         return PlatformEnum.getLaunchStartDateForPlatform(platformCode);

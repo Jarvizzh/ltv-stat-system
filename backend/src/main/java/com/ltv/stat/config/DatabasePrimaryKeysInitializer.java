@@ -175,7 +175,7 @@ public class DatabasePrimaryKeysInitializer {
                     "VALUES ('rocnovel', '中文在线', 'TOKEN_COOKIE', '2026-07-10', 1) " +
                     "ON DUPLICATE KEY UPDATE platform_name = VALUES(platform_name), launch_start_date = VALUES(launch_start_date)");
             jdbcTemplate.execute("INSERT INTO platform_config (platform_code, platform_name, auth_type, launch_start_date, status, auth_credentials) " +
-                    "VALUES ('flicknovel', '番茄海外', 'ED25519_KEY', '2026-09-16', 1, '{\"companyId\":\"355549587538358272\",\"privateKey\":\"ymcPnTqpiQOAtROHJoeegoovJxS7wv6t0HLDUv5q3/G4qry6yKcvjYwhrBqwuEIMjfXMIIqDe0YUPu9JaPofMQ==\"}') " +
+                    "VALUES ('flicknovel', '番茄海外', 'ED25519_KEY', '2026-09-17', 1, '{\"companyId\":\"355549587538358272\",\"privateKey\":\"ymcPnTqpiQOAtROHJoeegoovJxS7wv6t0HLDUv5q3/G4qry6yKcvjYwhrBqwuEIMjfXMIIqDe0YUPu9JaPofMQ==\"}') " +
                     "ON DUPLICATE KEY UPDATE platform_name = VALUES(platform_name), auth_type = 'ED25519_KEY', launch_start_date = VALUES(launch_start_date)");
             log.info("Checked/initialized platform_config table with default platforms and launch_start_date");
         } catch (Exception e) {

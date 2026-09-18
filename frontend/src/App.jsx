@@ -583,7 +583,7 @@ export default function App() {
   const overallRoi = totalSpend > 0 ? (((totalRecharge - totalRefund) / totalSpend) * 100).toFixed(2) : '0.00';
 
   const currentPlatformObj = platformsList?.find(p => p.code?.toLowerCase() === (selectedPlatform || 'rocnovel').toLowerCase());
-  const currentPlatformLaunchDate = currentPlatformObj?.launchStartDate || (selectedPlatform?.toLowerCase() === 'flicknovel' ? '2026-09-16' : '2026-07-10');
+  const currentPlatformLaunchDate = currentPlatformObj?.launchStartDate || (selectedPlatform?.toLowerCase() === 'flicknovel' ? '2026-09-17' : '2026-07-10');
 
   // 月度卡片指标完全由后端接口计算并返回 (monthlySummary)，支持近4个月动态列表
   const monthlyList = Array.isArray(monthlySummary?.months) && monthlySummary.months.length > 0
