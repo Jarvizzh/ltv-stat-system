@@ -21,6 +21,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,6 +34,7 @@ public class LtvBenchmarkService {
     private final LtvPredictBenchmarkRepository benchmarkRepository;
     private final UserSubscriptionPeriodRepository userSubscriptionPeriodRepository;
     private final UserService userService;
+    private final Map<String, List<LtvPredictBenchmark>> benchmarkCurveCache = new ConcurrentHashMap<>();
 
     @Autowired
     public LtvBenchmarkService(RawOrderRepository rawOrderRepository,
@@ -51,6 +53,10 @@ public class LtvBenchmarkService {
         this(rawOrderRepository, benchmarkRepository, userSubscriptionPeriodRepository, null);
     }
 
+    public void clearBenchmarkCache() {
+        benchmarkCurveCache.clear();
+    }
+
     /**
      * 按特定系统用户配置的落地页 ID 重新计算并保存该用户的专属基准衰减曲线 (USER 维度)
      */
@@ -64,19 +70,25 @@ public class LtvBenchmarkService {
             return;
         }
 
-        Set<String> pidSet = userPIds.stream().map(String::trim).collect(Collectors.toSet());
-        List<RawOrder> userOrders = rawOrderRepository.findAll().stream()
-                .filter(o -> o.getLandingPageId() != null && pidSet.contains(o.getLandingPageId().trim()))
-                .collect(Collectors.toList());
+        Set<String> pidSet = userPIds.stream().filter(p -> p != null && !p.trim().isEmpty()).map(String::trim).collect(Collectors.toSet());
+        if (pidSet.isEmpty()) return;
+
+        List<RawOrder> userOrders = rawOrderRepository.findByLandingPageIdIn(new ArrayList<>(pidSet));
 
         if (userOrders.isEmpty()) {
             return;
         }
 
-        Map<String, Integer> userPeriodMap = userSubscriptionPeriodRepository.findAll().stream()
-                .filter(p -> p.getMemberId() != null && p.getSubPeriodDays() != null)
-                .collect(Collectors.toMap(UserSubscriptionPeriod::getMemberId,
-                        UserSubscriptionPeriod::getSubPeriodDays, (a, b) -> a));
+        Set<String> memberIds = userOrders.stream()
+                .map(RawOrder::getMemberId)
+                .filter(id -> id != null && !id.trim().isEmpty())
+                .collect(Collectors.toSet());
+
+        Map<String, Integer> userPeriodMap = memberIds.isEmpty() ? Collections.emptyMap() :
+                userSubscriptionPeriodRepository.findByMemberIdIn(memberIds).stream()
+                        .filter(p -> p.getMemberId() != null && p.getSubPeriodDays() != null)
+                        .collect(Collectors.toMap(p -> p.getMemberId().trim(),
+                                UserSubscriptionPeriod::getSubPeriodDays, (a, b) -> a));
 
         Map<Integer, List<RawOrder>> ordersByPeriod = userOrders.stream()
                 .collect(Collectors.groupingBy(o -> userPeriodMap.getOrDefault(o.getMemberId(), 1)));
@@ -99,6 +111,7 @@ public class LtvBenchmarkService {
             List<RawOrder> periodOrders = entry.getValue();
             calculateBenchmarkForGroup(dimType, dimValue, subPeriod, periodOrders, tzMap);
         }
+        clearBenchmarkCache();
     }
 
     /**
@@ -146,46 +159,57 @@ public class LtvBenchmarkService {
         }
 
         log.info("LTV prediction benchmark calculation finished.");
+        clearBenchmarkCache();
     }
 
     @Transactional
     public List<LtvPredictBenchmark> getBenchmarkCurve(String platformCode, String dimensionType, String dimensionValue, Integer subPeriodDays) {
         String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
-                ? platformCode.trim().toLowerCase() : null;
+                ? platformCode.trim().toLowerCase() : "all";
+        int period = subPeriodDays != null ? subPeriodDays : 1;
+        String cacheKey = pCode + ":" + (dimensionType != null ? dimensionType : "") + ":" + (dimensionValue != null ? dimensionValue : "") + ":" + period;
+
+        List<LtvPredictBenchmark> cached = benchmarkCurveCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
 
         List<LtvPredictBenchmark> list = Collections.emptyList();
 
         // Level 1: (PLATFORM_USER, platformCode + ":" + userId) if platformCode is specified and dimType is USER
-        if (pCode != null && "USER".equalsIgnoreCase(dimensionType)) {
+        if (!"all".equalsIgnoreCase(pCode) && "USER".equalsIgnoreCase(dimensionType)) {
             list = benchmarkRepository.findByDimensionTypeAndDimensionValueAndSubPeriodDaysOrderByDayIndexAsc(
-                    "PLATFORM_USER", pCode + ":" + dimensionValue, subPeriodDays);
+                    "PLATFORM_USER", pCode + ":" + dimensionValue, period);
         }
 
         // Level 2: (PLATFORM, platformCode) if platformCode is specified
-        if (list.isEmpty() && pCode != null) {
+        if (list.isEmpty() && !"all".equalsIgnoreCase(pCode)) {
             list = benchmarkRepository.findByDimensionTypeAndDimensionValueAndSubPeriodDaysOrderByDayIndexAsc(
-                    "PLATFORM", pCode, subPeriodDays);
+                    "PLATFORM", pCode, period);
         }
 
         // Level 3: (USER, userId)
         if (list.isEmpty() && "USER".equalsIgnoreCase(dimensionType)) {
             list = benchmarkRepository.findByDimensionTypeAndDimensionValueAndSubPeriodDaysOrderByDayIndexAsc(
-                    "USER", dimensionValue, subPeriodDays);
+                    "USER", dimensionValue, period);
         }
 
         // Level 4: (ALL, DEFAULT)
         if (list.isEmpty()) {
             list = benchmarkRepository.findByDimensionTypeAndDimensionValueAndSubPeriodDaysOrderByDayIndexAsc(
-                    "ALL", "DEFAULT", subPeriodDays);
+                    "ALL", "DEFAULT", period);
         }
 
         // Fallback: Populate seed benchmarks if still empty
         if (list.isEmpty()) {
-            populateSeedBenchmarks("ALL", "DEFAULT", subPeriodDays);
+            populateSeedBenchmarks("ALL", "DEFAULT", period);
             list = benchmarkRepository.findByDimensionTypeAndDimensionValueAndSubPeriodDaysOrderByDayIndexAsc(
-                    "ALL", "DEFAULT", subPeriodDays);
+                    "ALL", "DEFAULT", period);
         }
 
+        if (list != null && !list.isEmpty()) {
+            benchmarkCurveCache.put(cacheKey, list);
+        }
         return list;
     }
 
@@ -302,6 +326,7 @@ public class LtvBenchmarkService {
         }
 
         benchmarkRepository.saveAll(benchmarksToSave);
+        clearBenchmarkCache();
     }
 
     private void extrapolatePowerLawTail(String dimensionType, String dimensionValue, Integer subPeriodDays,
@@ -391,5 +416,6 @@ public class LtvBenchmarkService {
             list.add(bench);
         }
         benchmarkRepository.saveAll(list);
+        clearBenchmarkCache();
     }
 }

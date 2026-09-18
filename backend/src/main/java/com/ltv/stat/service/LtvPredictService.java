@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,6 +31,7 @@ public class LtvPredictService {
     private final SubscriptionConfigVersionRepository versionRepository;
     private final LtvPredictFacade ltvPredictFacade;
     private final CohortCurveExtrapolator extrapolator;
+    private final Map<String, List<SubscriptionConfigVersion>> matchingVersionCache = new ConcurrentHashMap<>();
 
     @Autowired
     public LtvPredictService(LtvBenchmarkService benchmarkService,
@@ -40,6 +42,10 @@ public class LtvPredictService {
         this.versionRepository = versionRepository;
         this.ltvPredictFacade = ltvPredictFacade != null ? ltvPredictFacade : new LtvPredictFacade(new PaybackPredictEngine(), new RoiPredictEngine());
         this.extrapolator = extrapolator != null ? extrapolator : new CohortCurveExtrapolator();
+    }
+
+    public void clearVersionCache() {
+        matchingVersionCache.clear();
     }
 
     public LtvPredictService(LtvBenchmarkService benchmarkService) {
@@ -155,7 +161,9 @@ public class LtvPredictService {
             ctx.userCount = count;
 
             if (versionRepository != null) {
-                List<SubscriptionConfigVersion> matchedVersions = versionRepository.findMatchingPeriodVersions(period, launchTime);
+                String vKey = period + ":" + (launchTime != null ? launchTime.toLocalDate().toString() : "now");
+                List<SubscriptionConfigVersion> matchedVersions = matchingVersionCache.computeIfAbsent(vKey,
+                        k -> versionRepository.findMatchingPeriodVersions(period, launchTime));
                 if (!matchedVersions.isEmpty()) {
                     SubscriptionConfigVersion ver = matchedVersions.get(0);
                     if (ver.getRenewPriceCent() != null && ver.getRenewPriceCent() > 0) {

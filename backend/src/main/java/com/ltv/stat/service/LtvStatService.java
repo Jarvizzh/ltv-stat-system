@@ -422,6 +422,17 @@ public class LtvStatService {
         LocalDate currDate = platformStartDate;
         List<LtvDailyStat> statList = new ArrayList<>();
 
+        Set<String> allSubMemberIds = orders.stream()
+                .filter(o -> o.getIsSubs() != null && o.getIsSubs() == 1)
+                .map(RawOrder::getMemberId)
+                .filter(id -> id != null && !id.trim().isEmpty())
+                .collect(Collectors.toSet());
+
+        Map<String, UserSubscriptionPeriod> subPeriodMap = allSubMemberIds.isEmpty() ? Collections.emptyMap() :
+                userSubscriptionPeriodRepository.findByMemberIdIn(allSubMemberIds).stream()
+                        .filter(p -> p.getMemberId() != null)
+                        .collect(Collectors.toMap(p -> p.getMemberId().trim(), p -> p, (a, b) -> a));
+
         while (!currDate.isAfter(maxToday)) {
             List<RawOrder> cohortOrders = ordersByDate.getOrDefault(currDate, Collections.emptyList());
             LtvLaunchConfig launchConfig = configsByDate.get(currDate);
@@ -429,7 +440,7 @@ public class LtvStatService {
             BigDecimal spend = launchConfig != null ? launchConfig.getSpend() : BigDecimal.ZERO;
             String remark = isMasterAcc ? masterRemark : (launchConfig != null ? launchConfig.getRemark() : "");
 
-            LtvDailyStat stat = calculateSingleCohort(userId, currDate, cohortOrders, spend, remark, maxToday, tzMap);
+            LtvDailyStat stat = calculateSingleCohort(userId, currDate, cohortOrders, spend, remark, maxToday, tzMap, subPeriodMap);
             stat.setPlatformCode(targetPlatform);
             statList.add(stat);
             currDate = currDate.plusDays(1);
@@ -493,6 +504,10 @@ public class LtvStatService {
     }
 
     private LtvDailyStat calculateSingleCohort(Long userId, LocalDate launchDate, List<RawOrder> cohortOrders, BigDecimal spend, String remark, LocalDate maxToday, Map<String, String> tzMap) {
+        return calculateSingleCohort(userId, launchDate, cohortOrders, spend, remark, maxToday, tzMap, null);
+    }
+
+    private LtvDailyStat calculateSingleCohort(Long userId, LocalDate launchDate, List<RawOrder> cohortOrders, BigDecimal spend, String remark, LocalDate maxToday, Map<String, String> tzMap, Map<String, UserSubscriptionPeriod> preloadedSubPeriodMap) {
         LtvDailyStat stat = new LtvDailyStat();
         stat.setUserId(userId);
         stat.setLaunchDate(launchDate);
@@ -531,10 +546,18 @@ public class LtvStatService {
 
         long subUserCount = subMemberIds.size();
 
-        // 3.0 从 user_subscription_period 表按 subMemberIds 批量关联查询该 Cohort 订阅用户的订阅周期天数
+        // 3.0 从 user_subscription_period 优先从预查 Map 关联该 Cohort 订阅用户的订阅周期天数，避免循环逐天查库
         Integer detectedPeriod = 1;
         if (!subMemberIds.isEmpty()) {
-            List<UserSubscriptionPeriod> userSubPeriods = userSubscriptionPeriodRepository.findByMemberIdIn(subMemberIds);
+            List<UserSubscriptionPeriod> userSubPeriods;
+            if (preloadedSubPeriodMap != null) {
+                userSubPeriods = subMemberIds.stream()
+                        .map(preloadedSubPeriodMap::get)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+            } else {
+                userSubPeriods = userSubscriptionPeriodRepository.findByMemberIdIn(subMemberIds);
+            }
             if (!userSubPeriods.isEmpty()) {
                 Map<Integer, Long> periodCountMap = userSubPeriods.stream()
                         .filter(p -> p.getSubPeriodDays() != null)
@@ -974,12 +997,18 @@ public class LtvStatService {
 
             for (LtvDailyStat s : monthStats) {
                 if (s.getSpend() != null && s.getSpend().compareTo(BigDecimal.ZERO) > 0 && s.getLaunchDate() != null) {
-                    long daysElapsed = ChronoUnit.DAYS.between(s.getLaunchDate(), maxToday) + 1;
-                    PredictionResult pred = ltvPredictService.predictCohort(s, (int) daysElapsed);
+                    BigDecimal d30 = s.getPredictedDay30Recharge();
+                    BigDecimal d60 = s.getPredictedDay60Recharge();
+                    BigDecimal d90 = s.getPredictedDay90Recharge();
 
-                    BigDecimal d30 = pred.getPredictedDay30Recharge() != null ? pred.getPredictedDay30Recharge() : (s.getTotalRecharge() != null ? s.getTotalRecharge() : BigDecimal.ZERO);
-                    BigDecimal d60 = pred.getPredictedDay60Recharge() != null ? pred.getPredictedDay60Recharge() : d30;
-                    BigDecimal d90 = pred.getPredictedDay90Recharge() != null ? pred.getPredictedDay90Recharge() : d60;
+                    if (d30 == null || d60 == null || d90 == null) {
+                        long daysElapsed = ChronoUnit.DAYS.between(s.getLaunchDate(), maxToday) + 1;
+                        PredictionResult pred = ltvPredictService.predictCohort(s, (int) daysElapsed);
+
+                        if (d30 == null) d30 = pred.getPredictedDay30Recharge() != null ? pred.getPredictedDay30Recharge() : (s.getTotalRecharge() != null ? s.getTotalRecharge() : BigDecimal.ZERO);
+                        if (d60 == null) d60 = pred.getPredictedDay60Recharge() != null ? pred.getPredictedDay60Recharge() : d30;
+                        if (d90 == null) d90 = pred.getPredictedDay90Recharge() != null ? pred.getPredictedDay90Recharge() : d60;
+                    }
 
                     sumD30Recharge = sumD30Recharge.add(d30);
                     sumD60Recharge = sumD60Recharge.add(d60);
