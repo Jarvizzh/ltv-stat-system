@@ -177,7 +177,6 @@ public class DatabasePrimaryKeysInitializer {
             jdbcTemplate.execute("INSERT INTO platform_config (platform_code, platform_name, auth_type, launch_start_date, status, auth_credentials) " +
                     "VALUES ('flicknovel', '番茄司南', 'ED25519_KEY', '2026-09-17', 1, '{\"companyId\":\"355549587538358272\",\"privateKey\":\"ymcPnTqpiQOAtROHJoeegoovJxS7wv6t0HLDUv5q3/G4qry6yKcvjYwhrBqwuEIMjfXMIIqDe0YUPu9JaPofMQ==\"}') " +
                     "ON DUPLICATE KEY UPDATE platform_name = VALUES(platform_name), auth_type = 'ED25519_KEY', launch_start_date = VALUES(launch_start_date)");
-            jdbcTemplate.execute("UPDATE platform_config SET platform_name = '番茄司南' WHERE platform_code = 'flicknovel'");
             log.info("Checked/initialized platform_config table with default platforms and launch_start_date");
         } catch (Exception e) {
             log.warn("Failed to create/init platform_config table: {}", e.getMessage());
@@ -288,22 +287,7 @@ public class DatabasePrimaryKeysInitializer {
             }
         }
 
-        // 10. 历史数据平滑迁移与补齐：将历史遗留数据中 platform_code 为 NULL 或 空 或 'ALL' 的历史记录统一补齐更新为 'rocnovel'
-        try {
-            jdbcTemplate.execute("UPDATE IGNORE user_landing_page SET platform_code = 'rocnovel' WHERE platform_code IS NULL OR platform_code = '' OR platform_code = 'ALL'");
-            jdbcTemplate.execute("UPDATE IGNORE raw_order SET platform_code = 'rocnovel' WHERE platform_code IS NULL OR platform_code = '' OR platform_code = 'ALL'");
-            jdbcTemplate.execute("UPDATE IGNORE ltv_launch_config SET platform_code = 'rocnovel' WHERE platform_code IS NULL OR platform_code = '' OR platform_code = 'ALL'");
-            jdbcTemplate.execute("UPDATE IGNORE subscription_config_version SET platform_code = 'rocnovel' WHERE platform_code IS NULL OR platform_code = '' OR platform_code = 'ALL'");
-            jdbcTemplate.execute("UPDATE IGNORE user_subscription_period SET platform_code = 'rocnovel' WHERE platform_code IS NULL OR platform_code = '' OR platform_code = 'ALL'");
-            // 清理此前因落地页/订单未关联而产生的 rocnovel 全零错误缓存行，以便重新聚合计算
-            jdbcTemplate.execute("DELETE FROM ltv_daily_stat WHERE platform_code = 'rocnovel' AND total_recharge = 0 AND spend = 0");
-            jdbcTemplate.execute("DELETE FROM daily_recharge_distribution WHERE platform_code = 'rocnovel' AND total_recharge = 0");
-            log.info("Successfully backfilled historical platform_code = 'rocnovel' and cleaned empty cache rows");
-        } catch (Exception e) {
-            log.warn("Failed to backfill historical platform_code: {}", e.getMessage());
-        }
-
-        // 11. 检查并补充 raw_order 表的 UTC 时间字段及索引
+        // 10. 检查并补充 raw_order 表的 UTC 时间字段及索引
         if (!isColumnExist("raw_order", "register_time_utc")) {
             try {
                 jdbcTemplate.execute("ALTER TABLE raw_order ADD COLUMN register_time_utc DATETIME DEFAULT NULL AFTER register_date_et");
@@ -324,23 +308,7 @@ public class DatabasePrimaryKeysInitializer {
             log.info("raw_order idx_reg_date_utc index info: {}", e.getMessage());
         }
 
-        // 12. 历史数据平滑回填与时区升级 (BJ -> CST / flicknovel -> UTC)
-        try {
-            jdbcTemplate.execute("UPDATE raw_order " +
-                    "SET register_time_utc = CONVERT_TZ(register_time_bj, '+08:00', '+00:00'), " +
-                    "    register_date_utc = DATE(CONVERT_TZ(register_time_bj, '+08:00', '+00:00')), " +
-                    "    pay_time_utc = CONVERT_TZ(pay_time_bj, '+08:00', '+00:00'), " +
-                    "    pay_date_utc = DATE(CONVERT_TZ(pay_time_bj, '+08:00', '+00:00')) " +
-                    "WHERE pay_time_utc IS NULL AND pay_time_bj IS NOT NULL");
-
-            jdbcTemplate.execute("UPDATE user_landing_page SET timezone = 'CST' WHERE timezone = 'BJ' AND platform_code != 'flicknovel'");
-            jdbcTemplate.execute("UPDATE user_landing_page SET timezone = 'UTC' WHERE platform_code = 'flicknovel' AND (timezone = 'BJ' OR timezone IS NULL)");
-            log.info("Successfully backfilled raw_order UTC timestamps and upgraded user_landing_page timezones");
-        } catch (Exception e) {
-            log.warn("Failed to backfill UTC timestamps or upgrade user_landing_page timezones: {}", e.getMessage());
-        }
-
-        // 13. 检查并创建 flicknovel_relation 表
+        // 11. 检查并创建 flicknovel_relation 表
         try {
             jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS flicknovel_relation (" +
                     "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
