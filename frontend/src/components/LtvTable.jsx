@@ -3,7 +3,8 @@ import { Edit2, Download } from 'lucide-react';
 import { exportLtvTable } from '../utils/exportExcel';
 import ExportModal from './ExportModal';
 
-export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuperAdmin, hasPermPredictPayback, hasPermRoiPredict }) {
+export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuperAdmin, hasPermPredictPayback, hasPermRoiPredict, selectedPlatform }) {
+  const isAllPlatform = (selectedPlatform || '').toUpperCase() === 'ALL';
   const [hoveredRemark, setHoveredRemark] = useState(null);
   const [hoveredPrediction, setHoveredPrediction] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -294,8 +295,9 @@ export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuper
                   {row.launchDate}
                 </td>
                 <td
-                  className={`col-1 text-left remark-cell ${isReadOnly ? '' : 'editable-cell'}`}
-                  onClick={() => !isReadOnly && onEditRow && onEditRow(row)}
+                  className={`col-1 text-left remark-cell ${isReadOnly || isAllPlatform ? '' : 'editable-cell'}`}
+                  title={isAllPlatform ? '大盘汇总备注不可直接编辑，请先选择具体平台' : (isReadOnly ? '只读模式不可编辑' : '点击编辑备注与消耗')}
+                  onClick={() => onEditRow && onEditRow(row)}
                   onMouseEnter={(e) => {
                     if (row.remark && row.remark.trim()) {
                       const rect = e.currentTarget.getBoundingClientRect();
@@ -308,19 +310,20 @@ export default function LtvTable({ data, onEditRow, isReadOnly, isAdmin, isSuper
                     }
                   }}
                   onMouseLeave={() => setHoveredRemark(null)}
-                  style={{ width: `${colWidths.col1}px`, minWidth: `${colWidths.col1}px`, cursor: isReadOnly ? 'default' : 'pointer' }}
+                  style={{ width: `${colWidths.col1}px`, minWidth: `${colWidths.col1}px`, cursor: 'pointer' }}
                 >
                   <div className="remark-inner-container">
                     <span className="remark-text-content">
                       {row.remark || <span style={{ color: 'var(--text-muted)' }}>-</span>}
                     </span>
-                    {!isReadOnly && <Edit2 size={11} color="var(--text-muted)" style={{ flexShrink: 0 }} />}
+                    {!isReadOnly && !isAllPlatform && <Edit2 size={11} color="var(--text-muted)" style={{ flexShrink: 0 }} />}
                   </div>
                 </td>
                 <td
-                  className={`col-2 text-right ${isReadOnly ? '' : 'editable-cell'}`}
-                  onClick={() => !isReadOnly && onEditRow && onEditRow(row)}
-                  style={{ width: `${colWidths.col2}px`, minWidth: `${colWidths.col2}px`, cursor: isReadOnly ? 'default' : 'pointer' }}
+                  className={`col-2 text-right ${isReadOnly || isAllPlatform ? '' : 'editable-cell'}`}
+                  title={isAllPlatform ? '大盘汇总消耗不可直接编辑，请先选择具体平台' : (isReadOnly ? '只读模式不可编辑' : '点击编辑备注与消耗')}
+                  onClick={() => onEditRow && onEditRow(row)}
+                  style={{ width: `${colWidths.col2}px`, minWidth: `${colWidths.col2}px`, cursor: 'pointer' }}
                 >
                   <span style={{ fontWeight: 600 }}>{formatUsd(row.spend)}</span>
                 </td>

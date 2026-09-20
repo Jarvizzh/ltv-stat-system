@@ -44,7 +44,7 @@ export default function LandingPageConfigModal({
     ? platforms.filter((p) => p.code !== 'ALL' && !p.isAll)
     : [
         { code: 'rocnovel', name: 'ROCNOVEL (中文在线)' },
-        { code: 'flicknovel', name: 'FLICKNOVEL (番茄海外)' },
+        { code: 'flicknovel', name: 'FLICKNOVEL (番茄司南)' },
       ];
 
   const initialPlat = (platformCode && platformCode !== 'ALL')
@@ -52,6 +52,7 @@ export default function LandingPageConfigModal({
     : (concretePlatforms[0]?.code || 'rocnovel');
 
   const [modalPlatform, setModalPlatform] = useState(initialPlat);
+  const isRocnovel = (modalPlatform || '').toLowerCase() === 'rocnovel';
   const [items, setItems] = useState([]); // [{ landingPageId: '', timezone: 'CST' }]
   const [mode, setMode] = useState('list'); // 'list' | 'batch'
   const [batchText, setBatchText] = useState('');
@@ -342,7 +343,7 @@ export default function LandingPageConfigModal({
               </button>
             </div>
 
-            {!isReadOnly && isAdmin && (
+            {!isReadOnly && isAdmin && !isRocnovel && (
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -379,7 +380,7 @@ export default function LandingPageConfigModal({
                   </p>
                   {!isReadOnly && (
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
-                      {isAdmin && (
+                      {isAdmin && !isRocnovel && (
                         <button
                           type="button"
                           className="btn btn-primary"
@@ -392,7 +393,7 @@ export default function LandingPageConfigModal({
                       )}
                       <button
                         type="button"
-                        className={isAdmin ? "btn btn-secondary" : "btn btn-primary"}
+                        className={isAdmin && !isRocnovel ? "btn btn-secondary" : "btn btn-primary"}
                         style={{ fontSize: '0.82rem', padding: '0.35rem 0.8rem' }}
                         onClick={handleAddItem}
                       >

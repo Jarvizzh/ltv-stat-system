@@ -5,7 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * 番茄海外染色归因明细实体
+ * 番茄司南染色归因明细实体
  */
 @Entity
 @Table(name = "flicknovel_relation", indexes = {

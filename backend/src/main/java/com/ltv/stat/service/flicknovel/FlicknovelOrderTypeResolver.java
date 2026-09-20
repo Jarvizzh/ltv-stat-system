@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 番茄海外订单充值类型解析策略组件
+ * 番茄司南订单充值类型解析策略组件
  * 
  * 架构设计原则: 高内聚、低耦合。
  * 1. 一旦番茄 OpenAPI 未来在报文中透出 benefit_type 或 product_id 等显式字段，

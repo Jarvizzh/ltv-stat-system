@@ -102,12 +102,12 @@ public class UserServiceLandingPageTest {
         assertNotNull(userInitial);
         assertTrue(userInitial.isEmpty(), "普通用户初始落地页应默认为空");
 
-        // 2. 管理员 (ADMIN) 初始状态：未配置 flicknovel 时，默认填入所有推广ID，番茄海外默认时区为 UTC
+        // 2. 管理员 (ADMIN) 初始状态：未配置 flicknovel 时，默认填入所有推广ID，番茄司南默认时区为 UTC
         List<LandingPageConfigItem> adminInitial = userService.getUserLandingPageConfigs("flicknovel", testAdminId);
         assertNotNull(adminInitial);
         assertFalse(adminInitial.isEmpty(), "管理员初始配置应默认返回所有推广ID");
         assertTrue(adminInitial.stream().anyMatch(c -> "TEST_PROMO_999".equals(c.getLandingPageId())), "应包含测试推广ID TEST_PROMO_999");
-        assertTrue(adminInitial.stream().allMatch(c -> "UTC".equals(c.getTimezone())), "番茄海外初始配置时区应默认为 UTC");
+        assertTrue(adminInitial.stream().allMatch(c -> "UTC".equals(c.getTimezone())), "番茄司南初始配置时区应默认为 UTC");
 
         // 3. 模拟管理员手动保存（指定 ET 时区与 UTC 时区）
         LandingPageConfigItem retained = new LandingPageConfigItem("flicknovel", "TEST_PROMO_999", "ET");

@@ -10,7 +10,7 @@ import java.time.Instant;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 番茄海外系统内部拉取服务验证测试
+ * 番茄司南系统内部拉取服务验证测试
  */
 @SpringBootTest
 public class FlicknovelInternalPullTest {

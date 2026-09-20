@@ -24,7 +24,7 @@ export default function UserManagementModal({ isOpen, onClose, token, currentUse
   const [availablePlatforms, setAvailablePlatforms] = useState([
     { code: 'ALL', name: '综合大盘' },
     { code: 'rocnovel', name: '中文在线' },
-    { code: 'flicknovel', name: '番茄海外' }
+    { code: 'flicknovel', name: '番茄司南' }
   ]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newUsername, setNewUsername] = useState('');

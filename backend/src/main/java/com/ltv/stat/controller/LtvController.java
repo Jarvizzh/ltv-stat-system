@@ -236,7 +236,10 @@ public class LtvController {
         String remark = (String) body.get("remark");
         String platformCode = (String) body.get("platformCode");
         if (platformCode == null || platformCode.trim().isEmpty() || "ALL".equalsIgnoreCase(platformCode.trim())) {
-            platformCode = "rocnovel";
+            Map<String, Object> res = new HashMap<>();
+            res.put("code", 400);
+            res.put("msg", "大盘数据不可直接编辑，请先切换至具体平台");
+            return ResponseEntity.badRequest().body(res);
         }
 
         Long targetUserId = null;
@@ -302,7 +305,10 @@ public class LtvController {
         }
         String platformCode = (String) body.get("platformCode");
         if (platformCode == null || platformCode.trim().isEmpty() || "ALL".equalsIgnoreCase(platformCode.trim())) {
-            platformCode = "rocnovel";
+            Map<String, Object> res = new HashMap<>();
+            res.put("code", 400);
+            res.put("msg", "大盘数据不可直接导入，请先切换至具体平台");
+            return ResponseEntity.badRequest().body(res);
         }
 
         TokenInfo currentUser = UserContext.getCurrentUser();

@@ -7,7 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
- * 番茄海外 OpenAPI 签名工具类 (Ed25519 签名)
+ * 番茄司南 OpenAPI 签名工具类 (Ed25519 签名)
  * 规范：
  * 1. sign 以外的 QueryParam 按参数名升序排序拼接成 key=value&key=value
  * 2. 尾部追加 "&body=" + 请求体 JSON

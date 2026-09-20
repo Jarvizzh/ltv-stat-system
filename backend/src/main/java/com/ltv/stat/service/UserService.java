@@ -3,19 +3,24 @@ package com.ltv.stat.service;
 import com.ltv.stat.dto.LandingPageConfigItem;
 import com.ltv.stat.dto.TokenInfo;
 import com.ltv.stat.dto.VisibleAccountDto;
+import com.ltv.stat.entity.FlicknovelPromotion;
 import com.ltv.stat.entity.SysUser;
 import com.ltv.stat.entity.UserLandingPage;
 import com.ltv.stat.entity.UserSubAccount;
 import com.ltv.stat.entity.UserViewPermission;
+import com.ltv.stat.repository.FlicknovelPromotionRepository;
 import com.ltv.stat.repository.RawOrderRepository;
 import com.ltv.stat.repository.SubscriptionConfigVersionRepository;
 import com.ltv.stat.repository.SysUserRepository;
 import com.ltv.stat.repository.UserLandingPageRepository;
 import com.ltv.stat.repository.UserSubAccountRepository;
 import com.ltv.stat.repository.UserViewPermissionRepository;
+import com.ltv.stat.service.flicknovel.FlicknovelApiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +42,13 @@ public class UserService {
     private final UserSubAccountRepository userSubAccountRepository;
     private final RawOrderRepository rawOrderRepository;
     private final SubscriptionConfigVersionRepository subscriptionConfigVersionRepository;
+
+    @Autowired(required = false)
+    private FlicknovelPromotionRepository flicknovelPromotionRepository;
+
+    @Autowired(required = false)
+    @Lazy
+    private FlicknovelApiService flicknovelApiService;
 
     @Value("${app.auth.username:superadmin}")
     private String defaultSuperAdminUsername;
@@ -535,6 +547,26 @@ public class UserService {
     public List<String> getAllPlatformLandingPageIds(String platformCode) {
         String pCode = (platformCode != null && !platformCode.trim().isEmpty()) ? platformCode.trim().toLowerCase() : "rocnovel";
         Set<String> pids = new LinkedHashSet<>();
+
+        // 若为番茄司南，优先从番茄全量推广链接库 (flicknovel_promotion) 读取
+        if ("flicknovel".equalsIgnoreCase(pCode) && flicknovelPromotionRepository != null) {
+            try {
+                if (flicknovelPromotionRepository.count() == 0 && flicknovelApiService != null) {
+                    flicknovelApiService.syncPromotionsAndTemplates(true);
+                }
+                List<FlicknovelPromotion> promoList = flicknovelPromotionRepository.findAll();
+                if (promoList != null) {
+                    for (FlicknovelPromotion promo : promoList) {
+                        if (promo.getPromotionId() != null && !promo.getPromotionId().trim().isEmpty() && !"__EMPTY__".equalsIgnoreCase(promo.getPromotionId().trim())) {
+                            pids.add(promo.getPromotionId().trim());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.error("[UserService] Failed to query flicknovel promotions: {}", e.getMessage());
+            }
+        }
+
         List<String> fromOrders = rawOrderRepository.findDistinctLandingPageIdsByPlatformCode(pCode);
         if (fromOrders != null) {
             for (String pid : fromOrders) {
@@ -589,7 +621,7 @@ public class UserService {
             list = userLandingPageRepository.findByUserId(userId);
         }
 
-        // 番茄海外 (flicknovel) 初始配置特殊处理：
+        // 番茄司南 (flicknovel) 初始配置特殊处理：
         // 仅管理员 (ADMIN / SUPER_ADMIN) 初始落地页默认填充系统已知的所有推广ID（时区默认 UTC）；普通用户 (USER) 初始默认为空
         boolean isAdmin = ("ADMIN".equalsIgnoreCase(user.getRole()) || "SUPER_ADMIN".equalsIgnoreCase(user.getRole()));
         if (filterPlatform && "flicknovel".equalsIgnoreCase(targetPlatform) && (list == null || list.isEmpty())) {

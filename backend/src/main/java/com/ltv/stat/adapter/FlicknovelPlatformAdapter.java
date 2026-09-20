@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 
 /**
- * 番茄海外 (FlickNovel) 适配器实现
+ * 番茄司南 (FlickNovel) 适配器实现
  */
 @Component
 public class FlicknovelPlatformAdapter implements PlatformSyncAdapter {
@@ -38,7 +38,7 @@ public class FlicknovelPlatformAdapter implements PlatformSyncAdapter {
     @Override
     public int syncOrdersForLandingPage(String landingPageId, PlatformConfig config) {
         log.info("[FlicknovelAdapter] Syncing orders for channel: {}", landingPageId);
-        // 番茄海外按时间区间全量拉取后按落地页关联归集
+        // 番茄司南按时间区间全量拉取后按落地页关联归集
         return flicknovelApiService.syncOrders(null, null, config);
     }
 

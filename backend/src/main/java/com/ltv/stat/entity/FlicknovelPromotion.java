@@ -4,7 +4,7 @@ import javax.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * 番茄海外推广链接实体
+ * 番茄司南推广链接实体
  */
 @Entity
 @Table(name = "flicknovel_promotion", indexes = {

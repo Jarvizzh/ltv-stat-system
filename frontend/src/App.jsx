@@ -435,6 +435,7 @@ export default function App() {
     sessionStorage.removeItem('admin_selected_platform');
     setIsAuthenticated(false);
     setCurrentUser(null);
+    setIsLogoutModalOpen(false);
     setSelectedPlatform('rocnovel');
     setTargetUserId(1);
     setUsersList([]);
@@ -562,18 +563,9 @@ export default function App() {
   const handleLandingPagesSaved = () => {
     if (activeTab === 'ltv') fetchLtvData(targetUserId, selectedPlatform);
     if (activeTab === 'distribution') fetchDistributionData(targetUserId, selectedPlatform);
-    if (currentUser.role === 'ADMIN') fetchUsersList();
+    if (currentUser?.role === 'ADMIN') fetchUsersList();
     showToast('落地页配置保存成功，已完成专属报表实时重算！', 'success');
   };
-
-  if (!isAuthenticated) {
-    return (
-      <>
-        <Toast toast={toast} onClose={() => setToast(null)} />
-        <Login onLoginSuccess={handleLoginSuccess} />
-      </>
-    );
-  }
 
   const currentPlatformObj = platformsList?.find(p => p.code?.toLowerCase() === (selectedPlatform || 'rocnovel').toLowerCase());
   const currentPlatformLaunchDate = currentPlatformObj?.launchStartDate || (selectedPlatform?.toLowerCase() === 'flicknovel' ? '2026-09-17' : '2026-07-10');
@@ -655,6 +647,15 @@ export default function App() {
     }
     return result;
   }, [data, currentPlatformLaunchDate, currentPlatformToday, selectedPlatform, targetUserId, currentUser]);
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <Toast toast={toast} onClose={() => setToast(null)} />
+        <Login onLoginSuccess={handleLoginSuccess} />
+      </>
+    );
+  }
 
   const totalSpend = displayedLtvData.reduce((acc, cur) => acc + (parseFloat(cur.spend) || 0), 0);
   const totalRecharge = displayedLtvData.reduce((acc, cur) => acc + (parseFloat(cur.totalRecharge) || 0), 0);
@@ -820,7 +821,13 @@ export default function App() {
         onTabChange={setActiveTab}
         loading={loading}
         onOpenSyncModal={() => setIsSyncModalOpen(true)}
-        onOpenBatchSpend={() => setIsBatchSpendOpen(true)}
+        onOpenBatchSpend={() => {
+          if ((selectedPlatform || '').toUpperCase() === 'ALL') {
+            showToast('大盘数据不可直接导入，请先切换至具体平台', 'warning');
+            return;
+          }
+          setIsBatchSpendOpen(true);
+        }}
         onOpenConfig={() => {
           setEditingTargetUserLandingPage(null);
           setIsConfigOpen(true);
@@ -1083,7 +1090,12 @@ export default function App() {
 
             <LtvTable
               data={displayedLtvData}
+              selectedPlatform={selectedPlatform}
               onEditRow={(row) => {
+                if ((selectedPlatform || '').toUpperCase() === 'ALL') {
+                  showToast('大盘数据不可直接编辑，请先切换至具体平台', 'warning');
+                  return;
+                }
                 if (isReadOnlyView) {
                   const msgText = isTargetMaster
                     ? '主账号为数据汇总账号，消耗由子账号自动累加计算，不可直接修改'

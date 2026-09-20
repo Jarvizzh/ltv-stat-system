@@ -120,7 +120,7 @@ export default function BatchSpendModal({ isOpen, onClose, onSaved, authFetch, t
 
   const actualPlatforms = (platformsList || [
     { code: 'rocnovel', name: '中文在线' },
-    { code: 'flicknovel', name: '番茄海外' }
+    { code: 'flicknovel', name: '番茄司南' }
   ]).filter(p => p.code !== 'ALL');
 
   return (

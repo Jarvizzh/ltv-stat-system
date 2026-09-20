@@ -36,7 +36,13 @@ export default function EditSpendModal({ isOpen, item, onClose, onSaved, authFet
 
     const effectivePlatform = (item.platformCode && item.platformCode !== 'ALL')
       ? item.platformCode
-      : (selectedPlatform && selectedPlatform !== 'ALL' ? selectedPlatform : 'rocnovel');
+      : (selectedPlatform && selectedPlatform !== 'ALL' ? selectedPlatform : null);
+
+    if (!effectivePlatform || effectivePlatform === 'ALL') {
+      setErrMsg('大盘数据不可直接编辑，请先切换至具体平台');
+      setLoading(false);
+      return;
+    }
 
     try {
       const res = await fetchFunc('/api/ltv/config', {

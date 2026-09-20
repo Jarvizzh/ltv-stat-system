@@ -4,7 +4,7 @@ import javax.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * 番茄海外充值模板实体 (v2)
+ * 番茄司南充值模板实体 (v2)
  */
 @Entity
 @Table(name = "flicknovel_recharge_template", indexes = {

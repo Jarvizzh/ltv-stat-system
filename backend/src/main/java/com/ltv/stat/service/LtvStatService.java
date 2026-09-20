@@ -34,9 +34,10 @@ public class LtvStatService {
 
     private static final Logger log = LoggerFactory.getLogger(LtvStatService.class);
     public static final LocalDate START_DATE = LocalDate.of(2026, 7, 10);
+    public static final LocalDate MULTI_PLATFORM_START_DATE = LocalDate.of(2026, 9, 17);
 
     /**
-     * 根据平台代码安全获取投放起始日期，中文在线为 2026-07-10，番茄海外为 2026-09-17，ALL 为 2026-07-10
+     * 根据平台代码安全获取投放起始日期，中文在线为 2026-07-10，番茄司南为 2026-09-17，ALL 为 2026-07-10
      */
     public static LocalDate getLaunchStartDateForPlatform(String platformCode) {
         return PlatformEnum.getLaunchStartDateForPlatform(platformCode);
@@ -91,8 +92,10 @@ public class LtvStatService {
 
     public LtvLaunchConfig saveLaunchConfig(String platformCode, Long userId, LocalDate launchDate, BigDecimal spend, String remark) {
         if (userId == null) userId = 1L;
-        String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
-                ? platformCode.trim().toLowerCase() : "rocnovel";
+        if (platformCode == null || "ALL".equalsIgnoreCase(platformCode.trim())) {
+            throw new IllegalArgumentException("大盘数据不可直接编辑，请先切换至具体平台");
+        }
+        String pCode = platformCode.trim().toLowerCase();
         if (userService.isMasterAccount(userId)) {
             throw new IllegalArgumentException("主账号为数据汇总账号，消耗由关联子账号自动计算，不可直接编辑！");
         }
@@ -126,8 +129,10 @@ public class LtvStatService {
     @Transactional
     public int batchSaveLaunchConfig(String platformCode, Long userId, List<Map<String, Object>> items) {
         if (userId == null) userId = 1L;
-        String pCode = (platformCode != null && !platformCode.trim().isEmpty() && !"ALL".equalsIgnoreCase(platformCode.trim()))
-                ? platformCode.trim().toLowerCase() : "rocnovel";
+        if (platformCode == null || "ALL".equalsIgnoreCase(platformCode.trim())) {
+            throw new IllegalArgumentException("大盘数据不可直接导入，请先切换至具体平台");
+        }
+        String pCode = platformCode.trim().toLowerCase();
         if (userService.isMasterAccount(userId)) {
             throw new IllegalArgumentException("主账号为数据汇总账号，消耗由关联子账号自动计算，不可直接导入！");
         }
@@ -368,50 +373,87 @@ public class LtvStatService {
             masterRemark = subNamesStr.isEmpty() ? "汇总数据" : "汇总数据（子账号：" + subNamesStr + "）";
 
             Map<LocalDate, BigDecimal> sumSpendMap = new HashMap<>();
+            Map<LocalDate, List<String>> remarkMap = new HashMap<>();
             for (Long subId : subUserIds) {
                 List<LtvLaunchConfig> subConfigs = isAll ? ltvLaunchConfigRepository.findByUserId(subId)
                         : ltvLaunchConfigRepository.findByPlatformCodeAndUserId(pCode, subId);
                 for (LtvLaunchConfig sc : subConfigs) {
-                    if (sc.getLaunchDate() != null && sc.getSpend() != null) {
-                        sumSpendMap.merge(sc.getLaunchDate(), sc.getSpend(), BigDecimal::add);
+                    if ("ALL".equalsIgnoreCase(sc.getPlatformCode())) continue;
+                    if (sc.getLaunchDate() != null) {
+                        if (sc.getSpend() != null) {
+                            sumSpendMap.merge(sc.getLaunchDate(), sc.getSpend(), BigDecimal::add);
+                        }
+                        if (sc.getRemark() != null && !sc.getRemark().trim().isEmpty()) {
+                            String cleanRemark = sc.getRemark().trim();
+                            String formatted = !sc.getLaunchDate().isBefore(MULTI_PLATFORM_START_DATE)
+                                    ? formatPlatformRemark(sc.getPlatformCode(), cleanRemark)
+                                    : cleanRemark;
+                            List<String> rList = remarkMap.computeIfAbsent(sc.getLaunchDate(), k -> new ArrayList<>());
+                            if (!rList.contains(formatted)) {
+                                rList.add(formatted);
+                            }
+                        }
                     }
                 }
             }
             configsByDate = new HashMap<>();
-            for (Map.Entry<LocalDate, BigDecimal> entry : sumSpendMap.entrySet()) {
+            Set<LocalDate> allDates = new HashSet<>(sumSpendMap.keySet());
+            allDates.addAll(remarkMap.keySet());
+            for (LocalDate d : allDates) {
                 LtvLaunchConfig mc = new LtvLaunchConfig();
                 mc.setPlatformCode(targetPlatform);
                 mc.setUserId(userId);
-                mc.setLaunchDate(entry.getKey());
-                mc.setSpend(entry.getValue());
-                mc.setRemark(masterRemark);
-                configsByDate.put(entry.getKey(), mc);
+                mc.setLaunchDate(d);
+                mc.setSpend(sumSpendMap.getOrDefault(d, BigDecimal.ZERO));
+                if (isAll) {
+                    List<String> remarks = remarkMap.get(d);
+                    mc.setRemark(remarks != null && !remarks.isEmpty() ? String.join(" | ", remarks) : masterRemark);
+                } else {
+                    mc.setRemark(masterRemark);
+                }
+                configsByDate.put(d, mc);
             }
         } else {
             List<LtvLaunchConfig> list = isAll ? ltvLaunchConfigRepository.findByUserId(userId)
                     : ltvLaunchConfigRepository.findByPlatformCodeAndUserId(pCode, userId);
             if (isAll) {
                 Map<LocalDate, BigDecimal> sumSpendMap = new HashMap<>();
-                Map<LocalDate, String> remarkMap = new HashMap<>();
-                for (LtvLaunchConfig c : list) {
+                Map<LocalDate, List<String>> remarkMap = new HashMap<>();
+                List<LtvLaunchConfig> sortedList = list.stream()
+                        .sorted(Comparator.comparing(c -> c.getPlatformCode() == null ? "" : c.getPlatformCode()))
+                        .collect(Collectors.toList());
+                for (LtvLaunchConfig c : sortedList) {
+                    if ("ALL".equalsIgnoreCase(c.getPlatformCode())) {
+                        continue;
+                    }
                     if (c.getLaunchDate() != null) {
                         if (c.getSpend() != null) {
                             sumSpendMap.merge(c.getLaunchDate(), c.getSpend(), BigDecimal::add);
                         }
                         if (c.getRemark() != null && !c.getRemark().trim().isEmpty()) {
-                            remarkMap.merge(c.getLaunchDate(), c.getRemark(), (r1, r2) -> r1 + "; " + r2);
+                            String cleanRemark = c.getRemark().trim();
+                            String formatted = !c.getLaunchDate().isBefore(MULTI_PLATFORM_START_DATE)
+                                    ? formatPlatformRemark(c.getPlatformCode(), cleanRemark)
+                                    : cleanRemark;
+                            List<String> rList = remarkMap.computeIfAbsent(c.getLaunchDate(), k -> new ArrayList<>());
+                            if (!rList.contains(formatted)) {
+                                rList.add(formatted);
+                            }
                         }
                     }
                 }
                 configsByDate = new HashMap<>();
-                for (Map.Entry<LocalDate, BigDecimal> entry : sumSpendMap.entrySet()) {
+                Set<LocalDate> allDates = new HashSet<>(sumSpendMap.keySet());
+                allDates.addAll(remarkMap.keySet());
+                for (LocalDate d : allDates) {
                     LtvLaunchConfig ac = new LtvLaunchConfig();
                     ac.setPlatformCode("ALL");
                     ac.setUserId(userId);
-                    ac.setLaunchDate(entry.getKey());
-                    ac.setSpend(entry.getValue());
-                    ac.setRemark(remarkMap.getOrDefault(entry.getKey(), ""));
-                    configsByDate.put(entry.getKey(), ac);
+                    ac.setLaunchDate(d);
+                    ac.setSpend(sumSpendMap.getOrDefault(d, BigDecimal.ZERO));
+                    List<String> remarks = remarkMap.get(d);
+                    ac.setRemark(remarks != null && !remarks.isEmpty() ? String.join(" | ", remarks) : "");
+                    configsByDate.put(d, ac);
                 }
             } else {
                 configsByDate = list.stream()
@@ -438,7 +480,9 @@ public class LtvStatService {
             LtvLaunchConfig launchConfig = configsByDate.get(currDate);
 
             BigDecimal spend = launchConfig != null ? launchConfig.getSpend() : BigDecimal.ZERO;
-            String remark = isMasterAcc ? masterRemark : (launchConfig != null ? launchConfig.getRemark() : "");
+            String remark = (launchConfig != null && launchConfig.getRemark() != null && !launchConfig.getRemark().trim().isEmpty())
+                    ? launchConfig.getRemark()
+                    : (isMasterAcc ? masterRemark : "");
 
             LtvDailyStat stat = calculateSingleCohort(userId, currDate, cohortOrders, spend, remark, maxToday, tzMap, subPeriodMap);
             stat.setPlatformCode(targetPlatform);
@@ -1139,5 +1183,23 @@ public class LtvStatService {
 
         // 7. 若截至今天逐自然日累加后仍未达到总消耗（极特殊数据微差），防护返回 null，决不上摸或假定未来天数
         return null;
+    }
+
+    /**
+     * 格式化大盘汇总的平台备注前缀：平台名称：xxxx
+     */
+    private String formatPlatformRemark(String platformCode, String rawRemark) {
+        if (rawRemark == null || rawRemark.trim().isEmpty()) {
+            return "";
+        }
+        String pName = PlatformEnum.fromCode(platformCode)
+                .map(PlatformEnum::getDisplayName)
+                .orElse(platformCode != null && !platformCode.trim().isEmpty() ? platformCode.trim() : "其他");
+        String cleanRemark = rawRemark.trim();
+        String prefix = pName + "：";
+        if (cleanRemark.startsWith(prefix)) {
+            return cleanRemark;
+        }
+        return prefix + cleanRemark;
     }
 }

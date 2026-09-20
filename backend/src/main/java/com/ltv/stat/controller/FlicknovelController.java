@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 番茄海外系统管理控制器
+ * 番茄司南系统管理控制器
  * 注：获取订单列表、获取推广链接、获取充值模版 3 个接口仅作为系统底层拉取服务使用，不对外暴露原始数据接口。
  * 此控制器仅保留系统级的数据同步与凭据管理能力。
  */
@@ -31,7 +31,7 @@ public class FlicknovelController {
     }
 
     /**
-     * 手动触发番茄海外订单同步到系统 raw_order
+     * 手动触发番茄司南订单同步到系统 raw_order
      */
     @PostMapping("/sync/orders")
     public ResponseEntity<?> syncOrders(@RequestBody(required = false) Map<String, String> body) {
@@ -54,14 +54,14 @@ public class FlicknovelController {
             result.put("syncedCount", count);
             result.put("startDate", startDate);
             result.put("endDate", endDate);
-            return ResponseEntity.ok(ApiResponseDto.success("番茄海外订单同步完成，共抓取/入库 " + count + " 条订单", result));
+            return ResponseEntity.ok(ApiResponseDto.success("番茄司南订单同步完成，共抓取/入库 " + count + " 条订单", result));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponseDto.error(500, "订单同步失败: " + e.getMessage()));
         }
     }
 
     /**
-     * 手动触发番茄海外染色归因记录同步到系统 flicknovel_relation
+     * 手动触发番茄司南染色归因记录同步到系统 flicknovel_relation
      */
     @PostMapping("/sync/relations")
     public ResponseEntity<?> syncRelations(@RequestBody(required = false) Map<String, String> body) {
@@ -84,14 +84,14 @@ public class FlicknovelController {
             result.put("syncedCount", count);
             result.put("startDate", startDate != null ? startDate : LocalDate.now().minusDays(2));
             result.put("endDate", endDate != null ? endDate : LocalDate.now());
-            return ResponseEntity.ok(ApiResponseDto.success("番茄海外染色归因记录同步完成，共抓取/落库 " + count + " 条染色数据", result));
+            return ResponseEntity.ok(ApiResponseDto.success("番茄司南染色归因记录同步完成，共抓取/落库 " + count + " 条染色数据", result));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponseDto.error(500, "染色归因记录同步失败: " + e.getMessage()));
         }
     }
 
     /**
-     * 手动触发番茄海外推广链/配置同步
+     * 手动触发番茄司南推广链/配置同步
      */
     @PostMapping("/sync/configs")
     public ResponseEntity<?> syncConfigs(@RequestBody(required = false) Map<String, Object> body) {
@@ -110,14 +110,14 @@ public class FlicknovelController {
             int count = flicknovelApiService.syncPromotionsAndConfigs(email, distAppId);
             Map<String, Object> result = new HashMap<>();
             result.put("syncedConfigs", count);
-            return ResponseEntity.ok(ApiResponseDto.success("番茄海外推广链接与配置同步完成，共保存 " + count + " 条记录", result));
+            return ResponseEntity.ok(ApiResponseDto.success("番茄司南推广链接与配置同步完成，共保存 " + count + " 条记录", result));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponseDto.error(500, "推广链同步失败: " + e.getMessage()));
         }
     }
 
     /**
-     * 手动触发番茄海外推广链接与充值模板 v2 全量拉取入库并刷新内存字典
+     * 手动触发番茄司南推广链接与充值模板 v2 全量拉取入库并刷新内存字典
      */
     @PostMapping("/sync/promotions-and-templates")
     public ResponseEntity<?> syncPromotionsAndTemplates() {
@@ -172,7 +172,7 @@ public class FlicknovelController {
     public ResponseEntity<?> updateConfig(@RequestBody Map<String, String> body) {
         TokenInfo currentUser = UserContext.getCurrentUser();
         if (currentUser != null && !currentUser.isSuperAdmin()) {
-            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "仅超级管理员可修改番茄海外配置"));
+            return ResponseEntity.status(403).body(ApiResponseDto.error(403, "仅超级管理员可修改番茄司南配置"));
         }
 
         String companyId = body != null ? body.get("companyId") : null;
@@ -180,6 +180,6 @@ public class FlicknovelController {
         String email = body != null ? body.get("defaultEmail") : null;
 
         flicknovelApiClient.updateCredentials(companyId, privateKey, email);
-        return ResponseEntity.ok(ApiResponseDto.success("番茄海外配置已成功更新！", null));
+        return ResponseEntity.ok(ApiResponseDto.success("番茄司南配置已成功更新！", null));
     }
 }

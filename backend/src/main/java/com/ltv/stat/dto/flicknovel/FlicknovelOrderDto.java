@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * 番茄海外订单数据实体
+ * 番茄司南订单数据实体
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class FlicknovelOrderDto {

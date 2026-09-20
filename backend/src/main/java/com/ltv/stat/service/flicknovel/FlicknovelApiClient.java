@@ -19,7 +19,7 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * 番茄海外 OpenAPI 客户端组件
+ * 番茄司南 OpenAPI 客户端组件
  * 封装 Ed25519 签名、通信、重试与各业务接口
  */
 @Component
@@ -111,7 +111,7 @@ public class FlicknovelApiClient {
         PlatformConfig config = platformConfigRepository.findByPlatformCode("flicknovel").orElseGet(() -> {
             PlatformConfig p = new PlatformConfig();
             p.setPlatformCode("flicknovel");
-            p.setPlatformName("番茄海外");
+            p.setPlatformName("番茄司南");
             p.setAuthType("ED25519_KEY");
             p.setStatus(1);
             return p;
@@ -196,10 +196,10 @@ public class FlicknovelApiClient {
         String baseUrl = getBaseUrl();
 
         if (companyId == null || companyId.trim().isEmpty()) {
-            throw new IllegalStateException("番茄海外 Company ID 未配置！");
+            throw new IllegalStateException("番茄司南 Company ID 未配置！");
         }
         if (privateKey == null || privateKey.trim().isEmpty()) {
-            throw new IllegalStateException("番茄海外 API 密钥 (Private Key) 未配置！");
+            throw new IllegalStateException("番茄司南 API 密钥 (Private Key) 未配置！");
         }
 
         try {
@@ -255,7 +255,7 @@ public class FlicknovelApiClient {
             log.info("[FlicknovelApiClient] POST {} cost: {}ms, status: {}", path, cost, response.getStatusCode());
 
             if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-                throw new RuntimeException("番茄海外接口响应异常: HTTP " + response.getStatusCodeValue() + ", body: " + response.getBody());
+                throw new RuntimeException("番茄司南接口响应异常: HTTP " + response.getStatusCodeValue() + ", body: " + response.getBody());
             }
 
             return objectMapper.readValue(response.getBody(), responseClass);
@@ -263,10 +263,10 @@ public class FlicknovelApiClient {
         } catch (HttpStatusCodeException hse) {
             String respBody = hse.getResponseBodyAsString();
             log.error("[FlicknovelApiClient] HTTP Error {} on {}: {}", hse.getRawStatusCode(), path, respBody);
-            throw new RuntimeException("番茄海外接口请求错误 (HTTP " + hse.getRawStatusCode() + "): " + respBody, hse);
+            throw new RuntimeException("番茄司南接口请求错误 (HTTP " + hse.getRawStatusCode() + "): " + respBody, hse);
         } catch (Exception e) {
             log.error("[FlicknovelApiClient] Failed to execute POST on {}: {}", path, e.getMessage(), e);
-            throw new RuntimeException("调用番茄海外接口异常: " + e.getMessage(), e);
+            throw new RuntimeException("调用番茄司南接口异常: " + e.getMessage(), e);
         }
     }
 }

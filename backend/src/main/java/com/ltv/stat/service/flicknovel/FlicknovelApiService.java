@@ -32,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * 番茄海外业务服务
+ * 番茄司南业务服务
  * 封装数据获取、系统级内部同步与工业级订单清洗逻辑
  */
 @Service
@@ -234,7 +234,7 @@ public class FlicknovelApiService {
 
         log.info("[FlicknovelSync] Starting syncOrders from {} to {}", startDate, endDate);
 
-        // 番茄海外数据默认以 UTC 时区为基准，按 UTC 自然日划分时间窗口
+        // 番茄司南数据默认以 UTC 时区为基准，按 UTC 自然日划分时间窗口
         int totalSavedOrders = 0;
         LocalDate currentStart = startDate;
         while (!currentStart.isAfter(endDate)) {

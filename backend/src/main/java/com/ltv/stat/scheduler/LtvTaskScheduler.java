@@ -36,7 +36,7 @@ public class LtvTaskScheduler {
     }
 
     /**
-     * 北京时间每 2 小时整点: 定时拉取番茄海外所有推广链接与充值模板 v2 入库并刷新内存字典
+     * 北京时间每 2 小时整点: 定时拉取番茄司南所有推广链接与充值模板 v2 入库并刷新内存字典
      */
     @Scheduled(cron = "0 0 */2 * * ?", zone = "Asia/Shanghai")
     public void scheduledFlicknovelPromotionAndTemplateSync() {
@@ -67,7 +67,7 @@ public class LtvTaskScheduler {
             log.error("Scheduled multi-platform order fetch failed", e);
         }
 
-        // 定时拉取番茄海外近 2 天染色归因记录独立落库
+        // 定时拉取番茄司南近 2 天染色归因记录独立落库
         try {
             flicknovelApiService.syncRelations(startBj, todayBj);
         } catch (Exception e) {
