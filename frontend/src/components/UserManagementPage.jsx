@@ -874,9 +874,9 @@ export default function UserManagementPage({ token, currentUser, onRefreshUsers,
         borderRadius: '0.5rem',
         border: '1px solid var(--border-color)'
       }}>
-        {/* 左侧：搜索输入框 + 刷新与新建用户按钮 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', width: '240px' }}>
+        {/* 左侧：搜索输入框 + 角色、类型、结算筛选框 + 重置筛选 */}
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem' }}>
+          <div style={{ position: 'relative', width: '220px' }}>
             <Search size={15} color="var(--text-sub)" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
@@ -897,6 +897,70 @@ export default function UserManagementPage({ token, currentUser, onRefreshUsers,
             )}
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>角色:</span>
+            <CustomSelect
+              value={roleFilter}
+              onChange={setRoleFilter}
+              options={[
+                { label: '全部角色', value: 'ALL' },
+                { label: '普通用户', value: 'USER' },
+                { label: '管理员', value: 'ADMIN' },
+                { label: '超级管理员', value: 'SUPER_ADMIN' },
+              ]}
+              className="custom-select-sm"
+              style={{ minWidth: '105px' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>类型:</span>
+            <CustomSelect
+              value={accountTypeFilter}
+              onChange={setAccountTypeFilter}
+              options={[
+                { label: '全部类型', value: 'ALL' },
+                { label: '普通账号', value: 0 },
+                { label: '主账号(汇总)', value: 1 },
+              ]}
+              className="custom-select-sm"
+              style={{ minWidth: '105px' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>结算:</span>
+            <CustomSelect
+              value={settlementFilter}
+              onChange={setSettlementFilter}
+              options={[
+                { label: '全部结算', value: 'ALL' },
+                { label: '参与结算', value: 1 },
+                { label: '不结算', value: 0 },
+              ]}
+              className="custom-select-sm"
+              style={{ minWidth: '100px' }}
+            />
+          </div>
+
+          {(searchTerm || roleFilter !== 'ALL' || accountTypeFilter !== 'ALL' || settlementFilter !== 'ALL') && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setSearchTerm('');
+                setRoleFilter('ALL');
+                setAccountTypeFilter('ALL');
+                setSettlementFilter('ALL');
+              }}
+              style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem', height: '32px' }}
+            >
+              重置筛选
+            </button>
+          )}
+        </div>
+
+        {/* 右侧：刷新与新建用户按钮 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <button
             className="btn btn-secondary"
             onClick={fetchUsers}
@@ -916,70 +980,6 @@ export default function UserManagementPage({ token, currentUser, onRefreshUsers,
             <UserPlus size={15} />
             <span>{showAddForm ? '收起新增表单' : '新建用户'}</span>
           </button>
-        </div>
-
-        {/* 右侧：角色筛选、类型筛选、结算筛选 */}
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>角色:</span>
-            <CustomSelect
-              value={roleFilter}
-              onChange={setRoleFilter}
-              options={[
-                { label: '全部角色', value: 'ALL' },
-                { label: '普通用户', value: 'USER' },
-                { label: '管理员', value: 'ADMIN' },
-                { label: '超级管理员', value: 'SUPER_ADMIN' },
-              ]}
-              className="custom-select-sm"
-              style={{ minWidth: '110px' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>类型:</span>
-            <CustomSelect
-              value={accountTypeFilter}
-              onChange={setAccountTypeFilter}
-              options={[
-                { label: '全部类型', value: 'ALL' },
-                { label: '普通账号', value: 0 },
-                { label: '主账号(汇总)', value: 1 },
-              ]}
-              className="custom-select-sm"
-              style={{ minWidth: '110px' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)', whiteSpace: 'nowrap' }}>结算:</span>
-            <CustomSelect
-              value={settlementFilter}
-              onChange={setSettlementFilter}
-              options={[
-                { label: '全部结算', value: 'ALL' },
-                { label: '参与结算', value: 1 },
-                { label: '不结算', value: 0 },
-              ]}
-              className="custom-select-sm"
-              style={{ minWidth: '105px' }}
-            />
-          </div>
-
-          {(searchTerm || roleFilter !== 'ALL' || accountTypeFilter !== 'ALL' || settlementFilter !== 'ALL') && (
-            <button
-              className="btn btn-secondary"
-              onClick={() => {
-                setSearchTerm('');
-                setRoleFilter('ALL');
-                setAccountTypeFilter('ALL');
-                setSettlementFilter('ALL');
-              }}
-              style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
-            >
-              重置筛选
-            </button>
-          )}
         </div>
       </div>
 
