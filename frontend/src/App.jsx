@@ -8,7 +8,7 @@ import EditSpendModal from './components/EditSpendModal';
 import TokenConfigModal from './components/TokenConfigModal';
 import SyncModal from './components/SyncModal';
 import BatchSpendModal from './components/BatchSpendModal';
-import UserManagementModal from './components/UserManagementModal';
+import UserManagementPage from './components/UserManagementPage';
 import LogoutConfirmModal from './components/LogoutConfirmModal';
 import ExportModal from './components/ExportModal';
 import MonthlySettlementTable from './components/MonthlySettlementTable';
@@ -109,15 +109,17 @@ export default function App() {
     });
   };
 
-  const [activeTab, setActiveTab] = useState('ltv'); // 'ltv' | 'distribution' | 'global-distribution' | 'settlement'
+  const [activeTab, setActiveTab] = useState('ltv'); // 'ltv' | 'distribution' | 'global-distribution' | 'settlement' | 'users'
 
   useEffect(() => {
     if (activeTab === 'global-distribution' && !hasPermGlobalDistribution) {
       setActiveTab('ltv');
     } else if (activeTab === 'settlement' && !hasPermSettlement) {
       setActiveTab('ltv');
+    } else if (activeTab === 'users' && !isSuperAdmin) {
+      setActiveTab('ltv');
     }
-  }, [activeTab, hasPermGlobalDistribution, hasPermSettlement]);
+  }, [activeTab, hasPermGlobalDistribution, hasPermSettlement, isSuperAdmin]);
   const [data, setData] = useState([]);
   const [distributionData, setDistributionData] = useState([]);
   const [distributionSummary, setDistributionSummary] = useState(null);
@@ -129,7 +131,6 @@ export default function App() {
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isBatchSpendOpen, setIsBatchSpendOpen] = useState(false);
-  const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [editingTargetUserLandingPage, setEditingTargetUserLandingPage] = useState(null);
@@ -833,7 +834,7 @@ export default function App() {
           setIsConfigOpen(true);
         }}
         onOpenExportModal={() => setIsExportModalOpen(true)}
-        onOpenUserManagement={() => setIsUserManagementOpen(true)}
+        onOpenUserManagement={() => setActiveTab('users')}
         onOpenTokenModal={() => setIsTokenModalOpen(true)}
         onLogout={() => setIsLogoutModalOpen(true)}
         currentUser={currentUser}
@@ -1140,6 +1141,16 @@ export default function App() {
             selectedPlatform={selectedPlatform}
           />
         )}
+
+        {/* Tab 5: 用户管理 (全屏列表页) */}
+        {activeTab === 'users' && isSuperAdmin && (
+          <UserManagementPage
+            token={localStorage.getItem('admin_token')}
+            currentUser={currentUser}
+            onRefreshUsers={fetchUsersList}
+            showToast={showToast}
+          />
+        )}
       </main>
       </div>
 
@@ -1159,17 +1170,6 @@ export default function App() {
         authFetch={authFetch}
         currentUser={currentUser}
       />
-
-      {currentUser && currentUser.role === 'SUPER_ADMIN' && (
-        <UserManagementModal
-          isOpen={isUserManagementOpen}
-          onClose={() => setIsUserManagementOpen(false)}
-          token={localStorage.getItem('admin_token')}
-          currentUser={currentUser}
-          onRefreshUsers={fetchUsersList}
-          showToast={showToast}
-        />
-      )}
 
       {currentUser && (
         <TokenConfigModal

@@ -428,6 +428,19 @@ body {
   border-color: rgba(99, 102, 241, 0.3);
 }
 
+.sidebar-sub-item.active {
+  background: rgba(99, 102, 241, 0.22);
+  color: #818cf8;
+  border-color: rgba(99, 102, 241, 0.45);
+  font-weight: 600;
+}
+
+.sidebar-fixed-flyout .popover-item.active {
+  background: rgba(99, 102, 241, 0.22);
+  color: #818cf8;
+  font-weight: 600;
+}
+
 /* 浮窗式弹窗 (收起时点击，fixed 定位绝对不被遮挡) */
 .sidebar-fixed-flyout {
   background: rgba(15, 23, 42, 0.96);

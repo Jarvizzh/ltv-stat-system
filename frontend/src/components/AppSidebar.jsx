@@ -256,11 +256,11 @@ export default function AppSidebar({
                     {isAdminSubmenuOpen && (
                       <div className="sidebar-sub-menu">
                         <button
-                          className="sidebar-sub-item"
-                          onClick={() => onOpenUserManagement && onOpenUserManagement()}
+                          className={`sidebar-sub-item ${activeTab === 'users' ? 'active' : ''}`}
+                          onClick={() => handleTabClick('users')}
                         >
                           <Users size={14} className="flex-shrink-0" />
-                          <span>用户权限</span>
+                          <span>用户管理</span>
                         </button>
                         <button
                           className="sidebar-sub-item"
@@ -276,7 +276,7 @@ export default function AppSidebar({
                   <div className="sidebar-popover-container">
                     <button
                       ref={adminBtnRef}
-                      className="sidebar-action-btn"
+                      className={`sidebar-action-btn ${activeTab === 'users' ? 'active' : ''}`}
                       onClick={handleAdminToggle}
                       title="系统管理"
                     >
@@ -297,14 +297,14 @@ export default function AppSidebar({
                       >
                         <div className="flyout-header">系统管理</div>
                         <button
-                          className="popover-item"
+                          className={`popover-item ${activeTab === 'users' ? 'active' : ''}`}
                           onClick={() => {
                             setIsAdminFlyoutOpen(false);
-                            onOpenUserManagement && onOpenUserManagement();
+                            handleTabClick('users');
                           }}
                         >
                           <Users size={14} />
-                          <span>用户权限</span>
+                          <span>用户管理</span>
                         </button>
                         <button
                           className="popover-item"
@@ -434,14 +434,11 @@ export default function AppSidebar({
                 <>
                   <div className="drawer-group-title" style={{ marginTop: '1rem' }}>系统管理</div>
                   <button
-                    className="drawer-item"
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      onOpenUserManagement();
-                    }}
+                    className={`drawer-item ${activeTab === 'users' ? 'active' : ''}`}
+                    onClick={() => handleTabClick('users')}
                   >
                     <Users size={18} />
-                    <span>用户权限</span>
+                    <span>用户管理</span>
                   </button>
                   <button
                     className="drawer-item"

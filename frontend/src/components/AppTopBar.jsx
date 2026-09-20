@@ -51,6 +51,8 @@ export default function AppTopBar({
         return '平台充值汇总';
       case 'settlement':
         return '财务结算单';
+      case 'users':
+        return '用户管理';
       case 'ltv':
       default:
         return 'LTV核心报表';
@@ -81,49 +83,52 @@ export default function AppTopBar({
 
       {/* 右侧：全局过滤器 + 顶部最右侧的用户头像与用户名 */}
       <div className="topbar-right">
-        {/* 平台选择器 */}
-        {platformsList && platformsList.length > 0 && (
-          <div
-            className="topbar-filter-pill platform-pill"
-            title="数据源业务平台（默认：中文在线）"
-          >
-            <Globe size={15} color="#6366f1" />
-            <span className="pill-label" style={{ color: '#6366f1' }}>平台</span>
-            <CustomSelect
-              value={selectedPlatform || 'rocnovel'}
-              onChange={(val) => onSelectPlatform && onSelectPlatform(val)}
-              options={platformsList.map((p) => ({
-                label: p.name || p.code,
-                value: p.code
-              }))}
-              className="custom-select-sm"
-              style={{ width: '100%' }}
-            />
-          </div>
-        )}
+        {/* 报表页面专属过滤器：平台选择器与视图选择器 */}
+        {activeTab !== 'users' && (
+          <>
+            {platformsList && platformsList.length > 0 && (
+              <div
+                className="topbar-filter-pill platform-pill"
+                title="数据源业务平台（默认：中文在线）"
+              >
+                <Globe size={15} color="#6366f1" />
+                <span className="pill-label" style={{ color: '#6366f1' }}>平台</span>
+                <CustomSelect
+                  value={selectedPlatform || 'rocnovel'}
+                  onChange={(val) => onSelectPlatform && onSelectPlatform(val)}
+                  options={platformsList.map((p) => ({
+                    label: p.name || p.code,
+                    value: p.code
+                  }))}
+                  className="custom-select-sm"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            )}
 
-        {/* 账号视图选择器 */}
-        {canSwitchView && (
-          <div
-            className={`topbar-filter-pill view-pill ${isReadOnly ? 'readonly' : ''}`}
-            title={isReadOnly ? '只读模式：您正在查看其他被授权账户的数据视图' : '主视图：您正在查看当前登录账户的数据'}
-          >
-            <Eye size={15} color={isReadOnly ? '#f43f5e' : '#6366f1'} />
-            <span className="pill-label" style={{ color: isReadOnly ? '#f43f5e' : '#6366f1' }}>
-              视图
-            </span>
-            <CustomSelect
-              value={targetUserId || currentUser?.userId || ''}
-              onChange={(val) => onSelectTargetUser(Number(val))}
-              options={usersList.map((u) => {
-                const isSelfUser = u.isSelf || u.id === currentUser?.userId;
-                const labelText = isSelfUser ? u.username : `${u.username} (只读)`;
-                return { label: labelText, value: u.id };
-              })}
-              className="custom-select-sm"
-              style={{ width: '100%' }}
-            />
-          </div>
+            {canSwitchView && (
+              <div
+                className={`topbar-filter-pill view-pill ${isReadOnly ? 'readonly' : ''}`}
+                title={isReadOnly ? '只读模式：您正在查看其他被授权账户的数据视图' : '主视图：您正在查看当前登录账户的数据'}
+              >
+                <Eye size={15} color={isReadOnly ? '#f43f5e' : '#6366f1'} />
+                <span className="pill-label" style={{ color: isReadOnly ? '#f43f5e' : '#6366f1' }}>
+                  视图
+                </span>
+                <CustomSelect
+                  value={targetUserId || currentUser?.userId || ''}
+                  onChange={(val) => onSelectTargetUser(Number(val))}
+                  options={usersList.map((u) => {
+                    const isSelfUser = u.isSelf || u.id === currentUser?.userId;
+                    const labelText = isSelfUser ? u.username : `${u.username} (只读)`;
+                    return { label: labelText, value: u.id };
+                  })}
+                  className="custom-select-sm"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            )}
+          </>
         )}
 
         {/* 用户头像与用户名放置在顶部最右侧 */}
