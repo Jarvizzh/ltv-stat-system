@@ -17,6 +17,14 @@ import Login from './components/Login';
 import Toast from './components/Toast';
 import { DollarSign, TrendingUp, Users, Wallet, AlertTriangle, Calendar, Info, X } from 'lucide-react';
 
+const VALID_TABS = ['ltv', 'distribution', 'global-distribution', 'settlement', 'users'];
+
+const getTabFromHash = () => {
+  if (typeof window === 'undefined') return 'ltv';
+  const cleanHash = window.location.hash.replace(/^#\/?/, '').trim().toLowerCase();
+  return VALID_TABS.includes(cleanHash) ? cleanHash : 'ltv';
+};
+
 export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -109,7 +117,25 @@ export default function App() {
     });
   };
 
-  const [activeTab, setActiveTab] = useState('ltv'); // 'ltv' | 'distribution' | 'global-distribution' | 'settlement' | 'users'
+  const [activeTab, setActiveTab] = useState(() => getTabFromHash());
+
+  // 监听浏览器前进、后退以及直接在地址栏变更 URL hash
+  useEffect(() => {
+    const handleHashChange = () => {
+      const tab = getTabFromHash();
+      setActiveTab(tab);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // 保证 activeTab 变化时 URL hash 随之同步
+  useEffect(() => {
+    const currentHash = window.location.hash.replace(/^#\/?/, '').trim().toLowerCase();
+    if (currentHash !== activeTab) {
+      window.location.hash = `#/${activeTab}`;
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab === 'global-distribution' && !hasPermGlobalDistribution) {
@@ -446,6 +472,8 @@ export default function App() {
     setDistributionSummary(null);
     setGlobalDistributionData([]);
     setGlobalDistributionSummary(null);
+    setActiveTab('ltv');
+    window.location.hash = '#/ltv';
     showToast('已安全退出登录', 'info');
   };
 
