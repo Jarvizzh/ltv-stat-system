@@ -94,6 +94,10 @@ export default function UserManagementPage({ token, currentUser, onRefreshUsers,
     permVideoGen: 0,
   });
 
+  // 删除确认弹窗状态
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const expandedRowRef = useRef(null);
 
   const isSuperAdmin = currentUser && currentUser.role === 'SUPER_ADMIN';
@@ -408,23 +412,27 @@ export default function UserManagementPage({ token, currentUser, onRefreshUsers,
     }
   };
 
-  // 删除用户
-  const handleDeleteUser = async (user) => {
-    if (!window.confirm(`确定要彻底删除用户 "${user.username}" (ID: ${user.id}) 吗？此操作无法撤销。`)) return;
+  // 确认删除用户 (自定义弹窗)
+  const handleConfirmDelete = async () => {
+    if (!userToDelete) return;
+    setDeleteLoading(true);
     try {
-      const res = await fetch(`/api/admin/users/${user.id}`, {
+      const res = await fetch(`/api/admin/users/${userToDelete.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
       if (res.ok && data.code === 0) {
-        if (showToast) showToast('删除用户成功', 'success');
+        if (showToast) showToast(`成功删除用户 [${userToDelete.username}]`, 'success');
+        setUserToDelete(null);
         fetchUsers();
       } else {
         if (showToast) showToast(data.msg || '删除用户失败', 'error');
       }
     } catch (e) {
       if (showToast) showToast('删除用户异常', 'error');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -473,57 +481,6 @@ export default function UserManagementPage({ token, currentUser, onRefreshUsers,
 
   return (
     <div className="user-management-page" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '3rem' }}>
-      {/* 顶部标题栏与简介 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(6, 182, 212, 0.2))',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#6366f1',
-              border: '1px solid rgba(99, 102, 241, 0.3)'
-            }}>
-              <Users size={20} />
-            </div>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
-                用户管理
-              </h2>
-              <p style={{ margin: '0.15rem 0 0', fontSize: '0.82rem', color: 'var(--text-sub)' }}>
-                统一管理系统账号角色、主子账号汇总、多平台接入访问范围、只读视图跨账号授权及 6 项核心功能权限。
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={fetchUsers}
-            disabled={loading}
-            title="重新获取最新用户列表"
-            style={{ fontSize: '0.82rem', padding: '0.45rem 0.8rem', gap: '0.35rem' }}
-          >
-            <RefreshCw size={14} className={loading ? 'spin' : ''} />
-            <span>刷新</span>
-          </button>
-
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowAddForm(!showAddForm)}
-            style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem', gap: '0.35rem' }}
-          >
-            <UserPlus size={15} />
-            <span>{showAddForm ? '收起新增表单' : '新建用户'}</span>
-          </button>
-        </div>
-      </div>
-
       {/* 统计指标卡片 (Metric Summary Cards) */}
       <div className="stats-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
         <div className="stat-card" style={{ padding: '0.85rem 1rem' }}>
@@ -917,14 +874,14 @@ export default function UserManagementPage({ token, currentUser, onRefreshUsers,
         borderRadius: '0.5rem',
         border: '1px solid var(--border-color)'
       }}>
-        {/* 左侧：搜索输入框 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '220px', maxWidth: '360px' }}>
-          <div style={{ position: 'relative', width: '100%' }}>
+        {/* 左侧：搜索输入框 + 刷新与新建用户按钮 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', width: '240px' }}>
             <Search size={15} color="var(--text-sub)" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
               className="form-input"
-              style={{ paddingLeft: '2rem', fontSize: '0.82rem', height: '34px' }}
+              style={{ paddingLeft: '2rem', fontSize: '0.82rem', height: '34px', width: '100%' }}
               placeholder="搜索用户名或账号ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -939,6 +896,26 @@ export default function UserManagementPage({ token, currentUser, onRefreshUsers,
               </button>
             )}
           </div>
+
+          <button
+            className="btn btn-secondary"
+            onClick={fetchUsers}
+            disabled={loading}
+            title="重新获取最新用户列表"
+            style={{ fontSize: '0.82rem', padding: '0.45rem 0.8rem', gap: '0.35rem', height: '34px', whiteSpace: 'nowrap' }}
+          >
+            <RefreshCw size={14} className={loading ? 'spin' : ''} />
+            <span>刷新</span>
+          </button>
+
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowAddForm(!showAddForm)}
+            style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem', gap: '0.35rem', height: '34px', whiteSpace: 'nowrap' }}
+          >
+            <UserPlus size={15} />
+            <span>{showAddForm ? '收起新增表单' : '新建用户'}</span>
+          </button>
         </div>
 
         {/* 右侧：角色筛选、类型筛选、结算筛选 */}
@@ -1303,10 +1280,16 @@ export default function UserManagementPage({ token, currentUser, onRefreshUsers,
 
                           <button
                             className="btn btn-danger"
-                            style={{ padding: '0.25rem 0.45rem', fontSize: '0.75rem' }}
+                            style={{
+                              padding: '0.25rem 0.45rem',
+                              fontSize: '0.75rem',
+                              background: 'rgba(244, 63, 94, 0.12)',
+                              color: '#f43f5e',
+                              border: '1px solid rgba(244, 63, 94, 0.25)'
+                            }}
                             title={isCurrentSelf ? '不可删除当前登录账号' : '彻底删除该用户'}
                             disabled={isCurrentSelf}
-                            onClick={() => handleDeleteUser(u)}
+                            onClick={() => setUserToDelete(u)}
                           >
                             <Trash2 size={13} />
                           </button>
@@ -1676,6 +1659,92 @@ export default function UserManagementPage({ token, currentUser, onRefreshUsers,
           </tbody>
         </table>
       </div>
+
+      {/* 删除确认弹窗 (替代原生 alert/confirm) */}
+      {userToDelete && (
+        <div className="modal-overlay" onClick={() => !deleteLoading && setUserToDelete(null)}>
+          <div
+            className="modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '420px', width: '90%', padding: '1.75rem' }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '1rem' }}>
+              <div
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '50%',
+                  background: 'rgba(244, 63, 94, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid rgba(244, 63, 94, 0.25)',
+                  boxShadow: '0 0 20px rgba(244, 63, 94, 0.15)',
+                }}
+              >
+                <Trash2 size={26} color="#f43f5e" />
+              </div>
+
+              <div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                  删除用户确认
+                </h3>
+                <p style={{ fontSize: '0.9rem', color: 'var(--text-sub)', lineHeight: '1.6', margin: 0 }}>
+                  确定要彻底删除用户{' '}
+                  <span style={{ color: '#f43f5e', fontWeight: 600 }}>
+                    "{userToDelete.username}"
+                  </span>{' '}
+                  (ID: {userToDelete.id}) 吗？
+                </p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.35rem', marginBottom: 0 }}>
+                  ⚠️ 此操作不可撤销，该账号的所有权限配置与关联关系将同步清除。
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', width: '100%', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '0.65rem 1rem', fontSize: '0.9rem', justifyContent: 'center' }}
+                  onClick={() => setUserToDelete(null)}
+                  disabled={deleteLoading}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{
+                    flex: 1,
+                    padding: '0.65rem 1rem',
+                    fontSize: '0.9rem',
+                    justifyContent: 'center',
+                    background: 'linear-gradient(135deg, #f43f5e, #e11d48)',
+                    color: '#ffffff',
+                    border: 'none',
+                    boxShadow: '0 4px 12px rgba(244, 63, 94, 0.35)',
+                    gap: '0.4rem'
+                  }}
+                  onClick={handleConfirmDelete}
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? (
+                    <>
+                      <RefreshCw size={15} className="spin" />
+                      <span>正在删除...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={15} />
+                      <span>彻底删除</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

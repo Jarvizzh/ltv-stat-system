@@ -1234,6 +1234,18 @@ body {
   border-color: var(--border-light);
 }
 
+.btn-danger {
+  background: rgba(244, 63, 94, 0.12);
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.25);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(244, 63, 94, 0.22);
+  color: #fb7185;
+  border-color: rgba(244, 63, 94, 0.45);
+}
+
 .btn:disabled,
 .btn-secondary:disabled,
 .btn-primary:disabled,
