@@ -87,6 +87,14 @@ export default function App() {
   }, []);
 
   const [targetUserId, setTargetUserId] = useState(() => {
+    const sessionTarget = sessionStorage.getItem('admin_target_user_id');
+    if (sessionTarget && !isNaN(Number(sessionTarget))) {
+      return Number(sessionTarget);
+    }
+    const localTarget = localStorage.getItem('admin_target_user_id');
+    if (localTarget && !isNaN(Number(localTarget))) {
+      return Number(localTarget);
+    }
     const uid = localStorage.getItem('admin_user_id');
     return uid ? Number(uid) : 1;
   });
@@ -211,6 +219,10 @@ export default function App() {
       localStorage.removeItem('admin_username');
       localStorage.removeItem('admin_role');
       localStorage.removeItem('admin_user_id');
+      localStorage.removeItem('admin_selected_platform');
+      sessionStorage.removeItem('admin_selected_platform');
+      localStorage.removeItem('admin_target_user_id');
+      sessionStorage.removeItem('admin_target_user_id');
       setIsAuthenticated(false);
       showToast('未登录或登录凭证已过 3 天有效期，请重新登录', 'warning');
       throw new Error('UNAUTHORIZED');
@@ -224,8 +236,19 @@ export default function App() {
     try {
       const res = await authFetch('/api/user/visible-accounts');
       const json = await res.json();
-      if (json.code === 0 && Array.isArray(json.data)) {
+      if (json.code === 0 && Array.isArray(json.data) && json.data.length > 0) {
         setUsersList(json.data);
+        const savedTarget = sessionStorage.getItem('admin_target_user_id') || localStorage.getItem('admin_target_user_id');
+        if (savedTarget) {
+          const targetIdNum = Number(savedTarget);
+          const isAllowed = json.data.some(u => u.id === targetIdNum);
+          if (!isAllowed) {
+            const fallbackUid = currentUser?.userId || Number(localStorage.getItem('admin_user_id')) || json.data[0].id;
+            setTargetUserId(fallbackUid);
+            sessionStorage.setItem('admin_target_user_id', String(fallbackUid));
+            localStorage.setItem('admin_target_user_id', String(fallbackUid));
+          }
+        }
       }
     } catch (e) {
       console.error('Failed to fetch visible accounts:', e);
@@ -389,6 +412,8 @@ export default function App() {
 
   const handleSelectTargetUser = (newUserId) => {
     setTargetUserId(newUserId);
+    sessionStorage.setItem('admin_target_user_id', String(newUserId));
+    localStorage.setItem('admin_target_user_id', String(newUserId));
     // 切换视图时清空上一视图数据并触发数据自动刷新
     setData([]);
     setDistributionData([]);
@@ -423,6 +448,8 @@ export default function App() {
     };
     setCurrentUser(userObj);
     setTargetUserId(newUid);
+    sessionStorage.setItem('admin_target_user_id', String(newUid));
+    localStorage.setItem('admin_target_user_id', String(newUid));
 
     // 清空上一个账号的数据缓存
     setData([]);
@@ -460,6 +487,8 @@ export default function App() {
     localStorage.removeItem('admin_user_id');
     localStorage.removeItem('admin_selected_platform');
     sessionStorage.removeItem('admin_selected_platform');
+    localStorage.removeItem('admin_target_user_id');
+    sessionStorage.removeItem('admin_target_user_id');
     setIsAuthenticated(false);
     setCurrentUser(null);
     setIsLogoutModalOpen(false);
